@@ -39,6 +39,7 @@ default-members = [
     "crates/sensors",
     "crates/serial-words",
     "crates/settings",
+    "crates/snapshot",
     "crates/share-windows",
     "crates/state",
     "crates/service-windows",
@@ -71,6 +72,7 @@ guesthouse-app-core = { path = "crates/app-core" }
 guesthouse-frame-socket = { path = "crates/frame-socket" }
 guesthouse-sensors = { path = "crates/sensors" }
 guesthouse-settings-core = { path = "crates/settings" }
+guesthouse-snapshot-core = { path = "crates/snapshot" }
 guesthouse-state-core = { path = "crates/state" }
 guesthouse-jail = { path = "crates/jail" }
 guesthouse-card-check = { path = "tools/card-check" }

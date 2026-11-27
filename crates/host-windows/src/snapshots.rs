@@ -16,17 +16,15 @@
 //! The disk work is behind [`Disks`], so all of this is tested without Windows.
 
 use crate::record::Record;
-use serde::{Deserialize, Serialize};
+use guesthouse_snapshot_core::windows_host::{
+    Entry, INDEX, Index, NEW_INDEX, chain_in, folder, index_text, links_in, read_index, shown, snapshot_disk,
+};
+pub use guesthouse_snapshot_core::windows_host::{
+    LONGEST_LABEL, MOST, Snapshot, checked_label, count_refusal,
+};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-
-/// The folder beside a machine's disk that holds its snapshots.
-const FOLDER: &str = "snapshots";
-const INDEX: &str = "index.json";
-/// The most snapshots a machine shows, and the longest a label is.
-pub const MOST: usize = 32;
-pub const LONGEST_LABEL: usize = 60;
 
 /// What's asked of virtual disks.
 pub trait Disks {
@@ -44,54 +42,6 @@ pub trait Disks {
     fn parent_of(&self, child: &Path) -> Result<PathBuf, String>;
 }
 
-/// A snapshot as the app is told of it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
-    pub id: u64,
-    pub label: String,
-    /// When it was taken, in seconds since 1970 in UTC.
-    pub taken: u64,
-    /// Whether the machine's disk is made on it, as it is just after it's taken or gone back to.
-    pub current: bool,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-struct Index {
-    #[serde(default)]
-    snapshots: Vec<Entry>,
-    /// The snapshot the machine's disk is made on, if any.
-    #[serde(default)]
-    current: Option<u64>,
-    #[serde(default)]
-    next_id: u64,
-    /// A snapshot being taken, until it's done, so a crash between moving the disk and making the new
-    /// one can be put right.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    taking: Option<Entry>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct Entry {
-    id: u64,
-    label: String,
-    taken: u64,
-    /// The snapshot its disk is made on, if any.
-    parent: Option<u64>,
-    /// Deleted, and kept only while a disk is made on it.
-    #[serde(default)]
-    hidden: bool,
-}
-
-fn folder(disk: &Path) -> PathBuf {
-    disk.parent().unwrap_or(Path::new(".")).join(FOLDER)
-}
-
-/// A snapshot's disk. Its firmware state and record sit beside it, named as the machine's are
-/// beside its disk.
-fn snapshot_disk(disk: &Path, id: u64) -> PathBuf {
-    folder(disk).join(format!("{id}.vhdx"))
-}
-
 fn state_file(disk: &Path) -> PathBuf {
     disk.with_extension("vmgs")
 }
@@ -99,7 +49,7 @@ fn state_file(disk: &Path) -> PathBuf {
 fn load(disk: &Path) -> Result<Index, String> {
     let path = folder(disk).join(INDEX);
     match fs::read_to_string(&path) {
-        Ok(text) => serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display())),
+        Ok(text) => read_index(&text).map_err(|error| format!("{}: {error}", path.display())),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(Index::default()),
         Err(error) => Err(format!("{}: {error}", path.display())),
     }
@@ -109,9 +59,8 @@ fn save(disk: &Path, index: &Index) -> Result<(), String> {
     let folder = folder(disk);
     fs::create_dir_all(&folder).map_err(|error| format!("{}: {error}", folder.display()))?;
     let path = folder.join(INDEX);
-    let new = folder.join("index.new.json");
-    let text = serde_json::to_string_pretty(index).expect("an index always serialises");
-    fs::write(&new, text + "\n").map_err(|error| format!("{}: {error}", new.display()))?;
+    let new = folder.join(NEW_INDEX);
+    fs::write(&new, index_text(index)).map_err(|error| format!("{}: {error}", new.display()))?;
     fs::rename(&new, &path).map_err(|error| format!("{}: {error}", path.display()))
 }
 
@@ -134,39 +83,13 @@ fn rename(from: &Path, to: &Path) -> Result<(), String> {
 
 /// The machine's snapshots, oldest first, without those deleted.
 pub fn list(disk: &Path) -> Result<Vec<Snapshot>, String> {
-    let index = load(disk)?;
-    Ok(index
-        .snapshots
-        .iter()
-        .filter(|entry| !entry.hidden)
-        .map(|entry| Snapshot {
-            id: entry.id,
-            label: entry.label.clone(),
-            taken: entry.taken,
-            current: index.current == Some(entry.id),
-        })
-        .collect())
+    Ok(shown(&load(disk)?))
 }
 
 /// The disks the machine's disk is made on, nearest first, which a machine must be able to open as
 /// it does its own.
 pub fn chain(disk: &Path) -> Result<Vec<PathBuf>, String> {
-    let index = load(disk)?;
-    let mut disks = Vec::new();
-    let mut next = index.current;
-    while let Some(id) = next {
-        let entry = index
-            .snapshots
-            .iter()
-            .find(|entry| entry.id == id)
-            .ok_or_else(|| format!("The snapshot index names a snapshot {id} it doesn't have."))?;
-        disks.push(snapshot_disk(disk, id));
-        next = entry.parent;
-        if disks.len() > index.snapshots.len() {
-            return Err("The snapshot index goes round in a circle.".into());
-        }
-    }
-    Ok(disks)
+    chain_in(&load(disk)?, disk)
 }
 
 /// Every disk of the machine that's made on another, each with the one it's made on: the machine's
@@ -174,16 +97,7 @@ pub fn chain(disk: &Path) -> Result<Vec<PathBuf>, String> {
 /// there while another is made on them, and those of another line of snapshots do too, which the
 /// machine's chain doesn't pass through.
 pub fn links(disk: &Path) -> Result<Vec<(PathBuf, PathBuf)>, String> {
-    let index = load(disk)?;
-    let mut links: Vec<(PathBuf, PathBuf)> = index
-        .snapshots
-        .iter()
-        .filter_map(|entry| Some((snapshot_disk(disk, entry.id), snapshot_disk(disk, entry.parent?))))
-        .collect();
-    if let Some(current) = index.current {
-        links.push((disk.to_owned(), snapshot_disk(disk, current)));
-    }
-    Ok(links)
+    Ok(links_in(&load(disk)?, disk))
 }
 
 /// Puts right what a machine's folder holds that says where the folder is, after the whole folder
