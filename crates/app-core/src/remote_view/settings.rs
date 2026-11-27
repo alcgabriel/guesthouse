@@ -5,8 +5,9 @@ use crate::failure::Failure;
 use crate::processes::qemu_pid;
 use guesthouse_daemon::slot::Slot;
 use guesthouse_jail::launch::start_time;
+use guesthouse_relay::LanSettings;
 use std::fmt;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -116,6 +117,19 @@ impl Settings {
         })
     }
 
+    /// What the network side starts with: QEMU's loopback forward upstream.
+    pub fn lan(&self) -> LanSettings {
+        LanSettings {
+            machine: self.machine.clone(),
+            upstream: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), self.loopback_port),
+            listen: self.listen,
+            idle_timeout: self.idle_timeout,
+            max_clients: self.max_clients,
+            name: self.name.clone(),
+            fingerprint: self.fingerprint.clone(),
+        }
+    }
+
     pub fn arguments(&self) -> Vec<String> {
         let mut words = vec![self.machine.clone(), RUN_FOLDER.into(), self.run_folder.display().to_string()];
         words.extend([LOOPBACK_PORT.to_owned(), self.loopback_port.to_string()]);
@@ -222,6 +236,17 @@ mod tests {
             ..full()
         };
         assert_eq!(Settings::parse(bare.arguments()), Ok(bare));
+    }
+
+    #[test]
+    fn the_network_side_goes_to_qemus_loopback_forward_with_the_rest_as_given() {
+        let lan = full().lan();
+        assert_eq!(lan.upstream, "127.0.0.1:19067".parse().unwrap());
+        assert_eq!(
+            (lan.machine.as_str(), lan.listen, lan.idle_timeout, lan.max_clients),
+            ("win11", Some("192.168.1.20:7800".parse().unwrap()), Some(Duration::from_secs(30)), Some(8))
+        );
+        assert_eq!((lan.name, lan.fingerprint), (Some("Windows 11".into()), Some("ab".repeat(32))));
     }
 
     #[test]

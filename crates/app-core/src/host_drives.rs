@@ -21,8 +21,6 @@ use std::process::Command;
 pub const FIRST_DRIVE_FD: RawFd = 40;
 /// A sysfs size is always in these, whatever the drive's own sectors are.
 const SECTOR_BYTES: u64 = 512;
-/// Drives are sold in thousands, not in powers of two.
-const KB: f64 = 1000.0;
 /// Folders in sysfs that aren't drives anyone gives a VM: loop devices, RAM disks, volumes made of
 /// others, and optical drives.
 const NOT_OFFERED: [&str; 6] = ["loop", "ram", "zram", "dm-", "md", "sr"];
@@ -52,14 +50,7 @@ pub struct HostDrive {
 impl HostDrive {
     /// Its size as the maker would say it, as `1.0 TB` or `500 GB`.
     pub fn size_text(&self) -> String {
-        let bytes = self.bytes as f64;
-        if bytes >= KB.powi(4) {
-            format!("{:.1} TB", bytes / KB.powi(4))
-        } else if bytes >= KB.powi(3) {
-            format!("{:.0} GB", bytes / KB.powi(3))
-        } else {
-            format!("{:.0} MB", bytes / KB.powi(2))
-        }
+        guesthouse_basics::words::size_as_maker_says(self.bytes)
     }
 
     /// What to call it: its make and size.

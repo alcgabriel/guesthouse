@@ -9,6 +9,7 @@
 //! place that fails the check, or isn't there, is a problem the machine is listed with.
 
 use guesthouse_control::{Card, Forward, NetworkMode, Share, valid_name};
+use guesthouse_remote_view_core::switch::SWITCH_FILE;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::BTreeMap;
@@ -25,8 +26,9 @@ const INSTALLER: &str = "installer.iso";
 /// A machine's events, a line each, and the log before it when this one grew too long.
 pub const EVENTS: &str = "events.log";
 pub const EVENTS_BEFORE: &str = "events.1.log";
-/// What stays in a machine's own folder when its disks are somewhere else.
-pub const OWN_FILES: [&str; 4] = [SETTINGS, LOCATION, EVENTS, EVENTS_BEFORE];
+/// What stays in a machine's own folder when its disks are somewhere else: the service's own files,
+/// its remote view's switch among them, which are never moved or counted as disks.
+pub const OWN_FILES: [&str; 5] = [SETTINGS, LOCATION, EVENTS, EVENTS_BEFORE, SWITCH_FILE];
 
 /// Something kept for as long as it's held, such as a folder opened so it can't be moved.
 pub type Held = Box<dyn Any + Send>;

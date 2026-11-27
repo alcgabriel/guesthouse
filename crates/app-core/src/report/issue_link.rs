@@ -2,14 +2,13 @@
 //! words and a few lines of the app's own log. It's only ever offered: the tester decides whether to
 //! open it, and can change anything in it before posting.
 //!
-//! Nothing from QEMU or the guest goes in it, as the issue is public.
+//! Nothing from QEMU or the guest goes in it, as the issue is public. The link is made as every
+//! host's is, by `guesthouse-report-core`, with this host's words and log in it. Which lines of the
+//! log are the app's own is this host's to say, as only it knows its log.
 
-use super::endpoint::NEW_ISSUE;
-use super::summary::{self, Summary};
+/// The link. The excerpt is cut first, from its oldest line, and then the description, until it fits.
+pub use guesthouse_report_core::issue::issue_link_with_words as issue_link;
 
-/// GitHub answered issue links of up to about 6,900 characters, and failed with a server error from
-/// about 7,000, when this was measured without being signed in. This leaves room below that.
-const MOST_LINK_CHARS: usize = 6000;
 /// About this many lines of the log, around the failure.
 const EXCERPT_LINES: usize = 20;
 /// Lines of the log after the failure, which say what the app did about it.
@@ -46,17 +45,6 @@ const OWN_SPEAKERS: [&str; 21] = [
 ];
 /// Words that mean a line quotes QEMU or the guest, whoever wrote it.
 const GUEST_WORDS: [&str; 4] = ["last words", "qemu-system", "the guest said", "serial"];
-/// The facts worth a line in the issue, in the order they read best.
-const FACTS: [&str; 8] = [
-    summary::KIND,
-    summary::VERSION,
-    summary::CARD,
-    summary::DRIVER,
-    summary::DISTRO,
-    summary::KERNEL,
-    summary::SESSION,
-    summary::MACHINE,
-];
 
 /// The lines around the last failure in the app's log, or its last lines if nothing failed, with any
 /// line that carries QEMU's or the guest's words left out. `log` must already be scrubbed.
@@ -81,63 +69,11 @@ fn is_own_line(line: &str) -> bool {
     timed && OWN_SPEAKERS.contains(&speaker) && !GUEST_WORDS.iter().any(|word| lower.contains(word))
 }
 
-/// The link. The excerpt is cut first, from its oldest line, and then the description, until it fits.
-pub fn issue_link(report_id: &str, summary: &Summary, description: &str, excerpt: &[String]) -> String {
-    let title = format!("Report {report_id}");
-    let mut excerpt = excerpt.to_vec();
-    let mut description: String = description.trim().to_owned();
-    loop {
-        let link = format!(
-            "{NEW_ISSUE}?title={}&body={}",
-            percent_encode(&title),
-            percent_encode(&body(report_id, summary, &description, &excerpt))
-        );
-        if link.len() <= MOST_LINK_CHARS {
-            return link;
-        }
-        if !excerpt.is_empty() {
-            excerpt.remove(0);
-        } else if !description.is_empty() {
-            let keep = description.chars().count() * 3 / 4;
-            description = description.chars().take(keep).collect();
-        } else {
-            return format!("{NEW_ISSUE}?title={}", percent_encode(&title));
-        }
-    }
-}
-
-fn body(report_id: &str, summary: &Summary, description: &str, excerpt: &[String]) -> String {
-    let mut text = format!("Report ID: {report_id}\n\n");
-    for key in FACTS {
-        if let Some(value) = summary.get(key) {
-            text.push_str(&format!("- {key}: {value}\n"));
-        }
-    }
-    if !description.is_empty() {
-        text.push_str(&format!("\n## What went wrong\n\n{description}\n"));
-    }
-    if !excerpt.is_empty() {
-        text.push_str(&format!("\n## The app's log\n\n```\n{}\n```\n", excerpt.join("\n")));
-    }
-    text
-}
-
-/// Everything but the characters a URL leaves alone is written as `%` and its bytes in hex.
-fn percent_encode(text: &str) -> String {
-    let mut encoded = String::with_capacity(text.len() * 3);
-    for byte in text.bytes() {
-        if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
-            encoded.push(byte.into());
-        } else {
-            encoded.push_str(&format!("%{byte:02X}"));
-        }
-    }
-    encoded
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::report::summary::{self, Summary};
+    use guesthouse_report_core::issue::MOST_LINK_CHARS;
 
     fn summary() -> Summary {
         let mut summary = Summary::default();

@@ -1,0 +1,16 @@
+[127019 bytes left out at the start]
+DEBUG [     1985] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1986] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1987] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1988] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1989] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1990] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1991] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1992] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1993] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1994] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1995] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1996] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1997] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1998] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1999] message Some(QueryAdapter) process=0x400012c0

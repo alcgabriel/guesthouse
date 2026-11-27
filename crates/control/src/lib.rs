@@ -16,6 +16,7 @@ pub mod screen;
 pub mod updates;
 
 pub use events::{Event, State};
+pub use guesthouse_remote_view_core::share::ShareInfo;
 
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, Read, Write};
@@ -77,6 +78,37 @@ pub enum Request {
     /// `ReportPart` lines, or `ReportMissing` if it couldn't be read, then `Done`. The service only
     /// hands them over. The app scrubs, packs and sends them.
     ReportFiles { machine: Option<String> },
+    /// Turns a machine's viewing from other devices on or off (`on`), and answers with `Share`.
+    /// Without `on` it changes nothing and answers the same. It works whether the machine runs or
+    /// not; a running machine opens or closes at once. Turning it off never cuts Guesthouse's own
+    /// window onto the machine. `pairing` opens (or closes) pairing for `pairing_seconds`, the
+    /// shared crate's default when not said.
+    Share {
+        name: String,
+        #[serde(default)]
+        on: Option<bool>,
+        #[serde(default)]
+        pairing: Option<bool>,
+        #[serde(default)]
+        pairing_seconds: Option<u32>,
+    },
+    /// Where a machine's viewing from other devices stands now, answered with `Share`. The app asks
+    /// it every few seconds while it shows it.
+    RemoteView { name: String },
+    /// Closes an open pairing at once. A device waiting is turned away. Answered with `Share`.
+    PairClose { name: String },
+    /// Lets in the device waiting to pair, whose code the person compared. Its clipboard and files
+    /// go off as soon as it's seen. Answered with `Share`.
+    PairAccept { name: String },
+    /// Turns away the device waiting to pair. Answered with `Share`.
+    PairDecline { name: String },
+    /// Allows or refuses a paired device one thing: `what` is `input` (control; off is view-only),
+    /// `clipboard`, `files`, `sound`, `mic` or `camera`. Answered with `Share`. There is no
+    /// `device_drop` on this host: remoteman's `drop` cuts whichever device leads, which may be
+    /// Guesthouse's own window.
+    DeviceAllow { name: String, fingerprint: String, what: String, on: bool },
+    /// Stops trusting a device: it's disconnected and has to pair again. Answered with `Share`.
+    DeviceRevoke { name: String, fingerprint: String },
 }
 
 /// What a machine is given at each boot, which can be changed while it's off.
@@ -273,9 +305,7 @@ pub fn valid_user(name: &str) -> bool {
 
 /// The `ssh` line that reaches an Ubuntu guest through the port the service listens on, on this PC's
 /// loopback, which needs no network in the guest.
-pub fn ssh_line(port: u16, user: &str) -> String {
-    format!("ssh -p {port} {user}@127.0.0.1")
-}
+pub use guesthouse_basics::words::ssh_line;
 
 /// Whether `edition` can name an edition: Windows' editions are letters, digits and spaces.
 pub fn valid_edition(edition: &str) -> bool {
@@ -344,6 +374,12 @@ pub enum Answer {
         viewer_certificate: String,
         viewer_key: String,
     },
+    /// Where a machine's viewing from other devices stands, for `Share` and `RemoteView`. The
+    /// address a device types in is this PC's on its network with `info.port`; the app finds it
+    /// itself with `guesthouse_relay::lan_address`, as the user, since it's the same PC's.
+    Share {
+        info: ShareInfo,
+    },
 }
 
 /// A machine as the service sees it.
@@ -403,6 +439,13 @@ pub struct Machine {
     pub working: Option<String>,
     /// The address the guest last reported, for Remote Desktop or SSH.
     pub address: Option<String>,
+    /// Whether it may be viewed from other devices while it runs. A service from before this says
+    /// nothing, which reads as off.
+    #[serde(default)]
+    pub remote_view: bool,
+    /// Its port on this PC's network for that, which it keeps once given, on or off.
+    #[serde(default)]
+    pub remote_port: Option<u16>,
 }
 
 /// One of a machine's snapshots.
@@ -544,6 +587,94 @@ mod tests {
         .unwrap();
         assert!(made.tpm && made.network && made.shares.is_empty() && made.user.is_empty());
         assert_eq!(made.folder, None, "an older app's machine is kept where machines always were");
+    }
+
+    #[test]
+    fn remote_view_is_asked_for_with_the_other_hosts_words_and_an_older_app_still_reads() {
+        let share: Request =
+            serde_json::from_value(json!({"ask": "share", "name": "win", "on": true})).unwrap();
+        assert_eq!(
+            share,
+            Request::Share { name: "win".into(), on: Some(true), pairing: None, pairing_seconds: None }
+        );
+        let asked: Request = serde_json::from_value(json!({"ask": "share", "name": "win"})).unwrap();
+        assert_eq!(
+            asked,
+            Request::Share { name: "win".into(), on: None, pairing: None, pairing_seconds: None }
+        );
+        assert_eq!(
+            serde_json::to_value(Request::Share {
+                name: "win".into(),
+                on: None,
+                pairing: Some(true),
+                pairing_seconds: Some(120)
+            })
+            .unwrap(),
+            json!({"ask": "share", "name": "win", "on": null, "pairing": true, "pairing_seconds": 120})
+        );
+        assert_eq!(
+            serde_json::to_value(Request::RemoteView { name: "win".into() }).unwrap(),
+            json!({"ask": "remote_view", "name": "win"})
+        );
+        let info = ShareInfo { port: Some(7792), ..ShareInfo::off("win") };
+        let answer = serde_json::to_value(Answer::Share { info: info.clone() }).unwrap();
+        assert_eq!(
+            (&answer["answer"], &answer["info"]["port"], &answer["info"]["state"]),
+            (&json!("share"), &json!(7792), &json!("off"))
+        );
+        assert_eq!(serde_json::from_value::<Answer>(answer).unwrap(), Answer::Share { info });
+    }
+
+    #[test]
+    fn pairing_and_devices_are_asked_for_with_the_other_hosts_words() {
+        for (request, json) in [
+            (Request::PairClose { name: "win".into() }, json!({"ask": "pair_close", "name": "win"})),
+            (Request::PairAccept { name: "win".into() }, json!({"ask": "pair_accept", "name": "win"})),
+            (Request::PairDecline { name: "win".into() }, json!({"ask": "pair_decline", "name": "win"})),
+            (
+                Request::DeviceAllow {
+                    name: "win".into(),
+                    fingerprint: "ab".repeat(32),
+                    what: "clipboard".into(),
+                    on: true,
+                },
+                json!({"ask": "device_allow", "name": "win", "fingerprint": "ab".repeat(32), "what": "clipboard", "on": true}),
+            ),
+            (
+                Request::DeviceRevoke { name: "win".into(), fingerprint: "ab".repeat(32) },
+                json!({"ask": "device_revoke", "name": "win", "fingerprint": "ab".repeat(32)}),
+            ),
+        ] {
+            assert_eq!(serde_json::to_value(&request).unwrap(), json);
+            assert_eq!(serde_json::from_value::<Request>(json).unwrap(), request);
+        }
+        assert!(serde_json::from_value::<Request>(json!({"ask": "device_drop", "name": "win"})).is_err());
+    }
+
+    #[test]
+    fn a_machines_remote_view_is_listed_and_an_older_service_says_off() {
+        let older = json!({
+            "name": "win", "system": "windows", "state": "running", "set_up": true, "memory_mb": 8192,
+            "processors": 4, "card": null, "address": "172.29.1.2"
+        });
+        let machine: Machine = serde_json::from_value(older.clone()).unwrap();
+        assert_eq!((machine.remote_view, machine.remote_port), (false, None));
+        let on = Machine { remote_view: true, remote_port: Some(7793), ..machine };
+        let listed = serde_json::to_value(&on).unwrap();
+        assert_eq!((&listed["remote_view"], &listed["remote_port"]), (&json!(true), &json!(7793)));
+        // An app from before these, which reads a machine with only the fields it knows, still reads
+        // the listing.
+        #[derive(Deserialize)]
+        struct Older {
+            name: String,
+            state: State,
+            address: Option<String>,
+        }
+        let read: Older = serde_json::from_value(listed).unwrap();
+        assert_eq!(
+            (read.name.as_str(), read.state, read.address.as_deref()),
+            ("win", State::Running, Some("172.29.1.2"))
+        );
     }
 
     #[test]

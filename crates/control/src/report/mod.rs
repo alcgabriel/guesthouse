@@ -2,29 +2,27 @@
 //! same server the Linux host's reports go to, so what's on the wire is the same. The service only
 //! hands over its files. It never builds or sends a report.
 //!
-//! - `contract` holds what the server and the Linux host agree on, pinned to the Linux sources.
-//! - `answer` reads the server's answer to a sent report.
+//! Most of it is `guesthouse-report-core`'s, which every host shares, and is re-exported here under
+//! the names it had:
+//!
+//! - `contract` is what the server and every host agree on, and `answer` reads its answer.
 //! - `kind` and `summary` are what sorts a report before anyone opens it.
-//! - `parts` is how the service's files come over the pipe, and are put back together.
-//! - `stage` makes the files from what was gathered, `send` is how they are posted, and `issue` is
-//!   the link that opens an issue about a sent report.
+//! - `send` is how a report is posted, and `issue` the link that opens an issue about a sent one.
 //! - `clock` writes times in UTC.
 //! - `scrub` and `trim` make each file fit to send, and `manifest` says what the bundle holds.
 //!
+//! Two parts are this host's own: `parts` is how the service's files come over the pipe, and are
+//! put back together, and `stage` makes the files from what was gathered.
+//!
 //! Nothing here calls into Windows, so it builds and is tested anywhere.
 
-pub mod answer;
-pub mod clock;
-pub mod contract;
-pub mod issue;
-pub mod kind;
-pub mod manifest;
 pub mod parts;
-pub mod scrub;
-pub mod send;
 pub mod stage;
-pub mod summary;
-pub mod trim;
+
+// The pieces every host shares, under the names they had here.
+pub use guesthouse_report_core::{
+    answer, clock, contract, issue, kind, manifest, scrub, send, summary, trim,
+};
 
 pub use answer::read_answer;
 pub use contract::{KEPT_DAYS, MOST_REPORT_BYTES, NEW_ISSUE, report_address};

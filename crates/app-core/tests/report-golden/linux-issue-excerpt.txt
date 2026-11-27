@@ -1,0 +1,4 @@
+10:00:01 app: could not read ~/.config/guesthouse/app.json
+10:00:13 start Starting the VM
+10:00:14 app: The VM did not start: something is still running.
+10:00:16 stop it stopped
