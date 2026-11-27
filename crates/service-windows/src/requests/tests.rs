@@ -1195,6 +1195,7 @@ mod network;
 mod pairing;
 mod places;
 mod remote_view;
+mod remote_view_ports;
 mod snapshot_labels;
 mod start_refusals;
 use network::FakeNet;
