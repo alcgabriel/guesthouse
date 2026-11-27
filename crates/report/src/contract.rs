@@ -1,5 +1,5 @@
-//! What a report's sender and the report server agree on. Each value is the Linux host's, and a test
-//! reads the Linux sources, so the two can't drift apart.
+//! What a report's sender and the report server agree on. Every host sends with these, so one server
+//! takes them all.
 
 /// The drop box that takes reports for several projects, each under its own name.
 pub const ADDRESS: &str = "https://files.ruxn.com/r/";
@@ -35,36 +35,34 @@ pub fn report_address() -> String {
 mod tests {
     use super::*;
 
-    const ENDPOINT: &str = include_str!("../../../app-core/src/report/endpoint.rs");
-    const SEND: &str = include_str!("../../../app-core/src/report/send.rs");
-    const BUNDLE: &str = include_str!("../../../app-core/src/report/bundle.rs");
+    // The hosts each had their own copy of these, and a test read the Linux sources so the two
+    // couldn't drift. Now there's one copy, so each value is pinned here instead.
 
     #[test]
     fn the_address_is_the_linux_hosts() {
-        assert!(ENDPOINT.contains(&format!("const ADDRESS: &str = \"{ADDRESS}\";")));
-        assert!(ENDPOINT.contains(&format!("const PROJECT: &str = \"{PROJECT}\";")));
-        assert!(ENDPOINT.contains(&format!("const ADDRESS_VARIABLE: &str = \"{ADDRESS_VARIABLE}\";")));
-        assert!(ENDPOINT.contains(&format!("pub const NEW_ISSUE: &str = \"{NEW_ISSUE}\";")));
+        assert_eq!(ADDRESS, "https://files.ruxn.com/r/");
+        assert_eq!(PROJECT, "guesthouse");
+        assert_eq!(ADDRESS_VARIABLE, "GUESTHOUSE_REPORT_ADDRESS");
+        assert_eq!(NEW_ISSUE, "https://github.com/ruxnlabs/guesthouse/issues/new");
     }
 
     #[test]
     fn the_limits_are_the_linux_hosts() {
-        assert!(ENDPOINT.contains("pub const MOST_REPORT_BYTES: u64 = 50_000_000;"));
         assert_eq!(MOST_REPORT_BYTES, 50_000_000);
-        assert!(ENDPOINT.contains(&format!("pub const KEPT_DAYS: u32 = {KEPT_DAYS};")));
+        assert_eq!(KEPT_DAYS, 30);
     }
 
     #[test]
     fn the_format_and_headers_are_the_linux_hosts() {
-        assert!(BUNDLE.contains(&format!("pub const FORMAT: &str = \"{FORMAT}\";")));
-        assert!(SEND.contains(&format!("\"{FORMAT_HEADER}: {{FORMAT}}\"")));
-        assert!(SEND.contains(&format!("\"{SUMMARY_HEADER}: {{summary}}\"")));
+        assert_eq!(FORMAT, "tar.gz");
+        assert_eq!(FORMAT_HEADER, "X-Report-Format");
+        assert_eq!(SUMMARY_HEADER, "X-Report-Summary");
     }
 
     #[test]
     fn the_answer_is_the_linux_hosts() {
-        assert!(SEND.contains(&format!("const CREATED: u16 = {CREATED};")));
-        assert!(SEND.contains(&format!("const ID_LENGTH: usize = {ID_LENGTH};")));
+        assert_eq!(CREATED, 201);
+        assert_eq!(ID_LENGTH, 10);
     }
 
     #[test]

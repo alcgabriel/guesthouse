@@ -1,0 +1,92 @@
+--proto
+=https
+--silent
+--show-error
+--max-time
+600
+--connect-timeout
+20
+--header
+Content-Type: application/octet-stream
+--header
+X-Report-Format: tar.gz
+--header
+Expect:
+--header
+X-Report-Summary: eyJjYXJkIjoiTlZJRElBIEdlRm9yY2UgUlRYIDQwODAiLCJjb250YWN0Ijoic29tZW9uZUBleGFtcGxlLm9yZyIsImRlc2NyaXB0aW9uIjoiSXQgd2VudCBibGFjay4g55S76Z2i44GM55yf44Gj6buS44Gr44Gq44KK44G-44GX44Gf44CCIiwiZHJpdmVyIjoiMzIuMC4xNS44MDk3IiwiaG9zdCI6IndpbmRvd3MiLCJraW5kIjoiY3Jhc2hlZCIsIm1hY2hpbmUiOiJ3aW5kb3dzIiwib3MiOiJXaW5kb3dzIDExIFBybyAyNEgyIGJ1aWxkIDI2MTAwIiwidmVyc2lvbiI6IjAuMTMuMCJ9
+--data-binary
+@guesthouse-report-20260101-000000.tar.gz
+--output
+guesthouse-report-20260101-000000.answer
+--write-out
+%{http_code}
+https://files.ruxn.com/r/guesthouse
+--
+--proto
+=https
+--silent
+--show-error
+--max-time
+600
+--connect-timeout
+20
+--header
+Content-Type: application/octet-stream
+--header
+X-Report-Format: tar.gz
+--header
+Expect:
+--data-binary
+@guesthouse-report-20260101-000000.tar.gz
+--output
+guesthouse-report-20260101-000000.answer
+--write-out
+%{http_code}
+https://files.ruxn.com/r/guesthouse
+--
+--proto
+=http,https
+--silent
+--show-error
+--max-time
+600
+--connect-timeout
+20
+--header
+Content-Type: application/octet-stream
+--header
+X-Report-Format: tar.gz
+--header
+Expect:
+--header
+X-Report-Summary: eyJjYXJkIjoiTlZJRElBIEdlRm9yY2UgUlRYIDQwODAiLCJjb250YWN0Ijoic29tZW9uZUBleGFtcGxlLm9yZyIsImRlc2NyaXB0aW9uIjoiSXQgd2VudCBibGFjay4g55S76Z2i44GM55yf44Gj6buS44Gr44Gq44KK44G-44GX44Gf44CCIiwiZHJpdmVyIjoiMzIuMC4xNS44MDk3IiwiaG9zdCI6IndpbmRvd3MiLCJraW5kIjoiY3Jhc2hlZCIsIm1hY2hpbmUiOiJ3aW5kb3dzIiwib3MiOiJXaW5kb3dzIDExIFBybyAyNEgyIGJ1aWxkIDI2MTAwIiwidmVyc2lvbiI6IjAuMTMuMCJ9
+--data-binary
+@guesthouse-report-20260101-000000.tar.gz
+--output
+guesthouse-report-20260101-000000.answer
+--write-out
+%{http_code}
+http://127.0.0.1:8080/r/guesthouse
+--
+--proto
+=http,https
+--silent
+--show-error
+--max-time
+600
+--connect-timeout
+20
+--header
+Content-Type: application/octet-stream
+--header
+X-Report-Format: tar.gz
+--header
+Expect:
+--data-binary
+@guesthouse-report-20260101-000000.tar.gz
+--output
+guesthouse-report-20260101-000000.answer
+--write-out
+%{http_code}
+http://127.0.0.1:8080/r/guesthouse
+--
