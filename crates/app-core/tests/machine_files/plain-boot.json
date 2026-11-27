@@ -1,0 +1,9 @@
+{
+  "name": "Plain",
+  "disk": "/srv/made-up/machines/plain/disk.qcow2",
+  "vars": "",
+  "cores": 1,
+  "ram_gib": 1,
+  "kind": "plain",
+  "iso": "/srv/made-up/boot.iso"
+}

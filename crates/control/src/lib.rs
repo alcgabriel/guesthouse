@@ -300,10 +300,7 @@ pub use guesthouse_account_core::windows_host::valid_user;
 pub use guesthouse_basics::words::ssh_line;
 
 /// Whether `edition` can name an edition: Windows' editions are letters, digits and spaces.
-pub fn valid_edition(edition: &str) -> bool {
-    const LONGEST: usize = 64;
-    edition.len() <= LONGEST && edition.chars().all(|c| c.is_ascii_alphanumeric() || c == ' ')
-}
+pub use guesthouse_settings_core::windows_host::valid_edition;
 
 /// Which card a machine is given.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -505,12 +502,7 @@ pub fn console_pipe(name: &str) -> String {
 }
 
 /// Whether `name` can name a machine: its folder and its VM take it as it is.
-pub fn valid_name(name: &str) -> bool {
-    const LONGEST: usize = 40;
-    !name.is_empty()
-        && name.len() <= LONGEST
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-}
+pub use guesthouse_settings_core::windows_host::valid_name;
 
 #[cfg(test)]
 mod tests {

@@ -32,6 +32,7 @@ default-members = [
     "crates/replay",
     "crates/report",
     "crates/sensors",
+    "crates/settings",
     "crates/share-windows",
     "crates/service-windows",
     "crates/transport",
@@ -60,6 +61,7 @@ guesthouse-daemon = { path = "crates/daemon" }
 guesthouse-app-core = { path = "crates/app-core" }
 guesthouse-frame-socket = { path = "crates/frame-socket" }
 guesthouse-sensors = { path = "crates/sensors" }
+guesthouse-settings-core = { path = "crates/settings" }
 guesthouse-jail = { path = "crates/jail" }
 guesthouse-card-check = { path = "tools/card-check" }
 guesthouse-control = { path = "crates/control" }

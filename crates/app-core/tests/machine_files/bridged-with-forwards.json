@@ -1,0 +1,14 @@
+{
+  "name": "Server",
+  "disk": "/srv/made-up/machines/server/disk.qcow2",
+  "vars": "/srv/made-up/machines/server/OVMF_VARS.fd",
+  "network_mode": "bridged",
+  "mac": "52:54:00:ab:cd:ef",
+  "bridge": "br0",
+  "forwards": [
+    {"protocol": "tcp", "host": 2222, "guest": 22},
+    {"protocol": "udp", "host": 7000, "guest": 7000}
+  ],
+  "only_through": "wg0",
+  "dns": "10.64.0.1"
+}

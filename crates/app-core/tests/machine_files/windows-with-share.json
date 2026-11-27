@@ -1,0 +1,17 @@
+{
+  "name": "Games",
+  "disk": "/srv/made-up/machines/games/disk.qcow2",
+  "vars": "/srv/made-up/machines/games/OVMF_VARS.fd",
+  "cores": 8,
+  "ram_gib": 16,
+  "screen": "2560x1440",
+  "refresh_hz": 144,
+  "hdr": true,
+  "kind": "windows",
+  "clipboard": true,
+  "share": "/srv/made-up/shared",
+  "vram_gib": 6,
+  "tpm": true,
+  "overlay": true,
+  "direct_frames": true
+}
