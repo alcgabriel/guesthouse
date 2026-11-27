@@ -1,0 +1,11 @@
+[package]
+name = "guesthouse-report-core"
+description = "Bug reports, the part no host differs in: what the report server and every host agree on, the summary that sorts a report, the kinds of problem, the answer, the issue link and the files' scrubbing and cutting. Nothing here calls the OS or the network: each host gathers, packs and sends its own way."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

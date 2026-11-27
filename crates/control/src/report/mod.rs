@@ -2,7 +2,7 @@
 //! same server the Linux host's reports go to, so what's on the wire is the same. The service only
 //! hands over its files. It never builds or sends a report.
 //!
-//! - `contract` holds what the server and the Linux host agree on, pinned to the Linux sources.
+//! - `contract` is what the server and every host agree on, from `guesthouse-report-core`.
 //! - `answer` reads the server's answer to a sent report.
 //! - `kind` and `summary` are what sorts a report before anyone opens it.
 //! - `parts` is how the service's files come over the pipe, and are put back together.
@@ -15,7 +15,6 @@
 
 pub mod answer;
 pub mod clock;
-pub mod contract;
 pub mod issue;
 pub mod kind;
 pub mod manifest;
@@ -25,6 +24,9 @@ pub mod send;
 pub mod stage;
 pub mod summary;
 pub mod trim;
+
+// The pieces every host shares, under the names they had here.
+pub use guesthouse_report_core::contract;
 
 pub use answer::read_answer;
 pub use contract::{KEPT_DAYS, MOST_REPORT_BYTES, NEW_ISSUE, report_address};

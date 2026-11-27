@@ -922,6 +922,7 @@ dependencies = [
  "guesthouse-jail",
  "guesthouse-relay",
  "guesthouse-remote-view-core",
+ "guesthouse-report-core",
  "guesthouse-sensors",
  "guesthouse-update-check",
  "jiff",
@@ -1016,6 +1017,7 @@ dependencies = [
 name = "guesthouse-control"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-report-core",
  "guesthouse-update-check",
  "serde",
  "serde_json",
@@ -1167,6 +1169,10 @@ dependencies = [
  "guesthouse-messages",
  "guesthouse-transport",
 ]
+
+[[package]]
+name = "guesthouse-report-core"
+version = "0.11.0"
 
 [[package]]
 name = "guesthouse-sensors"

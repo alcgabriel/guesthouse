@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// What the server is told the archive is.
-pub const FORMAT: &str = "tar.gz";
+pub use guesthouse_report_core::contract::FORMAT;
 const NAME_START: &str = "guesthouse-report-";
 /// The most a single log keeps at first. Logs are mostly text, which compresses about tenfold, so the
 /// whole stays well under the server's limit on most PCs.
