@@ -3,9 +3,11 @@
 //! `GUESTHOUSE_WRITE_GOLDEN=1 cargo test -p guesthouse-app-core report::golden` writes the copies
 //! afresh, which is only for a change meant to alter a report.
 
+use super::before_sending;
 use super::bundle::{Words, write_bundle};
 use super::collect::Collection;
 use super::issue_link::{failure_excerpt, issue_link};
+use super::kind::ProblemKind;
 use super::scrub::{Scrubber, scrub_emails, scrub_names};
 use super::summary::{self, Summary};
 use super::trim::trim;
@@ -151,4 +153,30 @@ fn a_bundle_holds_what_it_holds_today() {
     }
     all.push_str(&format!("== header\n{}\n", bundle.summary.header()));
     golden("linux-bundle.txt", &all);
+}
+
+#[test]
+fn what_is_said_before_sending_is_what_is_said_today() {
+    let mut made = String::new();
+    for machine in [None, Some("quillon-games".to_owned())] {
+        for has_run_logs in [false, true] {
+            for machine_running in [false, true] {
+                for kind in ProblemKind::ALL {
+                    let collection = Collection {
+                        machine: machine.clone(),
+                        has_run_logs,
+                        machine_running,
+                        ..Collection::default()
+                    };
+                    let said = before_sending(&collection, kind);
+                    made.push_str(&format!(
+                        "{} logs={has_run_logs} running={machine_running} {}: {said:?}\n",
+                        machine.is_some(),
+                        kind.word()
+                    ));
+                }
+            }
+        }
+    }
+    golden("linux-before-sending.txt", &made);
 }
