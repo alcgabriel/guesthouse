@@ -17,6 +17,7 @@ fn main() -> std::process::ExitCode {
     use std::time::{Duration, Instant};
 
     const LOOK: Duration = Duration::from_secs(3);
+    const SETTLE: Duration = Duration::from_secs(2);
     const MACHINES: [(&str, u16, &str); 2] = [
         ("Guesthouse test one", 65101, "0011223344556677ffffffffffffffffffffffffffffffffffffffffffffffff"),
         ("Guesthouse test two", 65102, "8899aabbccddeeffffffffffffffffffffffffffffffffffffffffffffffffff"),
@@ -60,7 +61,10 @@ fn main() -> std::process::ExitCode {
         announcer.withdraw();
         println!("withdrew {:?}", announcement.instance);
     }
-    let seen = look("withdrawn");
+    // A browse just after can still name the last one taken back, which a resolve no longer finds.
+    look("withdrawn");
+    std::thread::sleep(SETTLE);
+    let seen = look("withdrawn, a moment later");
     ok &= !full_names.iter().any(|full| seen.contains(full));
     if ok { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }
