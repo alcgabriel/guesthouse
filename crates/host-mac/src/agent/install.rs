@@ -14,9 +14,10 @@ use crate::install::password;
 use crate::install::plan::{Guest, Plan};
 use crate::install::runner::Runner;
 use crate::install::state::{self, InstallInfo, Phase, Source};
-use crate::install::steps::{MachineControl, RealSteps, Setup};
+use crate::install::steps::{MachineControl, RealSteps, Setup, firmware_dirs_of};
 use crate::protocol::{Secret, install_event_line};
 use crate::store;
+use crate::tools::{self, Places, Tool};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -334,15 +335,20 @@ impl Agent {
             .parent()
             .map(Path::to_path_buf)
             .unwrap_or_else(|| machines.clone());
-        let qemu_dir = tools
-            .qemu
-            .as_deref()
-            .or(config.qemu.as_deref().and_then(Path::to_str))
-            .map(PathBuf::from);
-        let mut firmware_dirs: Vec<PathBuf> = qemu_dir
-            .iter()
-            .filter_map(|q| q.parent()?.parent().map(|p| p.join("share/qemu")))
-            .collect();
+        // The firmware beside the QEMU the request or the agent names, then beside the protected
+        // path's QEMU as the app finds it with none named (the environment, the lab's build).
+        let mut qemus: Vec<PathBuf> = tools.qemu.iter().map(PathBuf::from).collect();
+        qemus.extend(config.qemu.clone());
+        qemus.extend(
+            tools::locate(
+                Tool::PvgQemu,
+                &Places::on_this_mac(Tool::PvgQemu, None, None),
+            )
+            .ok()
+            .map(|found| found.path),
+        );
+        let mut firmware_dirs: Vec<PathBuf> =
+            qemus.iter().flat_map(|q| firmware_dirs_of(q)).collect();
         firmware_dirs
             .extend(std::env::var_os("HOME").map(|home| Path::new(&home).join(LAB_FIRMWARE)));
         let setup = Setup {

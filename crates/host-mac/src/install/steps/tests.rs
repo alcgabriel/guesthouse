@@ -462,3 +462,24 @@ fn firmware_is_found_in_the_first_folder_that_has_both_files_and_its_absence_is_
     );
     let _ = fs::remove_dir_all(world.root);
 }
+
+#[test]
+fn firmware_is_looked_for_in_the_prefix_and_beside_a_qemu_run_from_its_build_folder() {
+    let world = World::new("firmware-beside");
+    let installed = world.root.join("prefix/bin/qemu-system-aarch64");
+    assert_eq!(
+        firmware_dirs_of(&installed),
+        vec![
+            world.root.join("prefix/share/qemu"),
+            world.root.join("prefix/bin/pc-bios")
+        ]
+    );
+    // A QEMU in its build folder, as ours is: the firmware is in pc-bios beside it.
+    let build = world.root.join("qemu-build");
+    fs::create_dir_all(build.join("pc-bios")).unwrap();
+    fs::write(build.join("pc-bios/edk2-aarch64-code.fd"), b"code").unwrap();
+    fs::write(build.join("pc-bios/edk2-aarch64-vars.fd"), b"vars").unwrap();
+    let found = find_firmware(&firmware_dirs_of(&build.join("qemu-system-aarch64"))).unwrap();
+    assert_eq!(found, (b"code".to_vec(), b"vars".to_vec()));
+    let _ = fs::remove_dir_all(world.root);
+}

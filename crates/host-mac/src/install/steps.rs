@@ -117,6 +117,21 @@ fn read_firmware(path: &Path) -> Option<Vec<u8>> {
     (compressed.is_file() && output.status.success()).then_some(output.stdout)
 }
 
+/// The folders a QEMU's firmware may be in: `share/qemu` of the prefix it is installed in, then
+/// `pc-bios` beside it, where a QEMU run from its own build folder keeps it.
+pub fn firmware_dirs_of(qemu: &Path) -> Vec<PathBuf> {
+    let Some(folder) = qemu.parent() else {
+        return Vec::new();
+    };
+    let mut dirs: Vec<PathBuf> = folder
+        .parent()
+        .map(|p| p.join("share/qemu"))
+        .into_iter()
+        .collect();
+    dirs.push(folder.join("pc-bios"));
+    dirs
+}
+
 /// QEMU's firmware for ARM: the code and the empty variables, from the first folder that has them.
 pub fn find_firmware(dirs: &[PathBuf]) -> Result<(Vec<u8>, Vec<u8>), StepError> {
     for dir in dirs {
