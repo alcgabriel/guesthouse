@@ -1,0 +1,5 @@
+{
+  "name": "Windows",
+  "disk": "/srv/made-up/machines/win/disk.qcow2",
+  "vars": "/srv/made-up/machines/win/OVMF_VARS.fd"
+}

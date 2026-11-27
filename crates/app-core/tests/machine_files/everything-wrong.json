@@ -1,0 +1,23 @@
+{
+  "name": "  ",
+  "disk": "relative/disk.qcow2",
+  "vars": "vars.fd",
+  "cores": 1,
+  "ram_gib": 2,
+  "screen": "1024x768",
+  "refresh_hz": 400,
+  "kind": "windows",
+  "user": "Administrator",
+  "share": "shared",
+  "vram_gib": 99,
+  "network_mode": "bridged",
+  "bridge": "a,b",
+  "forwards": [
+    {"protocol": "tcp", "host": 0, "guest": 22},
+    {"protocol": "tcp", "host": 2222, "guest": 22},
+    {"protocol": "tcp", "host": 2222, "guest": 23}
+  ],
+  "only_through": "has space",
+  "dns": "not-an-address",
+  "drives": [{"id": "../x"}, {"id": "ata-made-up"}, {"id": "ata-made-up"}, {"id": "nvme-made-up"}]
+}
