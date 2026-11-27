@@ -19,10 +19,10 @@ function Check([bool]$ok, [string]$what) {
 }
 
 # Starts the preview in a state, and returns its process once its window is up.
-function Start-Preview([string]$state, [string]$section = "") {
+function Start-Preview([string]$exe, [string]$state, [string]$section = "") {
   $env:GUESTHOUSE_APP_PREVIEW = $state
   if ($section) { $env:GUESTHOUSE_APP_SECTION = $section } else { Remove-Item Env:GUESTHOUSE_APP_SECTION -ErrorAction SilentlyContinue }
-  $p = Start-Process $Exe -PassThru
+  $p = Start-Process $exe -PassThru
   for ($i = 0; $i -lt 100 -and $p.MainWindowHandle -eq 0; $i++) { Start-Sleep -Milliseconds 200; $p.Refresh() }
   Start-Sleep -Milliseconds 1500
   $script:Root = [Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
@@ -64,7 +64,7 @@ function Reachable([string]$name) {
   if (-not $e) { return $false }
   $r = $e.Current.BoundingRectangle
   $under = Under ($r.X + $r.Width / 2) ($r.Y + $r.Height / 2)
-  if ($under -eq "covered") { "  (another window covers $name, so it isn't checked)" | Write-Host; return $true }
+  if ($under -eq "covered") { Write-Warning "Another window covers $name, so it isn't checked."; return $true }
   $under -eq "content"
 }
 
@@ -76,7 +76,7 @@ function Drags {
 }
 
 # Home: a card each, named as the sidebar's items were, and New machine and Report a problem.
-$p = Start-Preview home
+$p = Start-Preview $Exe home
 Check (Has "win11, Windows, Running") "Home has win11's card, by its name, system and state"
 Check (Has "build-box, Linux, Starting") "Home has build-box's card"
 Check (Has "New machine") "Home has New machine"
@@ -113,7 +113,7 @@ Check (Has "What went wrong") "Report a problem has its form"
 Stop-Preview $p
 
 # Connects through: Bridged offers the adapters and makes a change to save, and Shared takes both back.
-$p = Start-Preview settings Network
+$p = Start-Preview $Exe settings Network
 Check (-not (Has "Adapter to bridge onto")) "a shared machine has no adapter to choose"
 Check (Choose "Bridged") "Bridged can be chosen"
 Check (Has "Adapter to bridge onto") "Bridged offers the adapters"
@@ -123,18 +123,18 @@ Check (-not (Has "Adapter to bridge onto")) "and the adapters go"
 Stop-Preview $p
 
 # An Ubuntu machine has no Remote View.
-$p = Start-Preview linux
+$p = Start-Preview $Exe linux
 Check (Has "Switch machine, ubuntu") "linux opens on ubuntu's page"
 Check (-not (Has "Remote View")) "an Ubuntu machine has no Remote View"
 Stop-Preview $p
 
 # Remote View's states keep the names a device's pairing is driven by.
-$p = Start-Preview rv-waiting
+$p = Start-Preview $Exe rv-waiting
 Check (Has "Accept Phone") "a waiting device has Accept"
 Check (Has "Decline Phone") "and Decline"
 Check (Has "Code 4 8 2 9 1 7") "its code is read digit by digit"
 Stop-Preview $p
-$p = Start-Preview rv-devices
+$p = Start-Preview $Exe rv-devices
 Check (Has "Pair a New Device") "pairing closed has Pair a New Device"
 Check (Has "Remove Phone") "a paired device has Remove"
 Check (Has "Clipboard for Phone") "a paired device has its switches"
@@ -142,14 +142,14 @@ Check (-not (Has "Disconnect")) "there's no Disconnect"
 Stop-Preview $p
 
 # No machines: the first run's page.
-$p = Start-Preview empty
+$p = Start-Preview $Exe empty
 Check (Has "No machines yet") "no machines shows the first run"
 Check (Press "Windows 11, A Windows 11 ISO, or its install.wim or install.esd") "its Windows 11 can be pressed"
 Check (Has "Image") "and opens New machine"
 Stop-Preview $p
 
 # The service away: its own page, with Report a problem, and Back from that.
-$p = Start-Preview away
+$p = Start-Preview $Exe away
 Check (Has "Report a problem") "the away page has Report a problem"
 Check (Press "Report a problem") "it can be pressed"
 Check (Press "Back") "Back from the report page"
