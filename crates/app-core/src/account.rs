@@ -28,21 +28,9 @@ pub fn name_problem(kind: Kind, name: &str) -> Option<String> {
     }
 }
 
-/// The text as it goes inside an XML element or attribute.
-pub fn xml_text(text: &str) -> String {
-    let mut escaped = String::with_capacity(text.len());
-    for letter in text.chars() {
-        match letter {
-            '&' => escaped.push_str("&amp;"),
-            '<' => escaped.push_str("&lt;"),
-            '>' => escaped.push_str("&gt;"),
-            '"' => escaped.push_str("&quot;"),
-            '\'' => escaped.push_str("&apos;"),
-            other => escaped.push(other),
-        }
-    }
-    escaped
-}
+/// The text as it goes inside an XML element or attribute: the Linux host's escape, which takes the
+/// apostrophe too.
+pub use guesthouse_answers_core::linux_host::xml_text;
 
 #[cfg(test)]
 mod tests {

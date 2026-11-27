@@ -7,6 +7,7 @@ exclude = ["vendor/windows-reactor", "vendor/windows-rs"]
 # The app needs GTK's development files, which nothing else here does. Build it with `-p guesthouse-app`.
 default-members = [
     "crates/account",
+    "crates/answers",
     "crates/app-core",
     "crates/backend",
     "crates/backend-intel",
@@ -75,6 +76,7 @@ guesthouse-remote-view-core = { path = "crates/remote-view" }
 guesthouse-report-core = { path = "crates/report" }
 guesthouse-basics = { path = "crates/basics" }
 guesthouse-account-core = { path = "crates/account" }
+guesthouse-answers-core = { path = "crates/answers" }
 guesthouse-carry-core = { path = "crates/carry" }
 guesthouse-catalog-core = { path = "crates/catalog" }
 

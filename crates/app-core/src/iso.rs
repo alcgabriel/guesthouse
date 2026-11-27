@@ -23,45 +23,17 @@ pub fn any_iso_maker() -> bool {
     ISO_MAKERS.iter().any(|program| on_path(program))
 }
 
-/// What the answer file and its key install when the disc has no other edition this project runs.
-pub const WINDOWS_EDITION: &str = "Windows 11 Pro";
-
-/// The Windows 11 editions a guest runs here, best first, each with the KMS client key Microsoft
-/// publishes for it. The key only tells Setup which edition to install, so it never stops to ask;
-/// Windows stays unactivated. A disc with both installs Pro, as it always did. These are the editions
-/// an install has been run with here. Another one goes in with its key once it has been.
-pub const WINDOWS_EDITIONS: [(&str, &str); 2] = [
-    (WINDOWS_EDITION, "W269N-WFGWX-YVC9B-4J6C9-T83GX"),
-    // The IoT LTSC disc carries no Pro image at all.
-    ("Windows 11 IoT Enterprise LTSC", "KBN8V-HFGQ4-MGXVD-347P6-PDQGT"),
-];
-
-/// The key that picks `edition` in Setup, when it is one of the editions above.
-pub fn edition_key(edition: &str) -> Option<&'static str> {
-    WINDOWS_EDITIONS.iter().find(|(name, _)| same_edition(edition, name)).map(|(_, key)| *key)
-}
-
-/// Whether an image is the edition `name`, or that edition's own yearly image: LTSC media name their
-/// images "Windows 11 IoT Enterprise LTSC 2024", and Setup shows them without the year.
-fn same_edition(image: &str, name: &str) -> bool {
-    if image == name {
-        return true;
-    }
-    let Some(rest) = image.strip_prefix(name) else { return false };
-    rest.len() == 5 && rest.starts_with(' ') && rest[1..].chars().all(|digit| digit.is_ascii_digit())
-}
-const FIRST_WINDOWS_11_BUILD: u32 = 22000;
-const WIM_AMD64: &str = "9";
-const WIM_MAGIC: &[u8; 8] = b"MSWIM\0\0\0";
-const WIM_HEADER_SIZE: usize = 208;
-/// Where the header says the XML block is: its size, then its offset.
-const WIM_XML_ENTRY: usize = 0x48;
-/// The top byte of the size holds flags.
-const WIM_SIZE_MASK: u64 = (1 << 56) - 1;
-/// The XML block is a few hundred KiB. The size comes from the file, so it's held to something sane.
-const MOST_WIM_XML: u64 = 64 << 20;
+use guesthouse_answers_core::linux_host::editions::same_edition;
+/// The Windows 11 editions a guest runs here and the key that picks each, and the edition the answer
+/// file installs when the disc has no other: the Linux host's table, in the shared crate.
+pub use guesthouse_answers_core::linux_host::editions::{WINDOWS_EDITION, WINDOWS_EDITIONS, edition_key};
+/// A WIM's XML block and the images it lists, read as the shared crate reads them.
+use guesthouse_answers_core::linux_host::wim::{FIRST_WINDOWS_11_BUILD, WIM_AMD64, images_in, wim_xml};
+#[cfg(test)]
+use guesthouse_answers_core::linux_host::wim::{
+    MOST_WIM_XML, WIM_HEADER_SIZE, WIM_MAGIC, WIM_XML_ENTRY, field, utf16_text,
+};
 const READ_SECONDS: u64 = 60;
-const SKIP_CHUNK: usize = 1 << 24;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Iso {
@@ -114,59 +86,6 @@ impl Iso {
     fn plain_windows(title: &str) -> Self {
         Self { windows_disc: true, ..Self::plain(title) }
     }
-}
-
-/// The text between `<tag>` and `</tag>`.
-fn field<'a>(text: &'a str, tag: &str) -> Option<&'a str> {
-    let start = text.find(&format!("<{tag}>"))? + tag.len() + 2;
-    let end = text[start..].find(&format!("</{tag}>"))?;
-    Some(&text[start..start + end])
-}
-
-/// Each image's name, build and architecture, from a WIM's XML block.
-fn images_in(text: &str) -> Vec<(String, String, u32, String)> {
-    let mut images = Vec::new();
-    let mut rest = text;
-    while let Some(start) = rest.find("<IMAGE ") {
-        let Some(end) = rest[start..].find("</IMAGE>") else { break };
-        let image = &rest[start..start + end];
-        let build = field(image, "BUILD").and_then(|text| text.parse().ok());
-        if let (Some(name), Some(build), Some(arch)) = (field(image, "NAME"), build, field(image, "ARCH")) {
-            let shown = field(image, "DISPLAYNAME").unwrap_or(name);
-            images.push((name.to_owned(), shown.to_owned(), build, arch.to_owned()));
-        }
-        rest = &rest[start + end..];
-    }
-    images
-}
-
-fn utf16_text(data: &[u8]) -> String {
-    let units: Vec<u16> = data.as_chunks().0.iter().map(|pair| u16::from_le_bytes(*pair)).collect();
-    String::from_utf16_lossy(&units)
-}
-
-/// The XML block of a WIM or ESD, which is near its end. 7z can only stream the file, which takes
-/// seconds. `None` if this isn't a WIM.
-fn wim_xml(stream: &mut impl Read) -> Option<String> {
-    let mut header = [0; WIM_HEADER_SIZE];
-    stream.read_exact(&mut header).ok()?;
-    if &header[..WIM_MAGIC.len()] != WIM_MAGIC {
-        return None;
-    }
-    let number = |at: usize| Some(u64::from_le_bytes(header[at..at + 8].try_into().ok()?));
-    let size = (number(WIM_XML_ENTRY)? & WIM_SIZE_MASK).min(MOST_WIM_XML);
-    let mut left = number(WIM_XML_ENTRY + 8)?.checked_sub(WIM_HEADER_SIZE as u64)?;
-    let mut chunk = vec![0; SKIP_CHUNK];
-    while left > 0 {
-        let wanted = left.min(SKIP_CHUNK as u64) as usize;
-        match stream.read(&mut chunk[..wanted]) {
-            Ok(0) | Err(_) => return None,
-            Ok(read) => left -= read as u64,
-        }
-    }
-    let mut data = Vec::new();
-    stream.take(size).read_to_end(&mut data).ok()?;
-    Some(utf16_text(&data))
 }
 
 fn wim_images(path: &str, entry: &str) -> Vec<(String, String, u32, String)> {
@@ -463,3 +382,7 @@ mod tests {
         assert!(images_in(xml).is_empty());
     }
 }
+
+#[cfg(test)]
+#[path = "iso_golden.rs"]
+mod answers_golden;

@@ -5,7 +5,6 @@ use super::desktop::{BOOT_LINE, SERIAL_FILE, count, wait_for_desktop};
 use super::identity::set_up_identity;
 use super::recipe;
 use super::{KEY_POLL, Task, plan_for, start_if_there_is_room};
-use crate::account::xml_text;
 use crate::agent::{QUICK_SECONDS, guest_script, make_password, make_token};
 use crate::context::Context;
 use crate::disk_image::disk_size_gib;
@@ -24,6 +23,7 @@ use crate::vm_args::Boot;
 use crate::vm_host::{last_words, send_key};
 use crate::writable_copy::copy_writable;
 use crate::zones;
+use guesthouse_answers_core::linux_host::windows_guest::{self, PASSWORD_MARK, USER_MARK};
 use serde_json::json;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
@@ -58,8 +58,6 @@ const ANSWER_DISC: &str = "answer.iso";
 const ANSWER_LABEL: &str = "GPUPV_SETUP";
 const SETMODE_FILE: &str = "setmode.ps1";
 const TOKEN_ON_DISC: &str = "token.txt";
-const PASSWORD_MARK: &str = "@PASSWORD@";
-const USER_MARK: &str = "@USER@";
 
 /// The answer file for a host in this IANA zone, making this account. The template says UTC. The
 /// edition is the disc's own when it was read, and Pro when it wasn't, as it always was. Its key
@@ -73,15 +71,7 @@ pub fn answer_file(
 ) -> Result<String> {
     let name = zones::windows_zone(zone);
     let template = guest_script(context, "autounattend.xml")?;
-    let edition = edition.unwrap_or(iso::WINDOWS_EDITION);
-    let key = iso::edition_key(edition).map_or(String::new(), |key| {
-        format!("<ProductKey><Key>{key}</Key><WillShowUI>OnError</WillShowUI></ProductKey>")
-    });
-    let filled = template
-        .replace("<TimeZone>UTC<", &format!("<TimeZone>{name}<"))
-        .replace("@EDITION@", &xml_text(edition))
-        .replace("@PRODUCT_KEY@", &key);
-    Ok(filled.replace(USER_MARK, &xml_text(user)).replace(PASSWORD_MARK, &xml_text(password)))
+    Ok(windows_guest::fill(&template, &name, user, password, edition))
 }
 
 /// The edition of the disc this machine installs from, when the disc can be read and has one a guest

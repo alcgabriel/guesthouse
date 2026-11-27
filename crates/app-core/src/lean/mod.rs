@@ -28,10 +28,10 @@ pub const LEAN_FILE: &str = "lean.json";
 /// The guest's script, and the list it reads, by these names on the answer disc.
 pub const SCRIPT: &str = "lean.ps1";
 pub const DATA_ON_DISC: &str = "lean.json";
-/// Setup's specialize pass is the last moment before any account exists, so what it takes out is never
-/// installed for the new account. The answer file's own commands come first.
-const SPECIALIZE_END: &str = "      </RunSynchronous>";
-const SPECIALIZE_COMMAND: &str = "        <RunSynchronousCommand wcm:action=\"add\"><Order>5</Order><Path>cmd /c for %i in (D E F G H) do if exist %i:\\lean.ps1 powershell -NoProfile -ExecutionPolicy Bypass -File %i:\\lean.ps1 -Data %i:\\lean.json</Path></RunSynchronousCommand>\n";
+/// The command that runs the script in Setup's specialize pass, the last moment before any account
+/// exists, as the shared crate adds it.
+#[cfg(test)]
+use guesthouse_answers_core::linux_host::lean::SPECIALIZE_COMMAND;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -94,12 +94,7 @@ pub fn remake_imported(folder: &std::path::Path) -> Result<()> {
 /// The filled answer file with one command more in the specialize pass, which runs the script on the
 /// disc. The template is never changed, so an answer file without it is the same as before.
 pub fn with_specialize_step(answers: &str) -> Result<String> {
-    if answers.matches(SPECIALIZE_END).count() != 1 {
-        return Err(Failure::new(
-            "The answer file has no place for lean Windows' step, so nothing was installed.",
-        ));
-    }
-    Ok(answers.replacen(SPECIALIZE_END, &format!("{SPECIALIZE_COMMAND}{SPECIALIZE_END}"), 1))
+    guesthouse_answers_core::linux_host::lean::with_specialize_step(answers).map_err(Failure::new)
 }
 
 #[cfg(test)]

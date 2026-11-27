@@ -47,47 +47,16 @@ pub const SETUP_COMPLETE_PATH: &str = r"Windows\Setup\Scripts\SetupComplete.cmd"
 /// Windows reads the answer file here on the first start of an image applied with no Setup.
 pub const ANSWER_FILE_PATH: &str = r"Windows\Panther\unattend.xml";
 
-const COMPONENT: &str = r#"processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS""#;
-
 /// An answer file for the oobeSystem pass: English (US), every first-start question skipped, and one
-/// local administrator.
-pub fn answer_file(user: &str, password: &str) -> String {
-    let (user, password) = (escape(user), escape(password));
-    format!(
-        r#"<?xml version="1.0" encoding="utf-8"?>
-<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-  <settings pass="oobeSystem">
-    <component name="Microsoft-Windows-International-Core" {COMPONENT}>
-      <InputLocale>en-US</InputLocale><SystemLocale>en-US</SystemLocale><UILanguage>en-US</UILanguage><UserLocale>en-US</UserLocale>
-    </component>
-    <component name="Microsoft-Windows-Shell-Setup" {COMPONENT}>
-      <OOBE>
-        <HideEULAPage>true</HideEULAPage>
-        <HideLocalAccountScreen>true</HideLocalAccountScreen>
-        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
-        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
-        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-        <ProtectYourPC>3</ProtectYourPC>
-      </OOBE>
-      <UserAccounts>
-        <LocalAccounts>
-          <LocalAccount wcm:action="add">
-            <Name>{user}</Name>
-            <Group>Administrators</Group>
-            <Password><Value>{password}</Value><PlainText>true</PlainText></Password>
-          </LocalAccount>
-        </LocalAccounts>
-      </UserAccounts>
-    </component>
-  </settings>
-</unattend>
-"#
-    )
-}
+/// local administrator. The Windows host's, in the shared crate.
+pub use guesthouse_answers_core::windows_host::answer_file;
+/// The Windows host's XML escape, which leaves the apostrophe as it is.
+#[cfg(test)]
+use guesthouse_answers_core::windows_host::escape;
 
-fn escape(text: &str) -> String {
-    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
-}
+#[cfg(test)]
+#[path = "guest_golden.rs"]
+mod answers_golden;
 
 #[cfg(test)]
 mod tests {
@@ -210,9 +179,8 @@ pub mod linux {
         line.starts_with(INSTALL_FINISHED)
     }
 
-    pub fn account(user: &str, password: &str) -> String {
-        format!("{user} {password}\n")
-    }
+    /// The line `install.sh` reads, `user password`, as the shared crate makes it.
+    pub use guesthouse_answers_core::windows_host::ubuntu::account;
 
     /// A file as Linux needs it. A Windows checkout may have turned its line endings into CRLF,
     /// and `#!/bin/sh` with a carriage return after it runs nothing.

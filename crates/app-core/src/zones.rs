@@ -1,34 +1,27 @@
 //! The host's time zone, in the words Windows Setup wants.
 //!
-//! The table comes from Unicode's public CLDR data, under the Unicode License v3: `data/windows-zones.txt`
-//! says where. Anything it can't place stays on UTC, which is also what the answer file's template says.
+//! The table comes from Unicode's public CLDR data, under the Unicode License v3, and is the shared
+//! crate's: `guesthouse_answers_core::linux_host::zones`. Anything it can't place stays on UTC, which is
+//! also what the answer file's template says.
 
 use jiff::ZonedDateTime;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+#[cfg(test)]
+use guesthouse_answers_core::linux_host::zones::plain_name;
+use guesthouse_answers_core::linux_host::zones::{FALLBACK, table};
+
 pub const HOST_ZONE_LINK: &str = "/etc/localtime";
-const ZONE_TABLE: &str = include_str!("../data/windows-zones.txt");
 /// NixOS keeps its zone files in `/etc`, behind the links its `/etc/localtime` goes through.
 const ZONE_DATABASES: [&str; 2] = ["/usr/share/zoneinfo", "/etc/zoneinfo"];
-const FALLBACK: &str = "UTC";
 
 /// The host's IANA zone, from where the link points. Empty if that says nothing.
 pub fn host_zone(link: impl AsRef<Path>) -> String {
     let target = fs::read_link(link).unwrap_or_default();
     let text = target.to_string_lossy();
     text.split_once("zoneinfo/").map_or_else(String::new, |(_, zone)| zone.to_owned())
-}
-
-fn table() -> Vec<(&'static str, &'static str)> {
-    let lines = ZONE_TABLE.lines().filter(|line| !line.starts_with('#'));
-    lines.filter_map(|line| line.split_once('\t')).filter(|(_, name)| plain_name(name)).collect()
-}
-
-/// A bad value must never reach Windows Setup.
-fn plain_name(name: &str) -> bool {
-    name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b" .+()-".contains(&byte))
 }
 
 fn is_zone(zone: &str) -> bool {
@@ -120,3 +113,7 @@ mod tests {
         assert_eq!(host_zone(&link), "", "not a zone");
     }
 }
+
+#[cfg(test)]
+#[path = "zones_golden.rs"]
+mod answers_golden;

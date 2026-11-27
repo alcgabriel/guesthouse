@@ -44,6 +44,8 @@ guesthouse-update-check.workspace = true
 guesthouse-basics.workspace = true
 # Which names and passwords a guest's account takes, the rules every host shares.
 guesthouse-account-core.workspace = true
+# The building blocks of a guest's unattended install, as each host has them.
+guesthouse-answers-core.workspace = true
 # The export file's format, which every host can read and write.
 guesthouse-carry-core.workspace = true
 # Where a guest's images come from, and the rule that picks Ubuntu's disc, as data every host can share.

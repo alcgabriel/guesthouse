@@ -1,0 +1,11 @@
+[package]
+name = "guesthouse-answers-core"
+description = "The building blocks of a guest's unattended install, as each host has them: the XML escapes, the Windows edition table and WIM reader, the time zone table, the answer files' fills and templates. Nothing here calls the system, so every host can build on it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
