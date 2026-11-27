@@ -1093,6 +1093,7 @@ dependencies = [
  "guesthouse-backend-nvidia",
  "guesthouse-backend-standin",
  "guesthouse-core",
+ "guesthouse-daemon-shell",
  "guesthouse-frame-socket",
  "guesthouse-jail",
  "guesthouse-messages",
@@ -1101,6 +1102,13 @@ dependencies = [
  "libc",
  "log",
  "serde_json",
+]
+
+[[package]]
+name = "guesthouse-daemon-shell"
+version = "0.11.0"
+dependencies = [
+ "log",
 ]
 
 [[package]]
