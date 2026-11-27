@@ -211,6 +211,9 @@ pub fn start_problems(context: &Context, machine: &Machine) -> Result<Vec<String
 }
 
 #[cfg(test)]
+mod pins;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::host::stand_in::fake_cpus;
