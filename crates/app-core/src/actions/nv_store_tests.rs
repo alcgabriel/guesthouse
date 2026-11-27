@@ -183,3 +183,33 @@ fn the_driver_disc_goes_where_the_tools_disc_would_and_qemu_may_read_it() {
 
 // The script itself runs in crates/guest-scripts, which builds on Windows too, so CI runs it there under
 // Windows PowerShell 5.1 and pwsh.
+
+/// A throwaway's clean disk that already has the version gets it noted there, and one that had it
+/// copied in is told how to make that its clean state.
+#[test]
+fn a_throwaway_notes_its_clean_version_or_says_how_to_refresh_it() {
+    let scratch = Scratch::new();
+    let mut setup = set_up(&scratch, &["store current 32.0.16.1800"]);
+    setup.machine.throwaway = true;
+    let clean = crate::throwaway::clean_folder(&setup.context, &setup.machine);
+    fs::create_dir_all(&clean).unwrap();
+    let (_, error) = refresh(&setup);
+    assert_eq!(error, "");
+    assert_eq!(
+        fs::read_to_string(clean.join(crate::guest_driver_store::RECORD_FILE)).unwrap().trim(),
+        OFFERED
+    );
+
+    let scratch = Scratch::new();
+    let mut setup = set_up(&scratch, &["store replaced 32.0.16.1800"]);
+    setup.machine.throwaway = true;
+    let clean = crate::throwaway::clean_folder(&setup.context, &setup.machine);
+    fs::create_dir_all(&clean).unwrap();
+    let (_, error) = refresh(&setup);
+    assert!(error.starts_with(crate::guest_driver_store::BEHIND), "{error}");
+    assert!(error.contains("guesthouse-vm refresh-clean x"), "{error}");
+    assert!(
+        !clean.join(crate::guest_driver_store::RECORD_FILE).exists(),
+        "the clean disk still has the older one"
+    );
+}
