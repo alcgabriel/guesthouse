@@ -1669,10 +1669,11 @@ fn remove_disks(folder: &Path) -> Result<(), String> {
 }
 
 /// A size in words, in GB when it's large and MB when it isn't.
-fn size_words(bytes: u64) -> String {
-    const GB: f64 = (1u64 << 30) as f64;
-    if bytes >= 1 << 30 { format!("{:.1} GB", bytes as f64 / GB) } else { format!("{} MB", bytes >> 20) }
-}
+use guesthouse_basics::words::size_in_gb_or_mb_down as size_words;
+
+#[cfg(test)]
+#[path = "requests/size_words_tests.rs"]
+mod size_words_tests;
 
 mod forwards;
 mod pairing;

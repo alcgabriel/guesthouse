@@ -8,6 +8,8 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
+# The ssh line, as every host may word it.
+guesthouse-basics.workspace = true
 # Each request and answer is a line of JSON.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

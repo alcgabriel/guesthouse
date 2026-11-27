@@ -5,3 +5,5 @@
 //! A piece moves here from a host as it was, and keeps working at its old path there.
 
 pub mod json_file;
+pub mod text;
+pub mod words;

@@ -305,9 +305,7 @@ pub fn valid_user(name: &str) -> bool {
 
 /// The `ssh` line that reaches an Ubuntu guest through the port the service listens on, on this PC's
 /// loopback, which needs no network in the guest.
-pub fn ssh_line(port: u16, user: &str) -> String {
-    format!("ssh -p {port} {user}@127.0.0.1")
-}
+pub use guesthouse_basics::words::ssh_line;
 
 /// Whether `edition` can name an edition: Windows' editions are letters, digits and spaces.
 pub fn valid_edition(edition: &str) -> bool {
