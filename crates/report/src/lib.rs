@@ -1,8 +1,8 @@
 //! Bug reports, the part with no host in it, so every host builds on one implementation: what the
 //! report server and the hosts agree on (`contract`), the kinds of problem (`kind`), the
 //! facts that sort a report (`summary`), and how it's posted with `curl` and the server's answer
-//! read (`send`, `answer`), and
-//! times written in UTC (`clock`).
+//! read (`send`, `answer`), times
+//! written in UTC (`clock`) and a long file cut to its end (`trim`).
 //!
 //! Each host gathers its own files and facts, packs them and runs `curl` its own way. Where the
 //! hosts still differ in what they do with a report, each host's way is kept as it is, and the
@@ -16,3 +16,4 @@ pub mod contract;
 pub mod kind;
 pub mod send;
 pub mod summary;
+pub mod trim;

@@ -1,4 +1,6 @@
-//! Cuts a long log down to its end, which is where a run's story usually ends.
+//! Cuts a long log down to its end, which is where a run's story usually ends. The Windows host cuts
+//! every file of a report this way. The Linux host keeps a log's start and the lines of its middle
+//! a daemon's log marks as worth it too, with its own `trim`, which knows the daemon's log.
 
 /// The text as it is if it fits in `most_bytes`, and otherwise its last part that fits, cut at a
 /// character and, where a line starts inside that part, at the start of that line. A line before it
