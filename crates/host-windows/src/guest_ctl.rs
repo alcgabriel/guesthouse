@@ -9,10 +9,15 @@
 //!
 //! One request is in flight at a time: a second waits for the first, within its own time. The guest
 //! runs them one at a time too, on the thread that also listens for the host asking it to shut down.
+//!
+//! The handle is the shared pairing driver's way into the guest too ([`session::Guest`]), which
+//! tells an answer that may be lost from one the guest wrote.
 
 use crate::events::{Event, Sink};
 use crate::printable::printable;
+use guesthouse_remote_view_core::ctl::Words;
 use guesthouse_remote_view_core::ctl_wire::{self, Answer, Failure, Id, Progress, Reassembly};
+use guesthouse_remote_view_core::session::{self, Unanswered};
 use std::io::{self, BufRead, BufReader, Read};
 use std::sync::mpsc;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
@@ -268,6 +273,27 @@ impl GuestCtl {
         }
         true
     }
+}
+
+/// The shared driver asks through the channel. What the guest printed is the answer, whatever code
+/// `ctl` ended with, as the driver reads remoteman's own words for a refusal. A request that was never
+/// written, or that the guest refused to run, can't have run, so it's an answer too, in words the
+/// driver reads as a refusal. Everything else may or may not have run in the guest, and is
+/// [`Unanswered`], so the driver reads the status again before it sends anything more.
+impl session::Guest for GuestCtl {
+    fn ctl(&self, words: &Words) -> Result<String, Unanswered> {
+        match self.ask(words, ANSWER_WAIT) {
+            Ok(answer) => Ok(answer.text),
+            Err(refused @ (CtlError::NotAllowed(_) | CtlError::Guest(Failure::Refused))) => {
+                Ok(format!("error: {refused}"))
+            }
+            Err(error) => Err(Unanswered(error.to_string())),
+        }
+    }
+
+    /// The driver's lines name devices by their fingerprints and repeat the guest's words, which
+    /// stay out of every log on this host, as the channel's lines do.
+    fn log(&self, _line: &str) {}
 }
 
 fn fail(state: &mut State, error: CtlError) {

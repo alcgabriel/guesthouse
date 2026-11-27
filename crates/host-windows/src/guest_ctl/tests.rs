@@ -275,3 +275,29 @@ fn the_guests_report_runs_the_program_its_screen_installs() {
         crate::guest::REPORT.contains(r"$ctlHost = 'C:\Program Files\remoteman host\remoteman-host.exe'")
     );
 }
+
+/// The shared driver's way in: the guest's words come back as they are, a request that can't have
+/// run is a refusal, and whatever may have run is unanswered.
+#[test]
+fn the_driver_asks_through_the_channel_and_is_told_what_may_have_run() {
+    use guesthouse_remote_view_core::session::Guest as _;
+    let (ctl, _fake) = guest(|id, words| {
+        let said: &[u8] = match words[0].as_str() {
+            "status" => br#"{"pairing":false}"#,
+            "revoke" => return vec![failed_line(id, Failure::Timeout)],
+            "pair" => return vec![failed_line(id, Failure::Refused)],
+            _ => b"error: not now",
+        };
+        answer_lines(id, 1, said).unwrap()
+    });
+    assert_eq!(ctl.ctl(&ctl::status()).unwrap(), r#"{"pairing":false}"#);
+    assert_eq!(ctl.ctl(&ctl::host_allow("files", false).unwrap()).unwrap(), "error: not now");
+    assert_eq!(ctl.ctl(&ctl::pair_open()).unwrap(), format!("error: {}", Failure::Refused.sentence()));
+    let nothing = vec!["sharing".to_string(), "off".to_string()];
+    assert!(ctl.ctl(&nothing).unwrap().starts_with("error: "), "never written, so never run");
+    let timed_out = ctl.ctl(&ctl::device_revoke(&"a".repeat(64)).unwrap()).unwrap_err();
+    assert_eq!(timed_out.0, Failure::Timeout.sentence());
+    ctl.end();
+    assert_eq!(ctl.ctl(&ctl::status()).unwrap_err().0, CtlError::Stopped.to_string());
+    assert_eq!(GuestCtl::new().ctl(&ctl::status()).unwrap_err().0, CtlError::NoPort.to_string());
+}
