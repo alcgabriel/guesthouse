@@ -72,7 +72,8 @@ pub fn viewer_identity(state: &Path) -> Result<String, String> {
     Ok(fingerprint(&certificate))
 }
 
-/// The guest's trust list: the viewer, and nobody else.
+/// The guest's trust list with the viewer alone, which is also the viewer's line that decides
+/// whether the guest's installer runs again (see `trust`).
 pub fn trust_list(viewer: &str) -> String {
     format!("{viewer} Guesthouse\n")
 }
@@ -127,11 +128,24 @@ mod tests {
 
     #[test]
     fn the_guest_script_uses_the_names_the_host_writes() {
-        for name in [GUEST_SETUP, "trusted", "encoder.txt", "logon.txt", r"C:\Guesthouse\screen"] {
+        for name in
+            [GUEST_SETUP, "trusted", "viewer.txt", "encoder.txt", "logon.txt", r"C:\Guesthouse\screen"]
+        {
             assert!(SCRIPT.contains(name), "{name}");
         }
         assert!(SETUP.ends_with(GUEST_SETUP));
         assert!(SCRIPT.contains("screen: fingerprint"));
+    }
+
+    #[test]
+    fn the_guest_script_installs_again_for_the_viewer_and_gives_the_installer_the_whole_list() {
+        // The note is of the installer, the viewer's line and the encoder, in the order a guest
+        // installed before kept it in, when the viewer's line was the whole list.
+        assert!(SCRIPT.contains("($setupHash, $viewerHash, $encoder) -join ' '"));
+        assert!(SCRIPT.contains("Join-Path $Folder 'viewer.txt'"));
+        assert!(!SCRIPT.contains("Get-FileHash -LiteralPath $trusted"));
+        assert!(SCRIPT.contains(r#"'--trust', "`"$(Join-Path $Folder 'trusted')`"""#));
+        assert!(SCRIPT.contains("'--no-pair'"));
     }
 
     #[test]

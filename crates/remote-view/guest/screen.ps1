@@ -1,7 +1,7 @@
 # The guest's screen: remoteman's host, which shows its desktop to the remoteman viewer on the PC
 # that runs it, encoded on the guest's card. report.ps1 runs this at every start, as SYSTEM, before
 # its last line, so Send-Line is there. The host puts what it needs in C:\Guesthouse\screen before
-# each boot: remoteman's host's installer, from remoteman's release, the viewer to trust, and which
+# each boot: remoteman's host's installer, from remoteman's release, the devices to trust, and which
 # encoder suits the card. remoteman's installer does all of remoteman's own work, run unattended:
 # where its files go, its service and how it's started, its trust list. This script only signs the
 # guest in, lets the port in and says what happened.
@@ -114,20 +114,41 @@ function Set-UpdatesOff {
 }
 
 # remoteman's installer is run again whenever the host brings a different one, a different viewer
-# to trust or a different encoder, and whenever its service isn't there, whatever the guest's note
-# of the last install says. Run again, it keeps the host's identity, so its fingerprint stays.
-$trusted = Join-Path $screen 'trusted'
+# or a different encoder, and whenever its service isn't there, whatever the guest's note of the
+# last install says. Run again, it keeps the host's identity, so its fingerprint stays. It replaces
+# the host's whole trust list with the one it's given, so it's given trusted: the viewer and every
+# device paired in the guest, which the host reads off the guest's disk before each boot. Its note
+# is of viewer.txt, the viewer's line alone, so a device paired since doesn't run it again and
+# blink the picture. viewer.txt holds what trusted held when the viewer was all it had, so a guest
+# installed then keeps its note and isn't installed again.
+function Get-InstallNote([string]$Folder) {
+    $setupHash = (Get-FileHash -LiteralPath (Join-Path $Folder 'remoteman-host-setup.exe') -Algorithm SHA256).Hash
+    $viewerHash = (Get-FileHash -LiteralPath (Join-Path $Folder 'viewer.txt') -Algorithm SHA256).Hash
+    $encoder = (Get-Content -LiteralPath (Join-Path $Folder 'encoder.txt') -Raw).Trim()
+    ($setupHash, $viewerHash, $encoder) -join ' '
+}
+
+# Whether the note of the last install in $Folder isn't $Note.
+function Test-NoteChanged([string]$Folder, [string]$Note) {
+    $file = Join-Path $Folder 'installed.txt'
+    $installed = if (Test-Path -LiteralPath $file) { (Get-Content -LiteralPath $file -Raw).Trim() } else { '' }
+    $installed -ne $Note
+}
+
+function Get-SetupArguments([string]$Folder, [string]$Encoder, [string]$Log) {
+    # Start-Process joins these unquoted, so the paths are quoted here.
+    '--silent', '--trust', "`"$(Join-Path $Folder 'trusted')`"", '--encoder', $Encoder, '--no-pair', '--log', "`"$Log`""
+}
+
 $encoder = (Get-Content -LiteralPath (Join-Path $screen 'encoder.txt') -Raw).Trim()
-$wanted = ((Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash, (Get-FileHash -LiteralPath $trusted -Algorithm SHA256).Hash, $encoder) -join ' '
+$wanted = Get-InstallNote $screen
 $installedFile = Join-Path $screen 'installed.txt'
-$installed = if (Test-Path -LiteralPath $installedFile) { (Get-Content -LiteralPath $installedFile -Raw).Trim() } else { '' }
 $missing = -not (Get-Service -Name $service -ErrorAction SilentlyContinue)
-if ($missing -or -not (Test-Path -LiteralPath $hostExe) -or $installed -ne $wanted) {
+if ($missing -or -not (Test-Path -LiteralPath $hostExe) -or (Test-NoteChanged $screen $wanted)) {
     Send-Line "screen: installing remoteman host, encoder $encoder"
     # Its own log, where it says each step, and FAILED and why as its last line when it fails.
     $setupLog = Join-Path $screen 'remoteman-setup.log'
-    # Start-Process joins these unquoted, so the paths are quoted here.
-    $arguments = '--silent', '--trust', "`"$trusted`"", '--encoder', $encoder, '--no-pair', '--log', "`"$setupLog`""
+    $arguments = Get-SetupArguments $screen $encoder $setupLog
     $run = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru
     if ($run.ExitCode -ne 0) {
         Send-Line "screen: remoteman's installer failed, with $($run.ExitCode)"
