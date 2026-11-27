@@ -21,7 +21,7 @@ const THERE: u32 = 1;
 const PAGE_NUMBER_SHIFT: u32 = 2;
 /// A surface's pages are listed in one page.
 const MOST_SURFACE_PAGES: u64 = PAGE_BYTES / WORD_BYTES;
-/// A driver may round a row's bytes up to this, as Linux's guest driver does for widths whose
+/// A driver may round a row's bytes up to this, as our Linux guest driver does for widths whose
 /// rows a GPU would not take as they are.
 const ROW_ALIGN: u32 = 64;
 

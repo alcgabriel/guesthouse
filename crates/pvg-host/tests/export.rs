@@ -270,7 +270,7 @@ fn a_picture_that_changes_is_published_for_outside_readers() {
 
 /// Reads a running program's frames under `PVG_EXPORT_READ` for `PVG_EXPORT_READ_SECONDS` (10),
 /// giving each back at once, and says each second how many came and of what size: for a real
-/// guest's frames, such as `tools/pvg-desktop/start.sh host` with `--frames NAME`.
+/// guest's frames, such as a machine whose graphics process runs with `--frames NAME`.
 ///
 ///     PVG_EXPORT_READ=guesthouse.test PVG_EXPORT_READ_SECONDS=20 cargo test -p guesthouse-pvg-host \
 ///         --test export -- --ignored --nocapture a_reader_outside

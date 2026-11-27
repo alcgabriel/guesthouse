@@ -36,7 +36,7 @@ pub fn key(code: u16, iso: bool) -> Option<Key> {
     Some(Key { linux, qcode })
 }
 
-// Made by tools/pvg-host/keymap.py from keycodemapdb's data/keymaps.csv at f5772a62ec52.
+// Made from keycodemapdb's data/keymaps.csv at f5772a62ec52.
 // The Mac's virtual key code, the Linux key code, and QEMU's name for the key.
 pub const KEYS: [(u16, u16, &str); 118] = [
     (0x00, 30, "a"),             // ANSI_A

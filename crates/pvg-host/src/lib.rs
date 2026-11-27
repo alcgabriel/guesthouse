@@ -88,9 +88,10 @@ pub use window::Taking;
 /// The display's modes when the arguments name none.
 #[cfg(target_os = "macos")]
 pub const DEFAULT_MODES: &str = "1920x1080@60,1280x800@60,1024x768@60,640x480@60";
-/// What the program says to arguments it can't take, after `pvg-host: `. As the owner's table has
-/// it, byte for byte: the app and the daemon's checks read it. The window's own flags, `--input`,
-/// `--input-test`, `--power` and `--screen-scale`, are in the notes above.
+/// What the program says to arguments it can't take, after `pvg-host: `: what the Mac app
+/// expects, byte for byte, as the app and the daemon's checks read it. The window's own flags,
+/// `--input`, `--input-test`, `--power` and `--screen-scale`, are in this crate's notes at the top
+/// of this file.
 #[cfg(target_os = "macos")]
 pub const USAGE: &str = "usage: guesthouse-pvg-host --socket PATH [--control PATH] [--modes WxH@R,...] [--name NAME] [--window] [--frames NAME]\n       guesthouse-pvg-host --option-rom";
 /// A window's content at its start, in points.

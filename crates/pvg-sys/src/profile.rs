@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //! What one macOS build's device looks like to a guest, as far as the guard has to read it.
 //!
-//! The device's registers and commands are not a published interface. Every number here was seen
+//! The device's registers and commands are not a published interface. The numbers here were seen
 //! on that build, by playing the guest against the framework with a program of our own and reading
-//! what the device did and what the framework logged. The guard rests on these numbers, so a build
-//! with no profile is refused: on a build where a number has moved, the guard would check the
-//! wrong word.
+//! what the device did and what the framework logged. Two exceptions: three of the delete
+//! operations were not seen to delete (see `delete_operations`), and the `most_*` limits are this
+//! host's own choices. The guard rests on these numbers, so a build with no profile is refused: on
+//! a build where a number has moved, the guard would check the wrong word.
 //!
 //! A profile names only what the guard reads or what this host passes on. Whatever else the device
 //! has, a guest's write to it is not passed.
@@ -190,8 +191,8 @@ pub struct Commands {
     /// Says where a task's object list and its placement list are: the task, the two addresses
     /// in the task, 64 bits each, and the two lengths.
     pub set_lists: Command,
-    /// A number the device has retired. It refuses it with its ordinary fault and reads on, which
-    /// is what the guard makes of a command it won't pass.
+    /// A number in the device's group of invalid commands. It refuses it with its ordinary fault
+    /// and reads on, which is what the guard makes of a command it won't pass.
     pub refused: u32,
 }
 
@@ -241,7 +242,11 @@ pub struct TaskShape {
     pub info_pair_bytes: u64,
     /// The serializer's delete operations this host passes, by number: for a buffer, a texture,
     /// a depth and stencil state, a sampler, a function, and the two kinds of pipeline. Each is
-    /// its number, this length, and the object's id.
+    /// its number, this length, and the object's id. The numbers are what Apple's serializer
+    /// writes for each, read from its output. 1001, 1003, 1005 and 1007 were seen to delete.
+    /// 1002 (a depth and stencil state) and 1006 (a compute pipeline) are what the guest's driver
+    /// sends and were not seen to delete; they pass, as refusing them would refuse every such
+    /// object a driver lets go of. 1000 is not sent: command 37 deletes buffers.
     pub delete_operations: [u32; 7],
     pub delete_operation_bytes: u32,
     /// In a task's root page: the page of its table, and how many levels the table has.

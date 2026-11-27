@@ -127,8 +127,8 @@ const WINDOW_SMALLEST: u32 = 320;
 const WINDOW_LARGEST: (u32, u32) = (5120, 2880);
 const WINDOW_HERTZ: u16 = 60;
 /// A window's mode is a whole number of these pixels wide. The display shows a picture whose
-/// width is no multiple of 4 sheared (seen on the M5, macOS 27.2.1, by the guest's driver's
-/// tests); 8 keeps clear of that with room. The height is the window's own.
+/// width is no multiple of 4 sheared (seen on macOS 27.2.1 by our Linux guest driver's tests,
+/// on QEMU's device too); 8 keeps clear of that with room. The height is the window's own.
 const WIDTH_STEP: u32 = 8;
 /// How long a window's size has to stay the same before the guest is given it. A drag, a
 /// screen change or full screen brings several sizes in a row, and each mode list the guest
@@ -247,7 +247,7 @@ fn offer(
     offered: &Offered,
     then: impl FnOnce(String) + Send + 'static,
 ) {
-    // The owner's table's answer first, `ok N modes`, and what was offered after it.
+    // The answer the Mac app expects first, `ok N modes`, and what was offered after it.
     let text = format!("{} modes: {}", list.len(), modes_text(&list));
     let mut last = offered.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if last.as_ref() == Some(&list) {
@@ -287,7 +287,7 @@ fn send(to_qemu: &Mutex<UnixStream>, answer: Answer) -> io::Result<()> {
 }
 
 /// Binds a socket in the place of any file there, one only this process's user may connect to,
-/// whatever the folder's mode: QEMU's and the control socket both, as the owner asked. A socket
+/// whatever the folder's mode: QEMU's and the control socket both. A socket
 /// takes its mode from the umask at the bind, so the mask is narrowed for the bind and the mode
 /// set after: the socket is never open to others. The mask is the process's; a file another
 /// thread makes meanwhile is made private too, never more open.

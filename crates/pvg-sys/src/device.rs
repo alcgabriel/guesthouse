@@ -17,8 +17,8 @@ use std::time::{Duration, Instant};
 
 const WORD_BYTES: u64 = 4;
 const MAPPER_WORD_BYTES: u64 = 8;
-/// The device reads a ring inside the write that tells it of new commands. Should a build's not,
-/// it gets this long before a command counts as failed.
+/// The device reads a ring on a thread of its own after the write that tells it of new commands.
+/// It gets this long before a command counts as failed.
 const READ_WAIT: Duration = Duration::from_millis(500);
 const READ_LOOK: Duration = Duration::from_micros(50);
 /// How long a kick waits for a mode list's setter to be done before it tells the device all the same.
@@ -112,8 +112,7 @@ pub struct Device {
 }
 
 /// Two words of a display's state page that only a line reads: the mode list's number, and
-/// whether it waits for the guest to acknowledge it (as the notes have them, and the driver's
-/// header in tools/pvg-linux).
+/// whether it waits for the guest to acknowledge it, as they were seen on the device.
 const STATE_SEQUENCE: u64 = 0x200;
 const STATE_LIST_STATE: u64 = 0xfc0;
 

@@ -58,8 +58,8 @@ fn a_guest_reaches_its_device_through_the_socket_and_shows_a_picture() {
     let answer = ask(&control, "modes 1024x768@60,640x480@60");
     assert!(answer.starts_with("ok 2 modes: 1024x768@60,640x480@60 ("), "{answer}");
     assert!(ask(&control, "modes many").starts_with("error "));
-    // The owner's table: a bare word is read as an empty list, and with no window the unknown
-    // word's answer lists the words he knows.
+    // What the Mac app expects: a bare word is read as an empty list, and with no window the
+    // unknown word's answer lists the words the program knows.
     assert_eq!(ask(&control, "modes"), "error '' is no list of modes like 1920x1080@60,1280x800@60");
     assert_eq!(
         ask(&control, "bogus"),

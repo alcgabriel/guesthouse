@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-//! The program's usage, as the owner's table has it: the Mac app tells a build that publishes
-//! frames by its `--frames`, and a daemon that takes its place compares it line for line. Nothing here
-//! reaches the device.
+//! The program's usage, byte for byte what the Mac app expects: the app tells a build that
+//! publishes frames by its `--frames`, and a daemon that takes its place compares it line for
+//! line. Nothing here reaches the device.
 #![cfg(target_os = "macos")]
 
 use std::process::Command;
@@ -18,7 +18,7 @@ fn run(arguments: &[&str]) -> (Option<i32>, String, String) {
 }
 
 #[test]
-fn the_usage_is_the_owners_and_goes_to_standard_error() {
+fn the_usage_is_what_the_app_expects_and_goes_to_standard_error() {
     for arguments in [&[][..], &["--help"], &["--bogus"], &["--control", "c.sock"]] {
         assert_eq!(run(arguments), (Some(1), String::new(), USAGE.to_owned()), "{arguments:?}");
     }

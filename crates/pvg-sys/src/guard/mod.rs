@@ -441,8 +441,8 @@ impl Guard {
     }
 
     /// The cursor's picture, if a command with a new one was passed since the last call. The
-    /// framework hands a host no cursor picture on this macOS, so a host that shows one reads it
-    /// here, from the same words the device is given.
+    /// framework's declared interface hands a host no cursor picture on this macOS, so a host that
+    /// shows one reads it here, from the same words the device is given.
     pub fn take_glyph(&self) -> Option<Glyph> {
         self.glyph.borrow_mut().take()
     }
