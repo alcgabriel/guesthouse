@@ -136,10 +136,19 @@ fn run(
         record.mac = Some(network::mac_from(&host::new_guid().map_err(|error| error.to_string())?));
         record.save(&disk)?;
     }
+    let hosts = settings
+        .host_addresses
+        .as_ref()
+        .map(|addresses| crate::screen::hosts_file(settings.bridge.is_some(), addresses));
     match record.guest {
-        Guest::Windows => {
-            refresh_windows_disk(&disk, card.as_ref(), settings.nvapi_wrapper, &shares, sink.as_ref())?
-        }
+        Guest::Windows => refresh_windows_disk(
+            &disk,
+            card.as_ref(),
+            settings.nvapi_wrapper,
+            &shares,
+            hosts.as_deref(),
+            sink.as_ref(),
+        )?,
         Guest::Linux => {
             linux::refresh_disk(&files_disk(&disk), card.as_ref(), &shares, sink.as_ref())?;
             if !record.installed {

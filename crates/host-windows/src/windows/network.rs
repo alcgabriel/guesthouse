@@ -2,7 +2,7 @@
 //! forwards, the service list for IP Helper and Hyper-V, and the interface table for adapters.
 //! What it says and how it's read is [`crate::network`]'s.
 
-use crate::network::{self as portable, Netsh, Network, Proxy, Run};
+use crate::network::{self as portable, Netsh, Network, Protocol, Proxy, Run};
 use guesthouse_control::Bridging;
 use guesthouse_hcs::adapters;
 use guesthouse_hcs::services::{self, Standing};
@@ -122,8 +122,8 @@ impl Network for RealNetwork {
         self.netsh.rules()
     }
 
-    fn add_rule(&self, name: &str, port: u16) -> Result<(), String> {
-        self.netsh.add_rule(name, port)
+    fn add_rule(&self, name: &str, port: u16, protocol: Protocol) -> Result<(), String> {
+        self.netsh.add_rule(name, port, protocol)
     }
 
     fn delete_rule(&self, name: &str) -> Result<(), String> {

@@ -6,6 +6,7 @@
 //! What a machine is and what goes on its disks builds on every system, so its tests run anywhere.
 //! [`windows`], the work itself, is Windows only.
 
+pub mod announce;
 pub mod events;
 pub mod guest;
 pub mod guest_ctl;
