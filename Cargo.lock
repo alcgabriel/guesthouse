@@ -1062,6 +1062,9 @@ dependencies = [
 [[package]]
 name = "guesthouse-guest-scripts"
 version = "0.11.0"
+dependencies = [
+ "guesthouse-remote-view-core",
+]
 
 [[package]]
 name = "guesthouse-guest-share"

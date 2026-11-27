@@ -9,3 +9,7 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# The serial ctl channel's grammar and format, which the guest's report must agree with.
+guesthouse-remote-view-core.workspace = true

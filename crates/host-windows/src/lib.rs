@@ -8,6 +8,7 @@
 
 pub mod events;
 pub mod guest;
+pub mod guest_ctl;
 pub mod machine;
 pub mod network;
 pub mod printable;
