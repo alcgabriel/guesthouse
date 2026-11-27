@@ -1023,7 +1023,9 @@ impl Main {
             self.looking = None;
         }
         let (Some(viewing), Some(facts)) = (&self.viewing, self.remote_view_facts()) else { return };
-        let on = viewing.on(&facts);
+        // The list says on while the last answer said off when the switch was turned elsewhere, and
+        // a look then finds it.
+        let on = viewing.on(&facts) || facts.switch;
         if !self.live {
             return;
         }
@@ -1074,7 +1076,10 @@ impl Main {
         let machine = viewing.machine.clone();
         preview::asked(&ask.request(&machine));
         let info = viewing.info.clone().unwrap_or_else(|| ShareInfo::off(&machine));
-        let answer = crate::remote_view::pretend(&info, &ask, now_ms());
+        let answer = match preview::refusal(&ask) {
+            Some(reason) => Err(reason),
+            None => crate::remote_view::pretend(&info, &ask, now_ms()),
+        };
         self.remote_view_answered(ask, answer);
     }
 

@@ -22,7 +22,7 @@ use windows_reactor::WindowTheme;
 use super::{Account, Form, Kind, Line, Main, Making, Page, Ready, ReportStage};
 use crate::bridge::Status;
 use crate::log::Log;
-use crate::remote_view::Viewing;
+use crate::remote_view::{Ask, Viewing};
 use crate::report::Prepared;
 use guesthouse_control::ShareInfo;
 use guesthouse_control::report::Summary;
@@ -241,11 +241,18 @@ fn remote_view(main: &mut Main, state: &str) {
     let mut viewing = Viewing::new(name);
     viewing.take(info, Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20))), now);
     if state == "rv-refused" {
-        viewing.refused = Some(format!(
-            "{name} has no network, so no other device can reach it. Turn its network on first."
-        ));
+        viewing.refused = refusal(&Ask::Switch(true));
     }
     main.viewing = Some(viewing);
+}
+
+/// What the service says to `ask` in a state that refuses it: `rv-refused` turns the switch on for a
+/// machine with no network.
+pub fn refusal(ask: &Ask) -> Option<String> {
+    let refused = std::env::var(STATE).is_ok_and(|state| state == "rv-refused");
+    (refused && *ask == Ask::Switch(true)).then(|| {
+        "win11 has no network, so no other device can reach it. Turn its network on first.".to_owned()
+    })
 }
 
 /// Where a preview writes the requests its Remote View buttons would have sent, a line each,
