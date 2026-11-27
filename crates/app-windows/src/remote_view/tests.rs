@@ -176,7 +176,7 @@ fn failed_hides_pairing_and_says_why_with_the_devices_still_listed() {
 }
 
 #[test]
-fn a_device_viewing_has_the_screen_and_its_own_only_notice() {
+fn a_device_viewing_has_the_screen_in_any_placement_and_it_doesnt_come_back_by_itself() {
     let info = ShareInfo {
         viewer: Some("Phone".into()),
         viewer_placement: Some("only".into()),
@@ -186,7 +186,15 @@ fn a_device_viewing_has_the_screen_and_its_own_only_notice() {
     let shown = viewing(info).shown(&running());
     assert_eq!(shown.headline, "Phone is viewing this machine.");
     assert_eq!(shown.viewer.as_deref(), Some("Phone"));
-    assert!(shown.only.unwrap().starts_with("Phone is showing this machine on its own screen only"));
+    let takes = proposed::takes_screen("Phone");
+    assert!(
+        takes.contains("Open screen takes it back") && takes.contains("Neither connects again by itself")
+    );
+    assert!(!takes.contains("comes back when"));
+    assert_eq!(
+        proposed::screen_line("Phone"),
+        "Phone has this machine's screen now. Open screen takes it back."
+    );
     assert_eq!(shown.devices[0].line, "Viewing now \u{b7} 9f2c 41ab");
 }
 

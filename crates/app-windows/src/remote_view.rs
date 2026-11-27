@@ -49,16 +49,19 @@ pub mod proposed {
         format!("{seconds} s left to answer")
     }
 
-    /// In the group while a device views the machine: it has the screen, and how to take it back.
+    /// In the group while a device views the machine: it has the screen, what that did to this PC's
+    /// own window, and how to take it back. Tried with remoteman 0.1.9: the viewer's window here says
+    /// its session ended as another device took over, and neither side connects again by itself.
     pub fn takes_screen(name: &str) -> String {
         format!(
-            "One device shows this machine at a time. Open screen here takes it back, and {name}'s view ends."
+            "One device shows this machine at a time, so {name} has its screen and the machine's window here has \
+             lost it. Open screen takes it back, and {name}'s view ends. Neither connects again by itself."
         )
     }
 
     /// The Screen row's line while a device views the machine.
     pub fn screen_line(name: &str) -> String {
-        format!("{name} is viewing this machine. Open screen takes it back.")
+        format!("{name} has this machine's screen now. Open screen takes it back.")
     }
 
     /// What a device's switch is called for a screen reader, which reads it apart from its row.
@@ -191,10 +194,10 @@ pub struct Shown {
     pub address: Option<String>,
     pub port: Option<u16>,
     pub fingerprint: Option<String>,
-    /// The device viewing the machine now, which has the screen.
+    /// The device viewing the machine now, which has the screen. On this host any device does, in
+    /// whatever placement, so the shared `only_notice`, which says the picture here comes back when
+    /// the device leaves, isn't shown: it doesn't come back by itself.
     pub viewer: Option<String>,
-    /// What the machine's own window says while that device has the screen to itself.
-    pub only: Option<String>,
     pub bridged: bool,
     /// Hidden while sharing failed or the switch is off.
     pub pairing: Option<PairingShown>,
@@ -313,7 +316,6 @@ impl Viewing {
             address,
             port,
             fingerprint: info.fingerprint.clone().filter(|_| on),
-            only: info.viewing_only().filter(|_| on).map(wording::only_notice),
             viewer,
             bridged: facts.bridged,
             held: on && (info.pairing || info.pending.is_some()),

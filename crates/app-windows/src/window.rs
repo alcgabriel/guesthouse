@@ -673,15 +673,11 @@ fn remote_view_rows(shown: &Shown, context: &ViewContext<Main>) -> Vec<View> {
         return rows;
     }
     if let Some(viewer) = &shown.viewer {
-        let mut lines = vec![caption(&proposed::takes_screen(viewer)).into()];
-        if let Some(only) = &shown.only {
-            lines.push(caption(only).into());
-        }
         let take_back = button("Open screen", glyph::SCREEN, context.message(Message::Screen), false);
         rows.push(row_with(
             glyph::SCREEN,
             &shown.headline,
-            StackPanel::new().children(lines),
+            caption(&proposed::takes_screen(viewer)),
             Some(take_back.into()),
         ));
     }
