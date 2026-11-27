@@ -129,6 +129,9 @@ fn the_guest_runs_and_refuses_exactly_what_the_host_would() {
     for (line, guest) in lines.iter().zip(guest) {
         assert_eq!(guest, host_reads(line), "{line:?}");
     }
+    assert_eq!(host_reads("guesthouse: ctl ask 5 sharing on"), "run 5 sharing on");
+    assert_eq!(host_reads("guesthouse: ctl ask 5 sharing off"), "refuse 5");
+    assert_eq!(host_reads("guesthouse: ctl ask 5 drop"), "refuse 5");
     // The samples are both kinds, so neither side agrees by taking or refusing everything.
     assert!(lines.iter().any(|line| host_reads(line).starts_with("run ")));
     assert!(lines.iter().any(|line| host_reads(line).starts_with("refuse ")));

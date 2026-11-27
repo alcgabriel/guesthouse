@@ -31,6 +31,7 @@ fn every_command_this_host_makes_is_in_the_grammar() {
         ctl::pair_accept(),
         ctl::pair_decline(),
         ctl::updates_off(),
+        ctl::share(true),
         ctl::device_revoke(FP).unwrap(),
         ctl::device_revoke(&FP.to_ascii_uppercase()).unwrap(),
     ];
@@ -48,7 +49,7 @@ fn every_command_this_host_makes_is_in_the_grammar() {
 
 #[test]
 fn the_commands_that_cut_guesthouses_own_viewer_are_not() {
-    for words in [ctl::share(true), ctl::share(false), ctl::device_drop()] {
+    for words in [ctl::share(false), ctl::device_drop()] {
         assert!(allowed(&words).is_err(), "{words:?}");
     }
 }

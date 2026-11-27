@@ -61,8 +61,9 @@ function Send-Line([string]$Text) {
 # CHUNK", or "guesthouse: ctl failed ID REASON" when it ran nothing. The answers go to the port only,
 # never to the report's file, as they can hold the names of a person's devices and pairing codes.
 # Only the words the host may send are run, by the grammar below, which the host checks too: every
-# word is lower-case letters, digits and '-', a device is named by its fingerprint, and nothing is
-# ever quoted. The tests in guest-scripts run this block on its own.
+# word is lower-case letters, digits and '-', a device is named by its fingerprint, nothing is ever
+# quoted, and never `sharing off` or `drop`, which would cut Guesthouse's own viewer. The tests in
+# guest-scripts run this block on its own.
 function Test-CtlWords {
     param([string[]]$Words)
     if (-not $Words -or $Words.Count -eq 0) { return $false }
@@ -70,7 +71,7 @@ function Test-CtlWords {
         if ($word -cnotmatch '\A[0-9a-z-]+\z') { return $false }
     }
     $fp = '[0-9a-f]{64}'
-    $grammar = "\A(status|pair (on|off|accept|decline)|revoke $fp|device $fp (allow (clipboard|files|sound|mic|camera) (on|off)|view-only (on|off))|allow (clipboard|files) (on|off)|set updates off)\z"
+    $grammar = "\A(status|pair (on|off|accept|decline)|revoke $fp|device $fp (allow (clipboard|files|sound|mic|camera) (on|off)|view-only (on|off))|allow (clipboard|files) (on|off)|set updates off|sharing on)\z"
     return ($Words -join ' ') -cmatch $grammar
 }
 

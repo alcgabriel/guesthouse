@@ -16,8 +16,8 @@
 //! The words are a strict grammar ([`allowed`]), the same as the guest's validator, of what
 //! [`crate::ctl`] makes on this host: every word is lower-case ASCII letters, digits and `-`, and a
 //! device is named only by its fingerprint, so nothing the serial line carries needs quoting or can
-//! be read by a shell as anything but a word. `sharing` and `drop` are left out, as both cut
-//! Guesthouse's own viewer, which this host must never do.
+//! be read by a shell as anything but a word. `sharing off` and `drop` are left out, as both cut
+//! Guesthouse's own viewer, which this host must never do; `sharing on` cuts nobody and is in.
 
 use crate::ctl::{FINGERPRINT_LENGTH, Words};
 use crate::share::PERMISSIONS;
@@ -113,6 +113,7 @@ fn fingerprint(word: &str) -> bool {
 /// device FP view-only on|off
 /// allow clipboard|files on|off
 /// set updates off
+/// sharing on
 /// ```
 pub fn allowed(words: &[String]) -> Result<(), String> {
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
@@ -126,6 +127,7 @@ pub fn allowed(words: &[String]) -> Result<(), String> {
         ["device", fp, "view-only", on] => fingerprint(fp) && ON_OFF.contains(on),
         ["allow", "clipboard" | "files", on] => ON_OFF.contains(on),
         ["set", "updates", "off"] => true,
+        ["sharing", "on"] => true,
         _ => false,
     };
     if fits { Ok(()) } else { Err(format!("`{}` isn't a command the guest takes.", words.join(" "))) }

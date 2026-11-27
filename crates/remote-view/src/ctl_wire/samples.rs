@@ -16,8 +16,10 @@ pub const REFUSED: &[&str] = &[
     "pair on\toff",
     "pair On",
     "sharing off",
-    "sharing on",
     "drop",
+    "sharing  on",
+    "sharing On",
+    "sharing on off",
     "set updates on",
     "set updates",
     "allow input on",
@@ -64,4 +66,5 @@ pub const TAKEN: &[&str] = &[
     "allow files on",
     "allow clipboard off",
     "set updates off",
+    "sharing on",
 ];
