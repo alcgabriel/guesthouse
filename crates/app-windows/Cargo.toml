@@ -27,6 +27,10 @@ preview = []
 # The words on the service's pipe, and the pipe itself. The only way the app reaches the service.
 guesthouse-control.workspace = true
 windows-reactor = { path = "../../vendor/windows-reactor" }
+# Remote View's states, wording and limits, the same as every host shows them.
+guesthouse-remote-view-core.workspace = true
+# This PC's address on its network, which a device types in to view a machine.
+guesthouse-relay.workspace = true
 # The few calls WinUI doesn't make for us: the file dialog, the clipboard, cancelling a read that
 # waits on the pipe, and the console, which is Windows' Remote Desktop control in a window of our
 # own (OLE and variants for the control, the library loader for RdpBase and ATL, the pipe's wait,
@@ -48,6 +52,13 @@ windows-sys = { version = "0.61", features = [
     "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+[dev-dependencies]
+# What the Remote View group shows and asks is plain logic, tested on any system: these are the
+# words it uses and the requests it makes, which the tests hold.
+guesthouse-remote-view-core.workspace = true
+guesthouse-control.workspace = true
+serde_json = "1"
 
 [target.'cfg(windows)'.build-dependencies]
 # Stages the Windows App Runtime beside the exe and embeds the manifest that finds it there, so the

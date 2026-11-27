@@ -9,19 +9,22 @@
 //! at most, however fast its guest writes.
 
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use guesthouse_control::client::{self, Unreached};
 use guesthouse_control::updates;
-use guesthouse_control::{Answer, Bridging, CardInfo, Event, Machine, MachineSettings, NewMachine, Request};
+use guesthouse_control::{
+    Answer, Bridging, CardInfo, Event, Machine, MachineSettings, NewMachine, Request, ShareInfo,
+};
 use windows_reactor::ComponentCompletion;
 
 use crate::app::Message;
 use crate::pace::{Batch, Changes};
+use crate::remote_view::{self, Ask};
 
 /// How often the service is asked how things stand.
 const EVERY: Duration = Duration::from_secs(2);
@@ -318,5 +321,115 @@ impl Drop for Watch {
                 thread::sleep(STOP_APART);
             }
         });
+    }
+}
+
+/// What a remote view's thread is given to do.
+enum Look {
+    /// Ask this of the service.
+    Ask(Ask),
+    /// Look how it stands now, as when its switch went on.
+    Now,
+}
+
+/// A shown Windows machine's remote view, asked about on a thread of its own: what the person asks
+/// of it, and how it stands every [`EVERY`] while its switch is on. A reading of remoteman in the
+/// guest can take seconds, which mustn't hold up the service's other answers. Dropping it ends the
+/// thread once its call in hand is answered.
+pub struct Looking {
+    work: Sender<Look>,
+    on: Arc<AtomicBool>,
+}
+
+impl Looking {
+    pub fn ask(&self, ask: Ask) {
+        let _ = self.work.send(Look::Ask(ask));
+    }
+
+    /// Whether to keep looking, as the switch is. Turned on, it looks at once.
+    pub fn set_on(&self, on: bool) {
+        if !self.on.swap(on, Ordering::Relaxed) && on {
+            let _ = self.work.send(Look::Now);
+        }
+    }
+}
+
+/// The answer to a remote view's request, or the words for why there's none.
+fn share_answer(answer: Result<Answer, Unreached>) -> Result<ShareInfo, String> {
+    match answer {
+        Ok(Answer::Share { info }) => Ok(info),
+        Ok(Answer::Refused { reason }) => Err(reason),
+        Ok(_) => Err(Unreached::Garbled.words().to_owned()),
+        Err(unreached) => Err(unreached.words().to_owned()),
+    }
+}
+
+/// Starts asking about `name`'s remote view. Its messages carry `id`, so the window can tell them
+/// from those of a machine it no longer shows. Each answer to what was asked goes to the window;
+/// a look goes only when it differs from the last one told, with this PC's address, which a device
+/// types in.
+pub fn look(id: u64, name: String, on: bool, window: Window) -> Looking {
+    let (work, inbox) = mpsc::channel::<Look>();
+    let on = Arc::new(AtomicBool::new(on));
+    let looking = Arc::clone(&on);
+    let failed = window.clone();
+    let spawned = thread::Builder::new().name("remote view".into()).spawn(move || {
+        let mut told = Changes::new();
+        // The first look is at once.
+        let mut wait = Duration::ZERO;
+        loop {
+            match inbox.recv_timeout(wait) {
+                Ok(Look::Ask(ask)) => {
+                    let answer = share_answer(client::ask(&ask.request(&name)));
+                    if !window.tell(Message::RemoteViewAnswered(id, ask, answer)) {
+                        return;
+                    }
+                    // The answer is how it stands now, which the window has taken.
+                    told.forget();
+                    wait = EVERY;
+                    continue;
+                }
+                Ok(Look::Now) | Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Disconnected) => return,
+            }
+            wait = EVERY;
+            if !looking.load(Ordering::Relaxed) {
+                continue;
+            }
+            let answer = share_answer(client::ask(&Request::RemoteView { name: name.clone() }));
+            let address = guesthouse_relay::lan_address();
+            let seen = (answer.as_ref().map(remote_view::settled).map_err(Clone::clone), address);
+            if told.news(seen).is_some() && !window.tell(Message::RemoteViewSeen(id, answer, address)) {
+                return;
+            }
+        }
+    });
+    if let Err(error) = spawned {
+        let words = format!("The app couldn't start asking about the remote view: {error}");
+        let _ = failed.tell(Message::RemoteViewSeen(id, Err(words), None));
+    }
+    Looking { work, on }
+}
+
+/// The machine whose pairing the app last saw open, to close when the app goes, as nobody would be
+/// there to answer a device.
+static PAIRING_OPEN: Mutex<Option<String>> = Mutex::new(None);
+
+/// Notes whether `name`'s pairing is open, as an answer said.
+pub fn note_pairing(name: &str, open: bool) {
+    let mut noted = PAIRING_OPEN.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if open {
+        *noted = Some(name.to_owned());
+    } else if noted.as_deref() == Some(name) {
+        *noted = None;
+    }
+}
+
+/// Closes the pairing the app left open, if it did, as it goes. Best effort: the service closes it
+/// itself when its time is up.
+pub fn close_pairing_left_open() {
+    let noted = PAIRING_OPEN.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take();
+    if let Some(name) = noted {
+        let _ = client::ask(&Request::PairClose { name });
     }
 }

@@ -22,6 +22,8 @@ mod console;
 mod log;
 #[cfg(any(windows, test))]
 mod pace;
+#[cfg(any(windows, test))]
+mod remote_view;
 #[cfg(windows)]
 mod report;
 #[cfg(windows)]
@@ -50,7 +52,11 @@ fn main() {
         let _ = std::fs::write(path, format!("{info}\n"));
     }));
     let start = app::Start::new();
-    if let Err(error) = windows_reactor::App::run_component::<app::Main>(start) {
+    let ran = windows_reactor::App::run_component::<app::Main>(start);
+    // Nobody is left to answer a device that comes to pair. Only what the service's machines had
+    // open is noted, so a preview sends nothing.
+    bridge::close_pairing_left_open();
+    if let Err(error) = ran {
         let _ = std::fs::write(system::panic_file(), format!("the window couldn't open: {error}\n"));
         std::process::exit(1);
     }

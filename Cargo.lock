@@ -940,6 +940,9 @@ name = "guesthouse-app-windows"
 version = "0.11.0"
 dependencies = [
  "guesthouse-control",
+ "guesthouse-relay",
+ "guesthouse-remote-view-core",
+ "serde_json",
  "windows-reactor",
  "windows-reactor-setup",
  "windows-sys 0.61.2",
