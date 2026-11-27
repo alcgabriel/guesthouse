@@ -1,6 +1,6 @@
 //! The few facts that go with a report outside its bundle, so it can be sorted before anyone opens it:
-//! `summary.json` inside, and the same in the `X-Report-Summary` header. They are the Linux host's
-//! rules, so one server takes both.
+//! `summary.json` inside, and the same in the `X-Report-Summary` header. Every host keeps to these
+//! rules, so one server takes them all.
 //!
 //! The server takes a flat object of strings, at most 20 of them, none longer than 2000 characters,
 //! and a header of at most 6000 characters once it's base64url.
@@ -11,8 +11,14 @@ use std::collections::BTreeMap;
 pub const VERSION: &str = "version";
 pub const CARD: &str = "card";
 pub const DRIVER: &str = "driver";
+/// The Linux host's distribution, kernel and desktop session.
+pub const DISTRO: &str = "distro";
+pub const KERNEL: &str = "kernel";
+pub const SESSION: &str = "session";
+/// The Windows host's edition, version and build.
 pub const OS: &str = "os";
-/// Which kind of host the report is from. Always [`HOST_WINDOWS`] here.
+/// Which kind of host the report is from: [`HOST_WINDOWS`] from the Windows host. The Linux host's
+/// reports don't say.
 pub const HOST: &str = "host";
 /// The guest's kind, never the machine's name, which is the user's.
 pub const MACHINE: &str = "machine";
@@ -23,13 +29,13 @@ pub const CONTACT: &str = "contact";
 /// What `host` says in a report from a Windows host.
 pub const HOST_WINDOWS: &str = "windows";
 
-const MOST_KEYS: usize = 20;
-const MOST_VALUE_CHARS: usize = 2000;
-const MOST_HEADER_CHARS: usize = 6000;
+pub const MOST_KEYS: usize = 20;
+pub const MOST_VALUE_CHARS: usize = 2000;
+pub const MOST_HEADER_CHARS: usize = 6000;
 /// The start of the description goes in the summary. The whole of it is in the bundle.
-const DESCRIPTION_CHARS: usize = 1500;
+pub const DESCRIPTION_CHARS: usize = 1500;
 /// How much shorter the description gets each time the header is still too long.
-const DESCRIPTION_STEP: usize = 100;
+pub const DESCRIPTION_STEP: usize = 100;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Summary(BTreeMap<String, String>);
@@ -239,15 +245,11 @@ mod tests {
 
     #[test]
     fn the_limits_are_the_linux_hosts() {
-        let linux = include_str!("../../../app-core/src/report/summary.rs");
-        for line in [
-            format!("const MOST_KEYS: usize = {MOST_KEYS};"),
-            format!("const MOST_VALUE_CHARS: usize = {MOST_VALUE_CHARS};"),
-            format!("const MOST_HEADER_CHARS: usize = {MOST_HEADER_CHARS};"),
-            format!("const DESCRIPTION_CHARS: usize = {DESCRIPTION_CHARS};"),
-            format!("const DESCRIPTION_STEP: usize = {DESCRIPTION_STEP};"),
-        ] {
-            assert!(linux.contains(&line), "{line}");
-        }
+        // The server's limits, pinned now that the hosts share one copy.
+        assert_eq!(MOST_KEYS, 20);
+        assert_eq!(MOST_VALUE_CHARS, 2000);
+        assert_eq!(MOST_HEADER_CHARS, 6000);
+        assert_eq!(DESCRIPTION_CHARS, 1500);
+        assert_eq!(DESCRIPTION_STEP, 100);
     }
 }
