@@ -10,21 +10,22 @@
 #        vm.sh PROJECT_ROOT start SECONDS    starts it, waits for ssh
 #        vm.sh PROJECT_ROOT ssh COMMAND...   a command in it, as pvg (sudo works)
 #        vm.sh PROJECT_ROOT stop             powers it down, then ends QEMU
-# Environment: PVG_VM the VM's folder (build/pvg-macapp/P2/vm), PVG_VM_PORT
-#   the ssh port (22631), PVG_QEMU the QEMU (build/qemu-pvg/mp).
+# Environment: PVG_VM the VM's folder (target/linux-pvg/vm), PVG_VM_PORT
+#   the ssh port (22631), PVG_QEMU the QEMU (target/mac-helpers, from
+#   qemu/mac/build.sh), PVG_FIRMWARE the folder with its edk2 firmware
+#   (target/mac-helpers/Resources/qemu), PVG_IMAGE Ubuntu 26.04's arm64 cloud
+#   image, for make.
 #
-# Only one build VM of 6 GiB runs at a time on this Mac (setup.md); it takes
-# no guest slot, since it has no PVG device.
+# It has no pvg device, so it runs without the graphics process.
 set -eu
 root=$(cd "$1" && pwd)
 what=$2
 shift 2
-vm=${PVG_VM:-$root/build/pvg-macapp/P2/vm}
+vm=${PVG_VM:-$root/target/linux-pvg/vm}
 port=${PVG_VM_PORT:-22631}
-qemu=${PVG_QEMU:-$root/build/qemu-pvg/mp/qemu-system-aarch64}
-firmware=$root/build/qemu-pvg/qemu-i/pc-bios
-image=$root/.tools/guest/pvg-ubuntu/cloud1/ubuntu-26.04-server-cloudimg-arm64.img
-here=$root/tools/pvg-ubuntu
+qemu=${PVG_QEMU:-$root/target/mac-helpers/qemu-system-aarch64}
+firmware=${PVG_FIRMWARE:-$root/target/mac-helpers/Resources/qemu}
+here=$root/drivers/linux-pvg/package
 ssh_to() {
 	ssh -i "$vm/key" -p "$port" -o StrictHostKeyChecking=no -o UserKnownHostsFile="$vm/known_hosts" \
 		-o ConnectTimeout=5 -o ServerAliveInterval=15 -o LogLevel=ERROR pvg@127.0.0.1 "$@"
@@ -34,7 +35,8 @@ case $what in
 make)
 	mkdir -p "$vm"
 	[ -f "$vm/key" ] || ssh-keygen -q -t ed25519 -N '' -C pvg-build-vm -f "$vm/key"
-	[ -f "$vm/build.img" ] || "$root/.venv/bin/python" -I "$here/to-raw.py" "$qemu" "$image" "$vm/build.img" 40
+	image=${PVG_IMAGE:?names the Ubuntu 26.04 arm64 cloud image}
+	[ -f "$vm/build.img" ] || python3 -I "$here/to-raw.py" "$qemu" "$image" "$vm/build.img" 40
 	cp "$firmware/edk2-aarch64-vars.fd" "$vm/vars.fd"
 	rm -rf "$vm/seed" "$vm/seed.iso"
 	mkdir -p "$vm/seed"

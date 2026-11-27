@@ -15,8 +15,7 @@
  *
  * Observed, and what the order of things below follows from: the device
  * does not unmap the mapping a display shows, and no command blanks a
- * display. See notes/m5/working-notes.md, "Two tracks: the Linux guest's
- * screen".
+ * display.
  */
 
 #include <linux/slab.h>

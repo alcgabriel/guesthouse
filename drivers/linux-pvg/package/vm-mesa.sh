@@ -7,10 +7,9 @@
 # platforms, through glvnd with the vendor name pvg, prefix /opt/pvg-mesa,
 # installed into ~/mesa-stage by DESTDIR.
 #
-# As in tools/pvg-zink/guest/zink-build.sh, mesa_clc and vtn_bindgen2 come
-# first from a build of their own with LLVM (Ubuntu's LLVM 21), and the
-# build that is packaged takes them as -Dmesa-clc=system with LLVM off, so
-# nothing it installs links LLVM.
+# mesa_clc and vtn_bindgen2 come first from a build of their own with LLVM
+# (Ubuntu's LLVM 21), and the build that is packaged takes them as
+# -Dmesa-clc=system with LLVM off, so nothing it installs links LLVM.
 #
 # The libraries get the run path /opt/pvg-mesa/lib, so that what glvnd,
 # libgbm and the Vulkan loader open by its full path finds libgallium
@@ -60,6 +59,8 @@ tail -2 "$HOME/mesa-ninja.log"
 rm -rf "$stage"
 DESTDIR=$stage ninja -C "$build" install > "$HOME/mesa-install.log" 2>&1 ||
 	{ tail -20 "$HOME/mesa-install.log"; echo "vm-mesa: FAILED: install"; exit 1; }
+# The libraries' names have no spaces.
+# shellcheck disable=SC2044
 for lib in $(find "$stage" -name "*.so*" -type f); do
 	readelf -d "$lib" | grep -q "libLLVM" && echo "vm-mesa: $lib links LLVM"
 	readelf -d "$lib" | grep -q "RUNPATH.*/opt/pvg-mesa/lib" || echo "vm-mesa: $lib has no run path"

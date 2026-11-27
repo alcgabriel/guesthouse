@@ -7,7 +7,8 @@
 # keeps Mesa builds in guests apart; the VM runs at most an hour.
 #
 # Usage: build-mesa.sh PROJECT_ROOT MESA_TREE COMMIT [MESON_OPTION...]
-# Environment: PVG_OUT (build/pvg-macapp/P2/mesa); PVG_VM, PVG_VM_PORT as
+# Environment: PVG_OUT (target/linux-pvg/mesa); PVG_WAYLAND_PROTOCOLS, the
+#   release tarball wayland-protocols-1.50.tar.xz; PVG_VM, PVG_VM_PORT as
 #   for vm.sh. PVG_VM_UP=yes: the VM runs already (no start, no stop, no
 #   lock: the caller holds it).
 set -eu
@@ -15,11 +16,12 @@ root=$(cd "$1" && pwd)
 tree=$2
 commit=$(git -C "$tree" rev-parse --short=11 "$3")
 shift 3
-out=${PVG_OUT:-$root/build/pvg-macapp/P2/mesa}
-vm="sh $root/tools/pvg-ubuntu/vm.sh $root"
+out=${PVG_OUT:-$root/target/linux-pvg/mesa}
+protocols=${PVG_WAYLAND_PROTOCOLS:?names wayland-protocols-1.50.tar.xz}
+vm="sh $root/drivers/linux-pvg/package/vm.sh $root"
 mkdir -p "$out"
 if [ "${PVG_VM_UP:-}" != yes ]; then
-	exec lockf -t 3600 "$root/build/scratch/locks/mesa-guest.lock" env PVG_VM_UP=yes PVG_STARTED_VM=yes \
+	exec lockf -t 3600 "$out/mesa-guest.lock" env PVG_VM_UP=yes PVG_STARTED_VM=yes \
 		sh "$0" "$root" "$tree" "$commit" "$@"
 fi
 if [ "${PVG_STARTED_VM:-}" = yes ]; then
@@ -31,12 +33,12 @@ echo "build-mesa: $tree at $commit"
 # (Ubuntu 26.04 has 1.47).
 $vm ssh 'rm -rf ~/mesa-src ~/dl && mkdir -p ~/mesa-src ~/dl'
 git -C "$tree" archive "$commit" | $vm ssh 'tar -C ~/mesa-src -xf -'
-cat "$root/.tools/src/dl-wayland-protocols-1.50/wayland-protocols-1.50.tar.xz" |
+cat "$protocols" |
 	$vm ssh 'cat > ~/dl/wayland-protocols-1.50.tar.xz'
 # A build of another commit starts its build folders again.
 $vm ssh "[ \"\$(cat ~/mesa-commit 2>/dev/null)\" = $commit ] || rm -rf ~/build-mesa; echo $commit > ~/mesa-commit"
 status=0
-$vm ssh sh -s -- "$@" < "$root/tools/pvg-ubuntu/vm-mesa.sh" > "$out/build-$commit.log" 2>&1 || status=$?
+$vm ssh sh -s -- "$@" < "$root/drivers/linux-pvg/package/vm-mesa.sh" > "$out/build-$commit.log" 2>&1 || status=$?
 grep "vm-mesa\|error" "$out/build-$commit.log" | tail -60
 for log in clc-setup clc-ninja mesa-setup mesa-ninja mesa-install; do
 	$vm ssh "cat ~/$log.log" > "$out/$log-$commit.log" 2>/dev/null || true

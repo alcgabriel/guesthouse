@@ -25,10 +25,8 @@
  * signalled and jobs are in flight: a page flip, a sync_file's poll() or a
  * fence going into another submit then waits no longer than that.
  *
- * Observed with a played guest, see notes/m5/working-notes.md, "The next
- * stretch: the root page and a second ring". From a Linux guest and with a
- * task's commands in it: captures/pvg-linux/findings-cube.md, K3; with many
- * in flight: captures/pvg-linux/findings-v2.md.
+ * Observed with a played guest, and from a Linux guest with a task's
+ * commands in it, one at a time and many in flight.
  */
 
 #include <linux/jiffies.h>

@@ -119,7 +119,7 @@ static irqreturn_t pvg_irq(int irq, void *data)
 
 /*
  * The firmware may have left the device showing a picture: an option ROM such
- * as the owner's pvgfb turns the early framebuffer on and hands the firmware a
+ * as Guesthouse's pvgfb turns the early framebuffer on and hands the firmware a
  * framebuffer in guest memory, which Linux then shows its console on through
  * simpledrm. That framebuffer lies in no BAR of this device, so the aperture
  * helper finds it by the firmware's screen_info, which names no PCI device:

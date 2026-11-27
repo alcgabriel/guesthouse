@@ -11,7 +11,7 @@
 #   guesthouse-gnome_V_all.deb          Ubuntu's GNOME in place of weston
 #   guesthouse-plasma_V_all.deb         KDE Plasma in place of weston
 #   guesthouse-linux-driver-latest.json the manifest: every file once, with its sum
-# from the commits it names: the driver (tools/pvg-linux of this repo) and
+# from the commits it names: the driver (drivers/linux-pvg of this repo) and
 # our Mesa (a pvg-air branch). The Mesa is built in the build VM when
 # PVG_MESA_STAGE is not given (build-mesa.sh); the .deb files are made there
 # too, and the DKMS package is built and installed there once as a check.
@@ -19,24 +19,24 @@
 # Usage: make-package.sh PROJECT_ROOT OUT_DIR
 # Environment:
 #   PVG_VERSION      the package's version (0.1.0)
-#   PVG_DRIVER       the commit of tools/pvg-linux (HEAD)
-#   PVG_MESA_TREE    the Mesa tree (.tools/src/mesa-wt/UB), PVG_MESA_COMMIT its commit (HEAD)
+#   PVG_DRIVER       the commit of drivers/linux-pvg (HEAD)
+#   PVG_MESA_TREE    a Mesa tree with our pvg-air branch (needed), PVG_MESA_COMMIT its commit (HEAD)
 #   PVG_MESA_STAGE   a Mesa install from build-mesa.sh for that commit, if there is one
-#                    (build/pvg-macapp/P2/mesa/stage-COMMIT is taken when it is there)
+#                    (target/linux-pvg/mesa/stage-COMMIT is taken when it is there)
 #   PVG_VM_UP        yes: the build VM runs already
 set -eu
 root=$(cd "$1" && pwd)
 out=$2
 version=${PVG_VERSION:-0.1.0}
 driver=$(git -C "$root" rev-parse --short=7 "${PVG_DRIVER:-HEAD}")
-mesa_tree=${PVG_MESA_TREE:-$root/.tools/src/mesa-wt/UB}
+mesa_tree=${PVG_MESA_TREE:?names a Mesa tree with our pvg-air branch}
 mesa=$(git -C "$mesa_tree" rev-parse --short=11 "${PVG_MESA_COMMIT:-HEAD}")
 mesa_branch=$(git -C "$mesa_tree" branch --show-current)
-here=$root/tools/pvg-ubuntu
+here=$root/drivers/linux-pvg/package
 vm="sh $here/vm.sh $root"
-stage=${PVG_MESA_STAGE:-$root/build/pvg-macapp/P2/mesa/stage-$mesa}
+stage=${PVG_MESA_STAGE:-$root/target/linux-pvg/mesa/stage-$mesa}
 if [ ! -d "$stage/opt/pvg-mesa" ]; then
-	PVG_OUT=$root/build/pvg-macapp/P2/mesa sh "$here/build-mesa.sh" "$root" "$mesa_tree" "$mesa"
+	PVG_OUT=$root/target/linux-pvg/mesa sh "$here/build-mesa.sh" "$root" "$mesa_tree" "$mesa"
 fi
 if [ "${PVG_VM_UP:-}" != yes ]; then
 	$vm start 900
@@ -47,15 +47,15 @@ echo "make-package: version $version, driver $driver, Mesa $mesa_branch $mesa"
 # What goes into the VM: the driver at its commit, the Mesa install, this
 # folder at the commit of the driver's tree or as it is (it is packaging).
 in=$(mktemp -d /tmp/pvg-pkg.XXXXXX)
-git -C "$root" archive "$driver" tools/pvg-linux/driver tools/pvg-linux/uapi | tar -x -C "$in"
-mv "$in/tools/pvg-linux/driver" "$in/tools/pvg-linux/uapi" "$in/"
-rm -rf "$in/tools"
+git -C "$root" archive "$driver" drivers/linux-pvg/driver drivers/linux-pvg/uapi | tar -x -C "$in"
+mv "$in/drivers/linux-pvg/driver" "$in/drivers/linux-pvg/uapi" "$in/"
+rm -rf "$in/drivers"
 mkdir -p "$in/stage" "$in/tools" "$in/drirc"
 cp -R "$stage/opt" "$in/stage/"
 cp -R "$here/dkms" "$here/mesa-pkg" "$here/desktop" "$here/gnome" "$here/plasma" "$in/tools/"
-cp "$root/tools/pvg-zink/drirc/"*.conf "$in/drirc/"
+cp "$here/drirc/"*.conf "$in/drirc/"
 echo "$version" > "$in/version"
-echo "tools/pvg-linux at $driver (Guesthouse contributors' apple-host-phase0 branch)" > "$in/sources-driver"
+echo "drivers/linux-pvg at $driver" > "$in/sources-driver"
 echo "Mesa $mesa_branch at $mesa (KosmicKrisp with the pvg bridge, Zink)" > "$in/sources-mesa"
 $vm ssh 'rm -rf ~/pkg-in && mkdir ~/pkg-in'
 COPYFILE_DISABLE=1 tar -C "$in" -cf - . | $vm ssh 'tar -C ~/pkg-in -xf - 2>/dev/null'

@@ -8,9 +8,7 @@
  * commands then name. Its ring is its own: a command is 16 bytes, the
  * command, a mapping id and a word the device writes the outcome to.
  *
- * All of this is observed; the registers, the descriptor and the rules of
- * mapping are tabled in notes/m5/working-notes.md, "The IOSurface mapper's
- * device" and "Two tracks: the Linux guest's screen".
+ * All of this is observed.
  */
 
 #include <linux/bitmap.h>

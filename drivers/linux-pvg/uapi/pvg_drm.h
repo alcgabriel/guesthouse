@@ -3,8 +3,7 @@
  * What a program asks of the pvg driver, the guest driver for Apple's
  * paravirtualized graphics device, through its DRM file.
  *
- * Version 3. The page of notes beside this file, README.md, says what each
- * call does and who writes which bytes. Version 1's calls are as they were;
+ * Version 3. Version 1's calls are as they were;
  * version 2 adds a submit that does not wait, a call that waits for it, and
  * the sharing of buffer objects through PRIME. Version 3 adds fences going
  * into a queued submit, DRM's sync objects, read fences, and a call that
@@ -250,7 +249,7 @@ struct drm_pvg_command_buffer {
  * or blit.
  *
  * Returns when the device has stamped the command, which it does when the GPU
- * has done the work: what was drawn is there. See README.md.
+ * has done the work: what was drawn is there.
  *
  * EIO says the device refused: a command buffer's bytes, or an object that
  * could not be made from its description. The task and its objects are as
@@ -305,8 +304,7 @@ struct drm_pvg_sync {
  * which ends at stamp, works as it did.
  *
  * Where the task has no ring of its own the call waits for the fences going
- * in, and then as SUBMIT does, and the number is done when it returns. See
- * README.md.
+ * in, and then as SUBMIT does, and the number is done when it returns.
  */
 #define PVG_QUEUE_FENCE_OUT		(1 << 0)
 /* Version 3. */

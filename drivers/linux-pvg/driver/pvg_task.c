@@ -14,10 +14,7 @@
  * before it the part that names memory or a surface, so that no program can
  * name what is not its own.
  *
- * All of this is observed; the tables are in notes/m5/working-notes.md, "The
- * next stretch: a task and its page table", "Two tracks: a task's commands
- * and its objects" and the sections on the serializer and the triangle. The
- * interface is tools/pvg-linux/uapi/pvg_drm.h, with a page of notes.
+ * All of this is observed. The interface is ../uapi/pvg_drm.h.
  */
 
 #include <linux/bitmap.h>
@@ -79,10 +76,9 @@ MODULE_PARM_DESC(test_no_retry, "For tests: do not delete and define again a tas
 
 /*
  * A task is PVG_TASK_BYTES, 4 GiB, with a table of two levels, its layout
- * otherwise that of ruxnpvg_proto.h. The shared base's header at d0057fc4
- * has 1 GiB, RUXNPVG_TASK_BYTES; the length is the drivers' choice, and
- * Guesthouse's guard takes a task of up to 4 GiB since its branch
- * apple-host-4g. A page of the table holds 4096 entries, so the top page
+ * otherwise that of ruxnpvg_proto.h. That header has 1 GiB,
+ * RUXNPVG_TASK_BYTES; the length is the drivers' choice, and Guesthouse's
+ * guard takes a task of up to 4 GiB. A page of the table holds 4096 entries, so the top page
  * names tables of 64 MiB each, 64 of them.
  */
 #define PVG_TASK_BYTES		(4ull << 30)
@@ -141,10 +137,8 @@ static u64 pvg_task_room_pages(void)
 /*
  * Operation 9 of the serializer, a texture over a buffer: 64 bytes, the
  * buffer's object number at byte 12, the offset in it at 16 and a row's
- * length at 24, 64 bits each, the texture's descriptor from 32. Not in the
- * shared base's header at d0057fc4, so it is the driver's own name. Held
- * against MetalSerializer and the helper by tools/pvg-wire's scenes
- * texture-buffer and texel-buffer (captures/pvg-desktop/X/findings.md).
+ * length at 24, 64 bits each, the texture's descriptor from 32. Not in
+ * ruxnpvg_proto.h, so it is the driver's own name.
  */
 #define PVG_OP_TEXTURE_BUFFER		9
 #define PVG_OP_TEXTURE_BUFFER_BYTES	64u

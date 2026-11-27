@@ -11,9 +11,7 @@
  * The cursor is the display's too: a picture the device reads through the
  * kernel task's page table, and a place and a flag in the state page.
  *
- * All of this is observed; the page's layout and the commands are tabled in
- * notes/m5/working-notes.md, "A display's state page, command 1", "The
- * display's commands" and "Two tracks: the Linux guest's screen".
+ * All of this is observed.
  */
 
 #include <linux/interrupt.h>
@@ -88,7 +86,7 @@ static bool pvg_display_read_modes(struct pvg_device *pvg)
 			continue;
 		dev_info(&pvg->pdev->dev, "display: mode %u: %ux%u at %u Hz (%#x)\n",
 			 i, mode.width, mode.height, mode.refresh, refresh);
-		/* Seen on the M5: the host shows such a surface sheared. */
+		/* Seen on an M5 Mac: the host shows such a surface sheared. */
 		if (mode.width % 4)
 			dev_info(&pvg->pdev->dev,
 				 "display: mode %u is %u wide, no multiple of 4: the host shows it sheared\n",

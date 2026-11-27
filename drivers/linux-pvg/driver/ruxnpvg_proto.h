@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /*
  * ruxnpvg_proto.h: the protocol of Apple's paravirtualized graphics device
- * (PCI 106b:eeee) and of its surface mapper, as the guest drivers on top of
- * ruxnpvg speak it.
+ * (PCI 106b:eeee) and of its surface mapper, as the guest drivers speak it.
  *
  * Data only: numbers and the layouts of words, no types, no code and no
  * includes, so that a kernel driver of either system, a firmware driver and a
@@ -10,10 +9,7 @@
  * clang-cl's target.
  *
  * Nothing here is documented by Apple. Every number was seen from outside, on
- * macOS 27.2.1 build 26B131, protocol version 252, and is tabled in
- * the M5 side's notes (notes/m5/working-notes.md on mac-pvg-seko).
- * ruxnpvg/proto/README.md says where each group comes from and where the
- * drivers disagree.
+ * macOS 27.2.1 build 26B131, protocol version 252.
  *
  * Words are 32 bits, little-endian. "A word index" is an offset divided by
  * four. Pages are the device's: 16 KiB, whatever the guest's own page size.
@@ -138,7 +134,7 @@
  * recheck on a timer, and never count interrupts. Interrupts can merge (one
  * fewer than commands was seen on Windows) and can come late (one in 1,000
  * to 3,000 on Linux under QEMU's default for HVF, 86 to 2,122 in 70,000 on
- * Windows on the M4). Seen on both systems.
+ * Windows on an M4 Mac). Seen on both systems.
  */
 #define RUXNPVG_COMMAND_HEADER_BYTES	12u
 #define RUXNPVG_COMMAND_NUMBER		0	/* word indices of the header */
@@ -213,7 +209,7 @@
 /*
  * Command numbers of the first ring, and the payload in bytes each driver
  * sends. Where a driver sends a payload of its own length, the macro takes
- * the counts. The device's least payload, where it is less, is in the README.
+ * the counts.
  */
 #define RUXNPVG_CMD_NOP_WORD		0	/* nothing seen; wants 4 bytes or more */
 #define RUXNPVG_CMD_NOP			30	/* nothing, with any payload */
@@ -314,8 +310,8 @@
  *
  * Kind 11 is a texture over a mapping of the surface mapper. It may be
  * named as a resource that is read, and sampled in a shader: one task draws
- * into a surface, another samples it. Seen on Windows on the M4 and on
- * Linux on the M5, 2026-11-26.
+ * into a surface, another samples it. Seen on Windows on an M4 Mac and on
+ * Linux on an M5 Mac, 2026-11-26.
  *
  * Kinds 13 (a heap over the guest's pages) and 14 are not sent: a try of
  * 13 reached the Mac's kernel GPU driver.

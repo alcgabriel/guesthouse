@@ -3,11 +3,9 @@
  * Guest driver for Apple's paravirtualized graphics device.
  *
  * The device's protocol is not documented. What this driver knows of it was
- * observed from outside and is written down in notes/m5/working-notes.md. The
- * device's numbers are in ruxnpvg_proto.h, a copy of the shared base's
- * ruxnpvg/proto/ruxnpvg_proto.h, on the lab repo's branch base/proto-header
- * at d0057fc4; tools/pvg-linux/proto-check.sh holds the copy and the driver
- * to it. What is defined here is this driver's own.
+ * observed from outside. The device's numbers are in ruxnpvg_proto.h, the
+ * header this driver shares with the Windows driver. What is defined here is
+ * this driver's own.
  */
 #ifndef PVG_H
 #define PVG_H
@@ -65,7 +63,7 @@
  * apart: the helper refuses every command buffer that names one with other
  * rows ("Invalid row byte alignment"), and the display's present of such a
  * surface ends the host's process. IOSurface rounds rows to 128 on its own
- * on the M5 and takes any multiple of 16 it is given. 16 and not more, so
+ * on an M5 Mac and takes any multiple of 16 it is given. 16 and not more, so
  * that a width that is a multiple of 4 pixels keeps rows of width * 4, which
  * the Vulkan driver's bridge counts on when it takes in a dma-buf. Before
  * PVG_FEATURE_PITCH_ALIGN the rows were width * 4.
