@@ -1,19 +1,53 @@
-//! The network side of the program: open or closed, and what it says about itself.
+//! A machine's network side: open or closed, announced while it listens, and what it says about itself.
 
-use super::control::{Counters, RelayClient, RelayReply, RelayStatus, Request, ShareState};
-use super::settings::Settings;
-use super::{Announcement, Announcer};
-use guesthouse_relay::{Config, Relay};
+use crate::control::{RelayClient, RelayReply, RelayStatus, Request, ShareState};
+use crate::relay::{Config, Relay};
+use guesthouse_remote_view_core::announce::{Announcement, Announcer};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::Duration;
 
 /// Where the network side listens when a request names no address: every network of this PC.
 const ANY_ADDRESS: IpAddr = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
 
+/// What a network side starts with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanSettings {
+    /// The machine's id, which only names it in what the network side says.
+    pub machine: String,
+    /// The guest's port: QEMU's forward on loopback on the Linux host, or the guest's own address.
+    pub upstream: SocketAddr,
+    /// Where to listen on the network from the start. Without it the network side starts closed, and
+    /// listens once asked to.
+    pub listen: Option<SocketAddr>,
+    /// The relay's own when left out.
+    pub idle_timeout: Option<Duration>,
+    pub max_clients: Option<usize>,
+    /// The name the machine is announced by on the network, which viewers show. Left out: its id.
+    pub name: Option<String>,
+    /// The guest host's fingerprint. Nothing is announced until it is known.
+    pub fingerprint: Option<String>,
+}
+
+impl LanSettings {
+    /// Starting closed, with the relay's own limits and nothing to announce yet.
+    pub fn new(machine: impl Into<String>, upstream: SocketAddr) -> Self {
+        Self {
+            machine: machine.into(),
+            upstream,
+            listen: None,
+            idle_timeout: None,
+            max_clients: None,
+            name: None,
+            fingerprint: None,
+        }
+    }
+}
+
 pub struct Lan {
     machine: String,
-    loopback: SocketAddr,
+    upstream: SocketAddr,
     listen: Option<SocketAddr>,
-    config: Settings,
+    config: LanSettings,
     relay: Option<Relay>,
     /// Why the last attempt to open did not work. Cleared by the next open or by a close.
     failure: Option<String>,
@@ -38,17 +72,17 @@ impl Announcer for Quiet {
 
 impl Lan {
     /// A closed network side, or one that opens at once if the settings have an address to listen on.
-    pub fn new(settings: &Settings) -> Self {
+    pub fn new(settings: &LanSettings) -> Self {
         Self::with_announcer(settings, Box::new(Quiet))
     }
 
     /// As [`Lan::new`], announcing the machine with `announcer` while it listens. The announcement
     /// goes out each time the network side opens or moves, and is taken back when it closes, so it
     /// never outlives the port.
-    pub fn with_announcer(settings: &Settings, announcer: Box<dyn Announcer + Send>) -> Self {
+    pub fn with_announcer(settings: &LanSettings, announcer: Box<dyn Announcer + Send>) -> Self {
         let mut lan = Self {
             machine: settings.machine.clone(),
-            loopback: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), settings.loopback_port),
+            upstream: settings.upstream,
             listen: settings.listen,
             config: settings.clone(),
             relay: None,
@@ -79,7 +113,7 @@ impl Lan {
         }
         // The old one goes first: the new address may be the same port on another interface.
         self.relay = None;
-        let mut config = Config::new(wanted, self.loopback);
+        let mut config = Config::new(wanted, self.upstream);
         if let Some(idle) = self.config.idle_timeout {
             config.idle_timeout = idle;
         }
@@ -157,9 +191,9 @@ impl Lan {
             state,
             address: local.map(|address| address.ip()),
             port: local.map(|address| address.port()),
-            loopback_port: self.loopback.port(),
+            loopback_port: self.upstream.port(),
             reason,
-            counters: self.relay.as_ref().map(|relay| Counters::from(relay.counters())).unwrap_or_default(),
+            counters: self.relay.as_ref().map(Relay::counters).unwrap_or_default(),
             clients: self
                 .relay
                 .as_ref()
@@ -183,7 +217,7 @@ impl Lan {
                 }
             }
             Request::Close => self.close(),
-            // The card's clock is the program's loop's, which takes this before it comes here.
+            // The card's clock is the Linux host's helper's, which takes this before it comes here.
             Request::StreamClocks { .. } => {}
         }
         RelayReply::Status(self.status())
@@ -200,21 +234,13 @@ impl Lan {
 mod tests {
     use super::*;
     use std::net::UdpSocket;
-    use std::path::PathBuf;
     use std::time::{Duration, Instant};
 
-    fn settings(loopback_port: u16, listen: Option<SocketAddr>) -> Settings {
-        Settings {
-            machine: "test".into(),
-            run_folder: PathBuf::new(),
-            loopback_port,
+    fn settings(loopback_port: u16, listen: Option<SocketAddr>) -> LanSettings {
+        LanSettings {
             listen,
-            qemu: None,
             idle_timeout: Some(Duration::from_secs(5)),
-            max_clients: None,
-            name: None,
-            fingerprint: None,
-            hold_clocks: None,
+            ..LanSettings::new("test", SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), loopback_port))
         }
     }
 
@@ -357,5 +383,41 @@ mod tests {
     fn a_listen_address_in_the_settings_opens_at_the_start() {
         let lan = Lan::new(&settings(19065, Some("127.0.0.1:0".parse().unwrap())));
         assert_eq!(lan.status().state, ShareState::Listening);
+    }
+
+    #[test]
+    #[cfg_attr(windows, ignore = "listens on this PC's network, which Windows' firewall may ask about")]
+    fn a_guest_with_an_address_of_its_own_is_reached_from_a_socket_on_any_network() {
+        // This PC's own address stands in for a guest's: what matters is that it is not loopback.
+        let Some(address) = crate::lan_address() else {
+            eprintln!("skipped: this PC has no address on a network");
+            return;
+        };
+        let guest = UdpSocket::bind((address, 0)).unwrap();
+        guest.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        let upstream = guest.local_addr().unwrap();
+        let mut lan = Lan::new(&LanSettings {
+            listen: Some("127.0.0.1:0".parse().unwrap()),
+            ..LanSettings::new("test", upstream)
+        });
+        let status = lan.status();
+        assert_eq!((status.state, status.loopback_port), (ShareState::Listening, upstream.port()));
+        let device = forward();
+        device.send_to(b"input", ("127.0.0.1", status.port.unwrap())).unwrap();
+        let mut buffer = [0u8; 16];
+        let (length, from) = guest.recv_from(&mut buffer).unwrap();
+        assert_eq!(&buffer[..length], b"input");
+        assert!(!from.ip().is_loopback(), "the device's socket is not on loopback: {from}");
+        // Something else on the network finds the device's socket first.
+        UdpSocket::bind((address, 0)).unwrap().send_to(b"stranger", from).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while lan.status().counters.refused_stranger == 0 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(lan.status().counters.refused_stranger, 1);
+        guest.send_to(b"video", from).unwrap();
+        let (length, _) = device.recv_from(&mut buffer).unwrap();
+        assert_eq!(&buffer[..length], b"video", "only the guest's answer reached the device");
+        lan.stop();
     }
 }

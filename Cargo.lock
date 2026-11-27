@@ -941,6 +941,9 @@ name = "guesthouse-app-windows"
 version = "0.11.0"
 dependencies = [
  "guesthouse-control",
+ "guesthouse-relay",
+ "guesthouse-remote-view-core",
+ "serde_json",
  "windows-reactor",
  "windows-reactor-setup",
  "windows-sys 0.61.2",
@@ -1017,6 +1020,7 @@ dependencies = [
 name = "guesthouse-control"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-remote-view-core",
  "guesthouse-report-core",
  "guesthouse-update-check",
  "serde",
@@ -1064,6 +1068,9 @@ dependencies = [
 [[package]]
 name = "guesthouse-guest-scripts"
 version = "0.11.0"
+dependencies = [
+ "guesthouse-remote-view-core",
+]
 
 [[package]]
 name = "guesthouse-guest-share"
@@ -1099,6 +1106,7 @@ dependencies = [
  "guesthouse-hcs",
  "guesthouse-jail",
  "guesthouse-remote-view-core",
+ "if-addrs",
  "serde",
  "serde_json",
 ]
@@ -1144,8 +1152,11 @@ version = "0.11.0"
 name = "guesthouse-relay"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-remote-view-core",
  "libc",
- "rustix",
+ "serde",
+ "serde_json",
+ "socket2",
 ]
 
 [[package]]
@@ -1192,6 +1203,8 @@ dependencies = [
  "guesthouse-control",
  "guesthouse-hcs",
  "guesthouse-host-windows",
+ "guesthouse-relay",
+ "guesthouse-remote-view-core",
  "serde",
  "serde_json",
  "windows-sys 0.61.2",

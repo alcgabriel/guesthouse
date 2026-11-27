@@ -6,7 +6,9 @@
 //! a machine made before it has none.
 //!
 //! This is the contents of that file and the choices made about it. Reading and writing it is the
-//! host's, which knows where machines are kept.
+//! host's, which knows where machines are kept. A host that keeps the two values somewhere else,
+//! such as in its machine's own settings, takes and gives them as they are with [`Switch::new`] and
+//! [`Switch::values`], and the choices are the same.
 
 use crate::share::{FIRST_PORT, LAST_PORT};
 use serde::{Deserialize, Serialize};
@@ -35,13 +37,24 @@ pub fn choose_port(taken: &[u16], is_free: impl Fn(u16) -> bool) -> Option<u16> 
 pub const NO_PORT: &str = "No port is free for sharing the screen (7792 to 7899 are all in use).";
 
 impl Switch {
+    /// The switch from its two values, wherever they were kept. A port outside the range is no
+    /// port: a new one is chosen when the switch is next turned on.
+    pub fn new(allow_remote_view: bool, remote_port: Option<u16>) -> Switch {
+        let remote_port = remote_port.filter(|port| (FIRST_PORT..=LAST_PORT).contains(port));
+        Switch { allow_remote_view, remote_port }
+    }
+
+    /// The two values to keep: whether it is on, and its port.
+    pub fn values(&self) -> (bool, Option<u16>) {
+        (self.allow_remote_view, self.remote_port)
+    }
+
     /// The switch from the file's text, which is `None` when there is no file. Anything that cannot
-    /// be read is off, which leaves the machine as it is. A port outside the range is no port: a
-    /// new one is chosen when the switch is next turned on.
+    /// be read is off, which leaves the machine as it is. A port outside the range is dropped, as
+    /// [`Switch::new`] drops it.
     pub fn read(text: Option<&str>) -> Switch {
-        let mut switch = text.and_then(|text| serde_json::from_str::<Switch>(text).ok()).unwrap_or_default();
-        switch.remote_port = switch.remote_port.filter(|port| (FIRST_PORT..=LAST_PORT).contains(port));
-        switch
+        let switch = text.and_then(|text| serde_json::from_str::<Switch>(text).ok()).unwrap_or_default();
+        Switch::new(switch.allow_remote_view, switch.remote_port)
     }
 
     /// The switch turned on or off. Turning it on gives it a port the first time, chosen with
