@@ -106,6 +106,10 @@ pub struct InstallInfo {
     /// by a new agent makes the same disk. Not secret.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disk_gb: Option<u64>,
+    /// Ubuntu's desktop as the person chose it (`gnome`, `plasma`, `weston`), kept for the same
+    /// reason. Left out, weston.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub desktop: Option<String>,
 }
 
 /// A step's usual time, in seconds, for guessing what is left before a pace is known.
@@ -148,6 +152,7 @@ impl InstallInfo {
             source,
             account: String::new(),
             disk_gb: None,
+            desktop: None,
         };
         info.refresh();
         info

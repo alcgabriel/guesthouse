@@ -74,6 +74,9 @@ pub enum Op {
         memory_mb: Option<u64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         disk_gb: Option<u64>,
+        /// Ubuntu's desktop: `gnome`, `plasma` or `weston`; left out, weston.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        desktop: Option<String>,
         /// The password of the guest's account, made by the app and kept in the Mac's Keychain.
         /// The agent holds it in memory and writes it to the answer files only.
         #[serde(default, skip_serializing_if = "Option::is_none")]

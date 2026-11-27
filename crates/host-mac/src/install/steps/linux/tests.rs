@@ -43,6 +43,7 @@ fn install_system(name: &str) -> (PathBuf, FakeGuest, serde_json::Value) {
             password: Some("k7mn-p3xq-ab9d-w4ht".into()),
             check_space: false,
             firmware_dirs: vec![qemu],
+            desktop: Default::default(),
         },
         transport: &mut network,
         control: &mut control,

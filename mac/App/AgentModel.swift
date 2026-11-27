@@ -100,9 +100,10 @@ final class AgentModel {
     /// the machine's id, or why it did not start.
     func install(
         name: String, guest: String, file: String?, qemu: String?, pvgHost: String?,
-        sizes: InstallSizes? = nil, password: String? = nil
+        sizes: InstallSizes? = nil, password: String? = nil, desktop: String? = nil
     ) async -> (id: String?, error: String?) {
         var request: [String: Any] = ["op": "install", "name": name, "guest": guest]
+        if let desktop { request["desktop"] = desktop }
         if let password { request["password"] = password }
         if let sizes {
             request["cores"] = sizes.cores

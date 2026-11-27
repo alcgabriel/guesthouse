@@ -46,7 +46,12 @@ impl RealSteps<'_> {
         let files = [
             (
                 "user-data",
-                ubuntu::user_data(account, &self.setup.id, &ubuntu::mac_time_zone()),
+                ubuntu::user_data(
+                    account,
+                    &self.setup.id,
+                    &ubuntu::mac_time_zone(),
+                    self.setup.desktop,
+                ),
             ),
             (ubuntu::ACCOUNT_FILE, ubuntu::account_file(account, secret)),
             ("meta-data", ubuntu::meta_data(&self.setup.id)),

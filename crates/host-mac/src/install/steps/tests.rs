@@ -62,6 +62,7 @@ impl World {
             // disk no Mac has), so they pass on a full disk too.
             check_space: false,
             firmware_dirs: vec![self.root.join("firmware")],
+            desktop: Default::default(),
         }
     }
 

@@ -221,6 +221,7 @@ impl Agent {
                 cores,
                 memory_mb,
                 disk_gb,
+                desktop,
                 password,
             } => match self.install_start(
                 &name,
@@ -231,6 +232,7 @@ impl Agent {
                     pvg_host,
                     driver_dir: driver_dir.map(PathBuf::from),
                     password,
+                    desktop,
                     sizes: Sizes {
                         cores,
                         memory_mb,

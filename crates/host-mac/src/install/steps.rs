@@ -52,6 +52,8 @@ pub struct Setup {
     pub check_space: bool,
     /// Folders to look for QEMU's firmware in.
     pub firmware_dirs: Vec<PathBuf>,
+    /// The desktop an Ubuntu machine gets.
+    pub desktop: crate::install::ubuntu::Desktop,
 }
 
 mod linux;

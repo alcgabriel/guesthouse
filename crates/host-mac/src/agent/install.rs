@@ -35,6 +35,8 @@ pub(super) struct Tools {
     pub sizes: Sizes,
     /// The guest account's password, in memory only.
     pub password: Option<Secret>,
+    /// Ubuntu's desktop as the app sent it.
+    pub desktop: Option<String>,
 }
 
 /// What Customise changed; each left out is the guest's default.
@@ -216,6 +218,11 @@ impl Agent {
         if let Some(password) = &tools.password {
             password::check(&password.0)?;
         }
+        if let Some(word) = &tools.desktop {
+            if crate::install::ubuntu::Desktop::parse(word).is_none() {
+                return Err(format!("{word} is not a desktop this can install."));
+            }
+        }
         let sizes = tools.sizes;
         let (cores, memory_mb, _) = default_sizes(
             guest,
@@ -232,6 +239,7 @@ impl Agent {
         let mut info = InstallInfo::new(&id, &Plan::for_guest(guest), source);
         info.account = crate::install::windows::account_name(&crate::install::windows::mac_user());
         info.disk_gb = Some(sizes.disk_gb.unwrap_or(default_sizes(guest, 4).2));
+        info.desktop = tools.desktop.clone();
         {
             let mut slots = lock(&self.shared.slots);
             let slot = slots.entry(id.clone()).or_default();
@@ -406,6 +414,7 @@ impl Agent {
                 .or_else(|| config.install.driver_dir.clone()),
             check_space: !config.install.fake,
             firmware_dirs,
+            desktop: desktop_for(&info, &tools),
         };
         let began = Instant::now();
         let clock = move || began.elapsed().as_millis() as u64;
@@ -449,6 +458,16 @@ impl Agent {
             runner.run(&mut steps);
         }
     }
+}
+
+/// The desktop: what was asked for with this agent, or what the install record kept, or weston.
+fn desktop_for(info: &InstallInfo, tools: &Tools) -> crate::install::ubuntu::Desktop {
+    tools
+        .desktop
+        .as_deref()
+        .or(info.desktop.as_deref())
+        .and_then(crate::install::ubuntu::Desktop::parse)
+        .unwrap_or_default()
 }
 
 /// The disk an install makes: the stand-in's small one, or what was asked for with this agent, or

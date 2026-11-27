@@ -198,11 +198,50 @@ fn time_zone_of(link: Option<&std::path::Path>) -> String {
     if plain { name } else { "Etc/UTC" }.to_string()
 }
 
+/// The desktop an Ubuntu machine starts to: weston (the driver package's own), Ubuntu's GNOME, or
+/// KDE Plasma. The driver package's `install.sh` reads the choice from `/etc/guesthouse/desktop`,
+/// which the answers write; weston needs no file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Desktop {
+    #[default]
+    Weston,
+    Gnome,
+    Plasma,
+}
+
+impl Desktop {
+    /// The word the app sends and the file holds.
+    pub fn parse(word: &str) -> Option<Desktop> {
+        match word {
+            "weston" => Some(Desktop::Weston),
+            "gnome" => Some(Desktop::Gnome),
+            "plasma" => Some(Desktop::Plasma),
+            _ => None,
+        }
+    }
+
+    pub fn word(self) -> &'static str {
+        match self {
+            Desktop::Weston => "weston",
+            Desktop::Gnome => "gnome",
+            Desktop::Plasma => "plasma",
+        }
+    }
+}
+
 /// The autoinstall answers: no questions, the largest disk, an account named after the Mac's user
 /// whose password is set at the end from the answer disc's account file (`ACCOUNT_FILE`), so the
 /// first console sign-in uses it, the clock in `time_zone` (the Mac's, `mac_time_zone`), the
-/// driver's service from the answer disc, and what is said on the serial port when it ends.
-pub fn user_data(account: &str, hostname: &str, time_zone: &str) -> String {
+/// driver's service from the answer disc, the desktop the driver package is to install, and what
+/// is said on the serial port when it ends.
+pub fn user_data(account: &str, hostname: &str, time_zone: &str, desktop: Desktop) -> String {
+    let desktop_lines = match desktop {
+        Desktop::Weston => String::new(),
+        chosen => format!(
+            "    - mkdir -p /target/etc/guesthouse\n    - echo {} > /target/etc/guesthouse/desktop\n",
+            chosen.word()
+        ),
+    };
     format!(
         "#cloud-config
 autoinstall:
@@ -244,7 +283,7 @@ autoinstall:
     - install -D -m 0644 /run/guesthouse-answers/{service} /target/etc/systemd/system/{service}
     - curtin in-target --target=/target -- systemctl enable {service}
     - umount /run/guesthouse-answers
-    - echo {finished} > /dev/ttyAMA0
+{desktop_lines}    - echo {finished} > /dev/ttyAMA0
 ",
         host = hostname,
         user = account,

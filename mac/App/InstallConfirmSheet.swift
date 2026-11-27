@@ -13,6 +13,7 @@ struct InstallConfirmSheet: View {
     @State private var cores = 4
     @State private var memoryGB = 6
     @State private var diskGB = 64
+    @State private var desktop = LinuxDesktop.gnome
     @State private var customising = false
     @State private var installer = ""
     @State private var problem: String?
@@ -44,6 +45,10 @@ struct InstallConfirmSheet: View {
                 systemRow
                 Divider()
                 nameRow
+                if guest == .ubuntu {
+                    Divider()
+                    desktopRow
+                }
                 Divider()
                 sizeRow
                 if customising { customiseRows }
@@ -114,6 +119,20 @@ struct InstallConfirmSheet: View {
                 Text(name)
                 Spacer()
             }
+        }
+    }
+
+    private var desktopRow: some View {
+        row("Desktop") {
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("Desktop", selection: $desktop) {
+                    ForEach(LinuxDesktop.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                Text(desktop.detail).font(.callout).foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 8)
+            Spacer()
         }
     }
 
@@ -204,7 +223,8 @@ struct InstallConfirmSheet: View {
         Task {
             let error = await library.startInstall(
                 guest: guest, name: name.trimmingCharacters(in: .whitespaces),
-                file: needsInstaller ? installer : nil, sizes: sizes)
+                file: needsInstaller ? installer : nil, sizes: sizes,
+                desktop: guest == .ubuntu ? desktop.rawValue : nil)
             starting = false
             if let error { problem = error } else { dismiss() }
         }

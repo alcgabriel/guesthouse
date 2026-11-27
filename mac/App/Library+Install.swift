@@ -47,7 +47,9 @@ extension Library {
     }
 
     /// Starts an install and selects the machine it makes. Returns why it did not start.
-    func startInstall(guest: InstallGuest, name: String, file: String?, sizes: InstallSizes?) async -> String? {
+    func startInstall(
+        guest: InstallGuest, name: String, file: String?, sizes: InstallSizes?, desktop: String? = nil
+    ) async -> String? {
         let plan = startPlan(forInstall: ())
         // Made here and kept in the Keychain at once, under a token, because the machine's own id
         // is only known when the agent answers.
@@ -58,7 +60,7 @@ extension Library {
         }
         let result = await agent.install(
             name: name, guest: guest.rawValue, file: file, qemu: plan.qemu, pvgHost: plan.pvgHost,
-            sizes: sizes, password: password)
+            sizes: sizes, password: password, desktop: desktop)
         if let error = result.error {
             PasswordKeychain.delete(for: token)
             return error

@@ -34,6 +34,31 @@ nonisolated enum InstallGuest: String, CaseIterable, Identifiable {
     static let windowsInstallerPage = "https://www.microsoft.com/software-download/windows11arm64"
 }
 
+/// The desktop an Ubuntu machine starts to. The agent passes the word on to the guest, where the
+/// driver package installs that desktop.
+nonisolated enum LinuxDesktop: String, CaseIterable, Identifiable {
+    case gnome, plasma, weston
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .gnome: "GNOME"
+        case .plasma: "KDE Plasma"
+        case .weston: "Minimal"
+        }
+    }
+
+    /// One line under the choice.
+    var detail: String {
+        switch self {
+        case .gnome: String(localized: "Ubuntu's own desktop.")
+        case .plasma: String(localized: "KDE's desktop, in the style of Windows.")
+        case .weston: String(localized: "A plain desktop with a terminal. Quickest to install, least memory.")
+        }
+    }
+}
+
 /// What Customise chose.
 nonisolated struct InstallSizes: Equatable {
     var cores: Int

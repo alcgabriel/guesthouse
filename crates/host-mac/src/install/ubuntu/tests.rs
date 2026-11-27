@@ -40,7 +40,7 @@ fn a_list_with_no_such_image_or_a_bad_checksum_is_said_not_guessed() {
 
 #[test]
 fn the_answers_install_with_no_questions_and_say_how_it_ended_on_the_serial_port() {
-    let text = user_data("nick", "guesthouse", "Europe/Berlin");
+    let text = user_data("nick", "guesthouse", "Europe/Berlin", Desktop::Weston);
     assert!(text.starts_with("#cloud-config\nautoinstall:"));
     assert!(text.contains("username: nick"));
     // The password comes from the account file on the disc, so no command the installer prints
@@ -104,7 +104,7 @@ fn the_installer_runs_with_no_questions_and_its_console_on_the_screen() {
 
 #[test]
 fn the_answers_put_the_drivers_service_into_the_installed_system_before_saying_finished() {
-    let text = user_data("nick", "guesthouse", "Europe/Berlin");
+    let text = user_data("nick", "guesthouse", "Europe/Berlin", Desktop::Weston);
     let enable = text
         .find(&format!("systemctl enable {DRIVER_SERVICE_FILE}"))
         .unwrap();
@@ -196,4 +196,19 @@ fn names_that_only_look_alike_are_left_out() {
     ] {
         assert!(pick_image(&line('a', name)).is_err(), "{name}");
     }
+}
+
+#[test]
+fn the_answers_name_gnome_or_plasma_for_the_driver_package_and_nothing_for_weston() {
+    let weston = user_data("nick", "guesthouse", "Europe/Berlin", Desktop::Weston);
+    assert!(!weston.contains("/etc/guesthouse/desktop"));
+    for (desktop, word) in [(Desktop::Gnome, "gnome"), (Desktop::Plasma, "plasma")] {
+        let text = user_data("nick", "guesthouse", "Europe/Berlin", desktop);
+        let line = text
+            .find(&format!("echo {word} > /target/etc/guesthouse/desktop"))
+            .unwrap();
+        assert!(line < text.find(&format!("echo {FINISHED}")).unwrap());
+        assert_eq!(Desktop::parse(word), Some(desktop));
+    }
+    assert_eq!(Desktop::parse("kde"), None);
 }
