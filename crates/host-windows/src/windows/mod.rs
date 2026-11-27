@@ -423,3 +423,57 @@ fn system_program(name: &str) -> PathBuf {
     let root = std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
     PathBuf::from(root).join("System32").join(name)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::events::Kept;
+
+    const PAIRED: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    /// A folder standing in for the machine's disk beside its viewer's state, and its Windows volume.
+    fn scratch(name: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let base = std::env::temp_dir().join(format!("gh-give-trust-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let root = base.join("volume");
+        std::fs::create_dir_all(&root).unwrap();
+        (base.join("machine.vhdx"), root.join(screen::GUEST_FOLDER), root)
+    }
+
+    #[test]
+    fn the_guest_is_given_the_viewers_line_and_every_device_it_trusts() {
+        let (disk, folder, root) = scratch("given");
+        let viewer = screen::viewer_identity(&screen::state_beside(&disk)).unwrap();
+        let live = root.join(trust::GUEST_TRUST_FILE);
+        std::fs::create_dir_all(live.parent().unwrap()).unwrap();
+        std::fs::write(&live, format!("{viewer} Guesthouse\r\n{PAIRED} Kitchen tablet\r\n")).unwrap();
+        std::fs::create_dir_all(&folder).unwrap();
+        give_trust(&folder, &root, &viewer).unwrap();
+        assert_eq!(std::fs::read_to_string(folder.join("viewer.txt")).unwrap(), screen::trust_list(&viewer));
+        assert_eq!(
+            std::fs::read_to_string(folder.join("trusted")).unwrap(),
+            format!("{viewer} Guesthouse\n{PAIRED} Kitchen tablet\n")
+        );
+        let _ = std::fs::remove_dir_all(disk.parent().unwrap());
+    }
+
+    #[test]
+    fn with_no_installer_a_guest_given_a_screen_before_has_its_list_made_again() {
+        let (disk, folder, root) = scratch("kept");
+        let sink = Kept::default();
+        keep_trust(&disk, &root, &sink);
+        assert!(
+            !folder.exists() && !screen::state_beside(&disk).exists(),
+            "a guest with no screen is left alone"
+        );
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("screen.ps1"), screen::SCRIPT).unwrap();
+        std::fs::write(folder.join("trusted"), format!("{PAIRED} Revoked since\n")).unwrap();
+        keep_trust(&disk, &root, &sink);
+        let viewer = screen::viewer_identity(&screen::state_beside(&disk)).unwrap();
+        assert_eq!(std::fs::read_to_string(folder.join("trusted")).unwrap(), screen::trust_list(&viewer));
+        assert_eq!(std::fs::read_to_string(folder.join("viewer.txt")).unwrap(), screen::trust_list(&viewer));
+        assert!(sink.0.lock().unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(disk.parent().unwrap());
+    }
+}
