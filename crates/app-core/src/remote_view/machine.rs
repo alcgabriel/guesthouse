@@ -57,12 +57,6 @@ const STALE: Duration = Duration::from_secs(2);
 const PARTS_FOLDER: &str = "remoteman";
 /// Where a build that ships the installer has it, in the program's folder.
 const SHIPPED: &str = "remoteman/remoteman-host-setup.exe";
-/// The release of remoteman's host this host puts in a guest. 0.1.6 is the first whose `--no-pair`
-/// still lets `pair on` open pairing, which every pairing here needs. The Windows host carries its own
-/// release, pinned in `windows/remoteman.json`. 0.1.9 is the first that takes `set updates off`.
-const REMOTEMAN_VERSION: &str = "0.1.9";
-const REMOTEMAN_BASE: &str = "https://files.ruxn.com/p/remoteman/";
-const REMOTEMAN_SHA256: &str = "15ed3cef0097fcddf90497997834d1511f35cbcba0279e90a4cb0dc1e1c2f37e";
 pub const TOO_OLD: &str = "This machine's display driver is older than viewing from other devices needs: its \
                            take-over script would take remoteman's screen for its own. Update the machine's \
                            display driver, then turn this on again.";
@@ -149,15 +143,11 @@ pub fn encoder(machine: &Machine) -> &'static str {
     encoder_for(&format!("PCI\\VEN_{vendor}"))
 }
 
-/// remoteman's host installer at this host's pin.
+/// remoteman's host installer at this host's pin, the release every host pins in
+/// `crates/remote-view/remoteman.json`. 0.1.6 is the first whose `--no-pair` still lets `pair on`
+/// open pairing, which every pairing here needs. 0.1.9 is the first that takes `set updates off`.
 pub fn pin() -> Pin {
-    let file = format!("remoteman-host-setup-{REMOTEMAN_VERSION}.exe");
-    Pin {
-        version: REMOTEMAN_VERSION.to_owned(),
-        url: format!("{REMOTEMAN_BASE}{file}"),
-        file,
-        sha256: REMOTEMAN_SHA256.to_owned(),
-    }
+    install::pinned().host_pin()
 }
 
 /// The pinned installer on this PC: the copy a build shipped, or one downloaded once into the fetched
