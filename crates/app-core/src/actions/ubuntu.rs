@@ -273,6 +273,10 @@ pub(super) fn jailed(task: &mut Task, plan: VmPlan) -> Result<VmPlan> {
 }
 
 #[cfg(test)]
+#[path = "ubuntu_install_pins.rs"]
+mod install_pins;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::linux::card::ForwardedCard;

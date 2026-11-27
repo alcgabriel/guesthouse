@@ -168,6 +168,10 @@ pub fn install(task: &mut Task) -> Result<()> {
 }
 
 #[cfg(test)]
+#[path = "macos_install_pins.rs"]
+mod install_pins;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
