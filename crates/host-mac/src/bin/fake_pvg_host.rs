@@ -10,6 +10,7 @@
 //! - `hostfail`: prints a line and exits 1 before opening its socket
 //! - `hostdie`: exits 3 a second and a half after QEMU connects
 //! - `hoststuck`: stays when QEMU goes, so only SIGTERM ends it
+//! - `hostnomodes`: answers `modes` with an error, as a device that refuses the list
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixListener;
@@ -50,6 +51,7 @@ fn main() {
     }
     let stuck = frames.contains("hoststuck");
     let dies = frames.contains("hostdie");
+    let no_modes = frames.contains("hostnomodes");
 
     if let Some(control) = control {
         let _ = std::fs::remove_file(&control);
@@ -58,8 +60,19 @@ fn main() {
             for stream in listener.incoming().flatten() {
                 let mut output = stream.try_clone().expect("a clone");
                 for line in BufReader::new(stream).lines().map_while(Result::ok) {
-                    if line.trim() == "status" {
+                    let (word, rest) = line.trim().split_once(' ').unwrap_or((line.trim(), ""));
+                    if word == "status" {
                         let _ = writeln!(output, "ok published 0 skipped 0 dropped 0 failed 0");
+                    } else if word == "modes" && no_modes {
+                        let _ = writeln!(output, "error the device refused the modes");
+                    } else if word == "modes" && !rest.is_empty() {
+                        let mut file = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open("fake-pvg-host.modes")
+                            .expect("the modes file");
+                        let _ = writeln!(file, "{rest}");
+                        let _ = writeln!(output, "ok {} modes", rest.split(',').count());
                     }
                 }
             }

@@ -189,11 +189,13 @@ impl Agent {
                 qemu,
                 rmhost,
                 pvg_host,
+                scale,
             } => self.start(
                 &machine,
                 qemu.as_deref(),
                 rmhost.as_deref(),
                 pvg_host.as_deref(),
+                scale,
             ),
             Op::Share {
                 machine,
@@ -335,11 +337,18 @@ impl Agent {
         qemu: Option<&str>,
         rmhost: Option<&str>,
         pvg_host: Option<&str>,
+        scale: Option<u32>,
     ) -> Result<(), String> {
         let machine = store::find(&self.shared.config.machines, id)?;
-        let launch = machine
+        let mut launch = machine
             .launch
             .ok_or("this machine has no firmware files in machine.json, so it cannot be started")?;
+        if let Some(scale) = scale {
+            if !launch::SCALES.contains(&scale) {
+                return Err(format!("{scale} is not a scale a guest takes (1 or 2)."));
+            }
+            launch.scale = scale;
+        }
         let run = self.begin(id, Event::Start).map_err(|refused| refused.0)?;
         self.remember_rmhost(id, rmhost);
         if let Err(reason) = self.spawn(id, run, &launch, qemu, pvg_host) {

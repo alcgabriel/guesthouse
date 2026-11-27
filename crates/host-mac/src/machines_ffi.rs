@@ -210,8 +210,12 @@ pub unsafe extern "C" fn guesthouse_machine_set_graphics(
 }
 
 /// Records the size machine `id`'s screen should be so that it fills its window: the pixels and
-/// the scaling (100 or 200). Today this only records it; nothing tells the guest yet. Returns
-/// `{"ok": true, "applied": false}` or `{"error": "..."}`.
+/// the scaling (100 or 200). For a running machine on the guarded path it is sent to the
+/// graphics process as its display mode, at most one a second (`screen_size::send`), so this
+/// can wait a second or more: call it off the main thread. Returns `{"ok": true, "applied":
+/// true, "mode": "WxH@60"}` when the graphics process took it, `{"ok": true, "applied": false,
+/// "why": "..."}` when it was not sent (QEMU's own device, a machine that is not running, or a
+/// newer size sent in its place), or `{"error": "..."}`.
 ///
 /// # Safety
 /// `id` is null or points to a nul-terminated string.
@@ -224,20 +228,52 @@ pub unsafe extern "C" fn guesthouse_machine_set_wanted_screen(
 ) -> *mut c_char {
     // SAFETY: passed on from the caller.
     let id = unsafe { text(id) };
-    into_c_string(match id {
-        Some(id) => {
-            let wanted = crate::screen_size::Wanted {
-                width_px,
-                height_px,
-                scaling_percent,
-            };
-            match crate::screen_size::record(id, wanted) {
-                Ok(()) => json!({ "ok": true, "applied": false }).to_string(),
-                Err(error) => error_json(&error),
-            }
+    let Some(id) = id else {
+        return into_c_string(error_json("the machine is not text"));
+    };
+    let wanted = crate::screen_size::Wanted {
+        width_px,
+        height_px,
+        scaling_percent,
+    };
+    if let Err(error) = crate::screen_size::record(id, wanted) {
+        return into_c_string(error_json(&error));
+    }
+    into_c_string(match tell_screen(id, wanted) {
+        Ok(crate::screen_size::Told::Applied(mode)) => {
+            json!({ "ok": true, "applied": true, "mode": mode }).to_string()
         }
-        None => error_json("the machine is not text"),
+        Ok(crate::screen_size::Told::Overtaken) => {
+            json!({ "ok": true, "applied": false, "why": "a newer size was sent in its place" })
+                .to_string()
+        }
+        Ok(crate::screen_size::Told::NotSent(why)) => {
+            json!({ "ok": true, "applied": false, "why": why }).to_string()
+        }
+        Err(error) => error_json(&error),
     })
+}
+
+/// Where machine `id`'s wanted size goes, by its graphics path.
+fn tell_screen(
+    id: &str,
+    wanted: crate::screen_size::Wanted,
+) -> Result<crate::screen_size::Told, String> {
+    use crate::launch::Graphics;
+    use crate::screen_size::Told;
+    let machines = store::default_folder().ok_or("no machines folder")?;
+    let machine = store::find(&machines, id)?;
+    let Some(launch) = machine.launch else {
+        return Ok(Told::NotSent(
+            "the machine is not started by the app, so nothing is sent".into(),
+        ));
+    };
+    if launch.graphics == Graphics::Qemu {
+        return Ok(Told::NotSent(
+            "QEMU's own device takes no size from the app; only the guest can change it".into(),
+        ));
+    }
+    crate::screen_size::send(id, &launch.host_control, wanted)
 }
 
 /// Asks machine `id`'s graphics process how it is doing, over its control socket. Returns the

@@ -46,6 +46,9 @@ pub enum Op {
         /// The graphics process, for a machine on the guarded path.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pvg_host: Option<String>,
+        /// The scale a Linux guest is started with: 2 for Sharp, 1 for Standard. Left out, 2.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        scale: Option<u32>,
     },
     /// Asks the guest to power off.
     Shutdown { machine: String },
@@ -291,7 +294,8 @@ mod tests {
                 machine: "win".into(),
                 qemu: Some("/q".into()),
                 rmhost: None,
-                pvg_host: None
+                pvg_host: None,
+                scale: None,
             }
         );
         let start = parse_request(r#"{"v":1,"op":"start","machine":"win"}"#).unwrap();
@@ -302,6 +306,7 @@ mod tests {
                 qemu: None,
                 rmhost: None,
                 pvg_host: None,
+                scale: None,
             }
         );
         assert_eq!(
@@ -319,6 +324,28 @@ mod tests {
             Op::ForceOff {
                 machine: "w".into()
             }
+        );
+    }
+
+    #[test]
+    fn a_start_may_carry_the_scale() {
+        let start = parse_request(r#"{"v":1,"op":"start","machine":"deb","scale":1}"#).unwrap();
+        assert!(matches!(start.op, Op::Start { scale: Some(1), .. }));
+        let request = Request {
+            v: VERSION,
+            id: 8,
+            op: Op::Start {
+                machine: "deb".into(),
+                qemu: None,
+                rmhost: None,
+                pvg_host: None,
+                scale: Some(2),
+            },
+        };
+        let text = serde_json::to_string(&request).unwrap();
+        assert_eq!(
+            text,
+            r#"{"v":1,"id":8,"op":"start","machine":"deb","scale":2}"#
         );
     }
 
@@ -344,6 +371,7 @@ mod tests {
                 qemu: None,
                 rmhost: None,
                 pvg_host: None,
+                scale: None,
             },
         };
         let text = serde_json::to_string(&request).unwrap();

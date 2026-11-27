@@ -2,7 +2,7 @@
 //! `machine.json` with the machine's settings. The store lists what is there and works out what
 //! starting a machine needs from it.
 
-use crate::launch::{DEFAULT_MODES, Graphics, Launch};
+use crate::launch::{DEFAULT_MODES, DEFAULT_SCALE, Graphics, Launch};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
@@ -214,6 +214,9 @@ fn launch_for(folder: &Path, id: &str, settings: &Settings) -> Option<Launch> {
         .unwrap_or_else(|| DEFAULT_MODES.iter().map(|mode| mode.to_string()).collect());
     Some(Launch {
         graphics: settings.graphics,
+        kind: settings.kind.clone(),
+        // The app says Sharp or Standard when it starts the machine.
+        scale: DEFAULT_SCALE,
         host_socket: run_dir.join("host.sock"),
         host_control: run_dir.join("control.sock"),
         cores: settings.cores,

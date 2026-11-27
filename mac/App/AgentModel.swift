@@ -65,8 +65,9 @@ final class AgentModel {
         }
     }
 
-    func start(_ machine: Machine, qemu: String, rmhost: String?, pvgHost: String?) async -> String? {
-        var request: [String: Any] = ["op": "start", "machine": machine.agentID]
+    /// `scale` is what a Linux guest draws its desktop at: 2 for Sharp, 1 for Standard.
+    func start(_ machine: Machine, qemu: String, rmhost: String?, pvgHost: String?, scale: Int) async -> String? {
+        var request: [String: Any] = ["op": "start", "machine": machine.agentID, "scale": scale]
         if !qemu.isEmpty { request["qemu"] = qemu }
         if let rmhost { request["rmhost"] = rmhost }
         if let pvgHost { request["pvg_host"] = pvgHost }

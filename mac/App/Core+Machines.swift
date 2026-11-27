@@ -127,9 +127,11 @@ nonisolated struct MachineProblems: Error {
     let problems: [String]
 }
 
-extension Core {
-    /// Tells the core the screen size that would fill the machine's window. Today the core only
-    /// records it (see `core/src/screen_size.rs`); returns why it refused, if it did.
+nonisolated extension Core {
+    /// Tells the core the screen size that would fill the machine's window. The core records it
+    /// and sends it to a running machine's graphics process, at most once a second (see
+    /// `core/src/screen_size.rs`), so this can wait: call it off the main thread. Returns why it
+    /// refused, if it did.
     @discardableResult
     static func setWantedScreen(machine id: String, _ wanted: WantedScreen) -> String? {
         guard let text = guesthouse_machine_set_wanted_screen(

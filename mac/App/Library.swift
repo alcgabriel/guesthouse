@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import os
@@ -130,7 +131,15 @@ final class Library {
         }
         startedHere.insert(machine.agentID)
         let rmhost = self.rmhost.path
-        run { await self.agent.start(machine, qemu: plan.qemu, rmhost: rmhost, pvgHost: plan.pvgHost) }
+        let scale = Self.startScale(for: machine)
+        run { await self.agent.start(machine, qemu: plan.qemu, rmhost: rmhost, pvgHost: plan.pvgHost, scale: scale) }
+    }
+
+    /// The scale a machine starts with: 2 when its screen is Sharp, 1 when Standard. As in the
+    /// screen window, Sharp is Standard on a display that is not Retina.
+    static func startScale(for machine: Machine) -> Int {
+        let retina = (NSScreen.main?.backingScaleFactor ?? 2) >= 2
+        return ScreenPrefs.sharp(machine.id) && retina ? 2 : 1
     }
 
     /// The program that shares screens with other devices, if it can be found.

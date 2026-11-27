@@ -7,11 +7,27 @@
 //! own, and QEMU forwards to it through `pvg-fwd` over shared guest memory. `host_args` is the
 //! process's command line and `qemu_args` makes QEMU's for either path, by `Launch::graphics`.
 //! Lines of run.sh that are only for debugging (the `-trace` options) are left out.
+//!
+//! A Linux machine (`kind` `linux`) gets two things more: QEMU's user-mode network, which its
+//! packages come over, and the scale its desktop should draw at, as a firmware file the guest
+//! reads (`SCALE_FILE`). A Windows machine's line is run.sh's, as before.
 
 use std::path::{Path, PathBuf};
 
 /// The modes the device offers when a machine names none, as in run.sh.
 pub const DEFAULT_MODES: [&str; 4] = ["640x480@60", "1024x768@60", "1280x800@60", "1920x1080@60"];
+
+/// The `kind` in `machine.json` that gets a network and a scale.
+pub const LINUX: &str = "linux";
+
+/// The firmware file (QEMU's `-fw_cfg`) a Linux guest reads its scale from: `1` or `2`.
+pub const SCALE_FILE: &str = "opt/com.ruxn.guesthouse/scale";
+
+/// The scales a guest is started with: 2 for Sharp, 1 for Standard.
+pub const SCALES: [u32; 2] = [1, 2];
+
+/// The scale when the app says nothing: Sharp, as the app's own default is.
+pub const DEFAULT_SCALE: u32 = 2;
 
 /// The longest socket path macOS takes, less its ending nul.
 pub const MAX_SOCKET_PATH: usize = 103;
@@ -49,6 +65,11 @@ impl Graphics {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Launch {
     pub graphics: Graphics,
+    /// `machine.json`'s `kind`: `windows`, `linux`, or a label of the person's own.
+    pub kind: String,
+    /// The scale a Linux guest draws its desktop at, from the app's Sharp or Standard when it
+    /// starts the machine (`SCALES`). Not passed to other guests.
+    pub scale: u32,
     pub cores: u32,
     pub memory_mb: u64,
     pub disk: PathBuf,
@@ -158,7 +179,23 @@ pub fn qemu_args(launch: &Launch) -> Vec<String> {
         "-serial",
         &format!("file:{}", path(&launch.run_dir.join("serial.log"))),
     ]);
-    add(&["-nic", "none", "-rtc", "base=localtime"]);
+    // Only a Linux machine has a network, and its scale as a file for the guest to read.
+    let linux = launch.kind == LINUX;
+    add(&[
+        "-nic",
+        if linux {
+            "user,model=virtio-net-pci"
+        } else {
+            "none"
+        },
+    ]);
+    add(&["-rtc", "base=localtime"]);
+    if linux {
+        add(&[
+            "-fw_cfg",
+            &format!("name={SCALE_FILE},string={}", launch.scale),
+        ]);
+    }
     add(&[
         "-device",
         "qemu-xhci,id=xhci",
@@ -267,6 +304,8 @@ mod tests {
 
     fn launch() -> Launch {
         Launch {
+            kind: "windows".into(),
+            scale: DEFAULT_SCALE,
             cores: 4,
             memory_mb: 6144,
             disk: "/m/win/win.img".into(),
@@ -428,6 +467,64 @@ mod tests {
             assert_eq!(got, want, "argument {index}");
         }
         assert_eq!(got.len(), want.len());
+    }
+
+    /// A Linux machine's line is the Windows one with the user-mode network in place of `-nic
+    /// none` and the scale file after `-rtc`, on either path; nothing else moves.
+    #[test]
+    fn a_linux_machine_gets_a_network_and_its_scale_and_nothing_else_changes() {
+        for (graphics, windows) in [
+            (Graphics::Qemu, qemu_args(&launch())),
+            (Graphics::Guarded, qemu_args(&guarded())),
+        ] {
+            let linux = Launch {
+                graphics,
+                kind: LINUX.into(),
+                scale: 1,
+                ..launch()
+            };
+            let got = qemu_args(&linux);
+            let mut want = windows.clone();
+            let nic = want.iter().position(|arg| arg == "-nic").unwrap();
+            assert_eq!(want[nic + 1], "none");
+            want[nic + 1] = "user,model=virtio-net-pci".into();
+            assert_eq!(want[nic + 2], "-rtc");
+            want.splice(
+                nic + 4..nic + 4,
+                [
+                    "-fw_cfg".to_string(),
+                    "name=opt/com.ruxn.guesthouse/scale,string=1".to_string(),
+                ],
+            );
+            for (index, (got, want)) in got.iter().zip(&want).enumerate() {
+                assert_eq!(got, want, "argument {index}");
+            }
+            assert_eq!(got.len(), want.len());
+        }
+    }
+
+    #[test]
+    fn a_sharp_linux_machine_is_told_2_and_other_kinds_are_told_nothing() {
+        let linux = Launch {
+            kind: LINUX.into(),
+            ..guarded()
+        };
+        assert!(
+            qemu_args(&linux).contains(&"name=opt/com.ruxn.guesthouse/scale,string=2".to_string())
+        );
+        for kind in ["windows", "Linux", "other"] {
+            let other = Launch {
+                kind: kind.into(),
+                scale: 1,
+                ..guarded()
+            };
+            let args = qemu_args(&other);
+            assert!(!args.iter().any(|arg| arg == "-fw_cfg"), "{kind}");
+            assert!(
+                args.windows(2).any(|pair| pair == ["-nic", "none"]),
+                "{kind}"
+            );
+        }
     }
 
     #[test]

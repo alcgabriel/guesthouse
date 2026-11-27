@@ -86,8 +86,12 @@ private struct ScreenContent: View {
         // A display that is not Retina has no pixels to spare, so Sharp is Standard there.
         let retina = (NSApp.keyWindow?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2) >= 2
         let wanted = WantedScreen.wanted(points: points, sharp: sharp && retina)
-        if let problem = Core.setWantedScreen(machine: machine.agentID, wanted) {
-            print("guesthouse: the screen size was not taken: \(problem)")
+        let id = machine.agentID
+        // The core waits its turn (one size a second) and for the graphics process's answer.
+        Task.detached {
+            if let problem = Core.setWantedScreen(machine: id, wanted) {
+                print("guesthouse: the screen size was not taken: \(problem)")
+            }
         }
     }
 }

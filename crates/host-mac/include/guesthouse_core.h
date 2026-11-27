@@ -71,7 +71,10 @@ char *guesthouse_driver_record(const char *id, const char *version);
 char *guesthouse_start_check(const char *request);
 
 /* Records the pixels and scaling (100 or 200) machine `id`'s screen should have to fill its
- * window. Only records for now: {"ok": true, "applied": false} or {"error": "..."}. */
+ * window, and for a running machine on the guarded path sends it to the graphics process as its
+ * display mode, at most one a second, the last one winning. May wait a second or more: call it
+ * off the main thread. {"ok": true, "applied": true, "mode": "WxH@60"} when the graphics process
+ * took it, {"ok": true, "applied": false, "why": "..."} when nothing was sent, {"error": "..."}. */
 char *guesthouse_machine_set_wanted_screen(const char *id, uint32_t width_px, uint32_t height_px,
                                            uint32_t scaling_percent);
 

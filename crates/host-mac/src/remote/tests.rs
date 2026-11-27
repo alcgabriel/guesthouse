@@ -3,6 +3,8 @@ use crate::create::{self, NewMachine};
 
 fn launch() -> Launch {
     Launch {
+        kind: "windows".into(),
+        scale: crate::launch::DEFAULT_SCALE,
         cores: 2,
         memory_mb: 4096,
         disk: "/m/w/disk.img".into(),

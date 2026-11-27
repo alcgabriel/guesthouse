@@ -134,6 +134,8 @@ impl MachineControl for AgentControl {
             self.tools.qemu.as_deref(),
             None,
             self.tools.pvg_host.as_deref(),
+            // The installer is not told; the first start from the app is.
+            None,
         )
     }
 

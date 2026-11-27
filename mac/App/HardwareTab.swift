@@ -120,12 +120,20 @@ struct HardwareTab: View {
         }
     }
 
+    /// A Linux machine on the protected path takes its window's size; Windows cannot be told yet.
+    private var followsNote: String {
+        if machine.kind == "linux" && machine.graphics == "guarded" {
+            return String(localized: "The machine's screen is always the size of its window. Sharp or Standard counts from the next start.")
+        }
+        return String(localized: "The machine's screen is always the size of its window. Not working yet: the guest cannot be told the size, so it keeps its own.")
+    }
+
     private var screenSection: some View {
         Section("Screen") {
             Toggle(isOn: $follows) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Size follows the window")
-                    Text("The machine's screen is always the size of its window. Not working yet: the guest cannot be told the size, so it keeps its own.").font(.callout).foregroundStyle(.secondary)
+                    Text(followsNote).font(.callout).foregroundStyle(.secondary)
                 }
             }
             LabeledContent {
