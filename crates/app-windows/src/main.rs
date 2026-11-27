@@ -7,7 +7,8 @@
 //! It's WinUI 3 through Microsoft's windows-reactor: `app.rs` is the app's state and what changes
 //! it, `window.rs` what's shown, `bridge.rs` the calls to the service, `screen.rs` remoteman's
 //! viewer, `console.rs` a machine's own screen in Windows' Remote Desktop control, `report.rs` a bug
-//! report's making and sending, and `system.rs` the rest of what's asked of Windows.
+//! report's making and sending, `log.rs` a log's lines, `pace.rs` how often the window is told
+//! things, and `system.rs` the rest of what's asked of Windows.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
@@ -17,6 +18,10 @@ mod app;
 mod bridge;
 #[cfg(windows)]
 mod console;
+#[cfg(any(windows, test))]
+mod log;
+#[cfg(any(windows, test))]
+mod pace;
 #[cfg(windows)]
 mod report;
 #[cfg(windows)]

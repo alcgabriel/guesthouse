@@ -23,6 +23,7 @@ use windows_reactor::*;
 
 use crate::bridge::{self, Ended, Job, Seen, Watch, Window};
 use crate::console::{self, Console};
+use crate::log::Log;
 use crate::report::{self, Asked, Prepared};
 
 #[cfg(feature = "preview")]
@@ -181,11 +182,9 @@ impl Line {
     }
 }
 
-fn push(lines: &mut Vec<Line>, line: Line) {
-    if lines.len() == LOG_LIMIT {
-        lines.remove(0);
-    }
-    lines.push(line);
+/// An empty log, which keeps up to [`LOG_LIMIT`] lines.
+pub fn new_log() -> Log<Line> {
+    Log::new(LOG_LIMIT)
 }
 
 pub fn state_words(state: State) -> &'static str {
@@ -507,7 +506,7 @@ pub struct SnapshotAsk {
 #[derive(Clone, PartialEq, Eq)]
 pub struct Making {
     pub name: String,
-    pub lines: Vec<Line>,
+    pub lines: Log<Line>,
     /// `Some(None)` when it worked, `Some(Some(why))` when it didn't.
     pub ended: Option<Option<String>>,
 }
@@ -518,7 +517,7 @@ pub struct Main {
     /// The machine whose page is shown, by name, as the list's order can change under it.
     pub selected: Option<String>,
     /// The selected machine's log, from its watch.
-    pub log: Vec<Line>,
+    pub log: Log<Line>,
     /// The watch that fills the log, while it lasts.
     watch: Option<Watch>,
     /// Which watch the log is from. Messages from an older one are dropped.
@@ -571,7 +570,8 @@ pub enum Message {
     Hwnd(isize),
     Status(Seen),
     Answered(Job, Result<Answer, Unreached>),
-    Watched(u64, Event),
+    /// Events that came close together, oldest first.
+    Watched(u64, Vec<Event>),
     WatchEnded(u64, Ended),
     Creating(Event),
     Created(Option<String>),
@@ -1079,16 +1079,18 @@ impl Main {
         }
     }
 
-    fn watched(&mut self, event: Event) {
-        if let (Event::State(state), Some(name), Ok(status)) = (&event, &self.selected, &mut self.seen)
-            && let Some(machine) = status.machines.iter_mut().find(|machine| &machine.name == name)
-        {
-            // Sooner than the next answer to Status, so the buttons follow at once.
-            machine.state = *state;
+    fn watched(&mut self, events: Vec<Event>) {
+        for event in &events {
+            if let (Event::State(state), Some(name), Ok(status)) = (event, &self.selected, &mut self.seen)
+                && let Some(machine) = status.machines.iter_mut().find(|machine| &machine.name == name)
+            {
+                // Sooner than the next answer to Status, so the buttons follow at once.
+                machine.state = *state;
+            }
         }
         self.follow_draft();
         self.end_stopped_console();
-        push(&mut self.log, Line::of(event));
+        self.log.extend(events.into_iter().map(Line::of));
     }
 
     /// Opens the selected machine's console in a window of its own, or brings it to the front if
@@ -1165,7 +1167,7 @@ impl Main {
                 "The service stopped sending this machine's log.".to_owned()
             }
         };
-        push(&mut self.log, Line { kind: Kind::Problem, text });
+        self.log.push(Line { kind: Kind::Problem, text });
     }
 
     fn create(&mut self) {
@@ -1173,7 +1175,7 @@ impl Main {
             return;
         }
         let Some(machine) = self.form.machine() else { return };
-        self.making = Some(Making { name: machine.name.clone(), lines: Vec::new(), ended: None });
+        self.making = Some(Making { name: machine.name.clone(), lines: new_log(), ended: None });
         bridge::create(machine, self.window.clone());
     }
 
@@ -1233,7 +1235,7 @@ impl Component for Main {
             seen: Err(Unreached::NoService.words().to_owned()),
             page: Page::Machine,
             selected: None,
-            log: Vec::new(),
+            log: new_log(),
             watch: None,
             watch_id: 0,
             rewatch: false,
@@ -1276,14 +1278,16 @@ impl Component for Main {
             Message::Hwnd(hwnd) => self.hwnd = hwnd,
             Message::Status(seen) => self.take_status(seen),
             Message::Answered(job, answer) => self.answered(job, answer),
-            Message::Watched(id, event) if id == self.watch_id && self.watch.is_some() => self.watched(event),
+            Message::Watched(id, events) if id == self.watch_id && self.watch.is_some() => {
+                self.watched(events)
+            }
             Message::WatchEnded(id, why) if id == self.watch_id && self.watch.is_some() => {
                 self.watch_ended(why)
             }
             Message::Watched(..) | Message::WatchEnded(..) => {}
             Message::Creating(event) => {
                 if let Some(making) = &mut self.making {
-                    push(&mut making.lines, Line::of(event));
+                    making.lines.push(Line::of(event));
                 }
             }
             Message::Created(ended) => {
