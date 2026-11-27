@@ -17,20 +17,15 @@ const PARTIAL: &str = "part";
 const CHECKED: &str = "sha256";
 const MIB: u64 = 1024 * 1024;
 
-/// Ubuntu's release folder for the version the Ubuntu install is made for, and its checksum list.
-const UBUNTU_RELEASE: &str = "https://releases.ubuntu.com/26.04/";
-const UBUNTU_SUMS: &str = "SHA256SUMS";
-/// The server disc's name begins and ends so, with the point release between.
-const UBUNTU_PREFIX: &str = "ubuntu-26.04";
-const UBUNTU_SUFFIX: &str = "-live-server-amd64.iso";
+pub use guesthouse_catalog_core::android::ANDROID_IMAGE_NAME;
+/// Ubuntu's release folder, its checksum list and the disc's name, and the Android image, are in
+/// every host's catalog, `guesthouse_catalog_core`.
+use guesthouse_catalog_core::android::{ANDROID_IMAGE_HOST, ANDROID_IMAGE_SHA256};
+#[cfg(test)]
+use guesthouse_catalog_core::ubuntu_amd64::{UBUNTU_PREFIX, UBUNTU_SUFFIX};
+use guesthouse_catalog_core::ubuntu_amd64::{UBUNTU_RELEASE, UBUNTU_SUMS, newest_server_disc};
 const UBUNTU_FOLDER: &str = "ubuntu";
 
-/// Guesthouse's Android image (LineageOS for VMs with its setup app, microG and ARM64 translation, built
-/// from `android/` in Guesthouse's source), as a compressed qcow2 of its system disk. A new one gets a new
-/// name, so one fetched before is never taken for it.
-pub const ANDROID_IMAGE_NAME: &str = "guesthouse-android-17-2026-11-23.qcow2";
-const ANDROID_IMAGE_SHA256: &str = "d547bda57a11624e201bd6c4ea50f3e8da3f63997d5a2ffb575220050ec10917";
-const ANDROID_IMAGE_HOST: &str = "https://files.ruxn.com/p/guesthouse/";
 const ANDROID_FOLDER: &str = "android";
 
 fn said(output: &std::process::Output) -> String {
@@ -135,28 +130,6 @@ pub fn fetch_checked(url: &str, wanted: &str, file: &Path, what: &str, step: &dy
     fs::rename(&partial, file)?;
     fs::write(file.with_extension(CHECKED), wanted)?;
     Ok(())
-}
-
-/// The newest point release's server disc in Ubuntu's checksum list, and its SHA-256.
-fn newest_server_disc(sums: &str) -> Option<(String, String)> {
-    let mut discs: Vec<(String, String)> = sums
-        .lines()
-        .filter_map(|line| {
-            let (sum, name) = line.split_once(' ')?;
-            let name = name.trim().trim_start_matches('*');
-            (name.starts_with(UBUNTU_PREFIX) && name.ends_with(UBUNTU_SUFFIX))
-                .then(|| (name.to_owned(), sum.to_owned()))
-        })
-        .collect();
-    // 26.04 sorts before 26.04.1, which sorts before 26.04.2.
-    discs.sort_by(|one, other| {
-        let point = |name: &str| {
-            let middle = &name[UBUNTU_PREFIX.len()..name.len() - UBUNTU_SUFFIX.len()];
-            middle.trim_start_matches('.').parse::<u32>().unwrap_or(0)
-        };
-        point(&one.0).cmp(&point(&other.0))
-    });
-    discs.pop()
 }
 
 /// Ubuntu's server disc that an Ubuntu machine installs from, fetched if it isn't here.

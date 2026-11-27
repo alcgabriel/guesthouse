@@ -918,6 +918,7 @@ dependencies = [
  "guesthouse-backend-intel",
  "guesthouse-backend-nvidia",
  "guesthouse-card-check",
+ "guesthouse-catalog-core",
  "guesthouse-daemon",
  "guesthouse-jail",
  "guesthouse-relay",
@@ -1004,6 +1005,10 @@ dependencies = [
  "guesthouse-backend",
  "guesthouse-backend-nvidia",
 ]
+
+[[package]]
+name = "guesthouse-catalog-core"
+version = "0.11.0"
 
 [[package]]
 name = "guesthouse-clock-helper"
