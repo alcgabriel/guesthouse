@@ -1,11 +1,14 @@
 //! What the app asks of Windows itself, beyond the window: the file dialog, the clipboard, Remote
-//! Desktop, the icon's file, and cancelling a read on the pipe. Every `unsafe` call of the app is
+//! Desktop, the icon's file, cancelling a read on the pipe, what opens at sign-in, and the file
+//! drop, for a newer Guesthouse. Every `unsafe` call of the app is
 //! here, but for the console's, which are in console.rs.
 
 use std::os::windows::io::AsRawHandle;
 use std::path::PathBuf;
 use std::process::Command;
 use std::thread::{self, JoinHandle};
+
+use crate::update;
 
 use windows_sys::Win32::Foundation::{GlobalFree, HWND};
 use windows_sys::Win32::System::Com::{
@@ -169,26 +172,147 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 /// Whether this is an installed app, beside the installer's uninstaller. Only an installed app is
 /// offered updates: a build of the repo is whatever it was built from.
 pub fn installed() -> bool {
-    std::env::current_exe()
-        .ok()
-        .and_then(|exe| Some(exe.parent()?.parent()?.join("uninstall.exe").is_file()))
-        .unwrap_or(false)
+    install_folder().is_some()
 }
 
-/// The newest Windows host's file, fetched with the curl Windows has, which needs no library of
-/// ours for HTTPS. Only HTTPS, with a time limit, and no more than the file can be.
-pub fn fetch_latest() -> Option<String> {
-    use std::os::windows::process::CommandExt;
+/// The curl Windows has, which needs no library of ours for HTTPS.
+fn curl() -> PathBuf {
     let root = std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
-    let curl = PathBuf::from(root).join(r"System32\curl.exe");
+    PathBuf::from(root).join(r"System32\curl.exe")
+}
+
+/// The newest Windows host's file, fetched with the curl Windows has. Only HTTPS, from the file
+/// drop's own address with no redirect followed, with a time limit, and no more than the file can be.
+fn fetch_latest() -> update::Fetched {
+    use std::os::windows::process::CommandExt;
     let limit = guesthouse_control::updates::LONGEST.to_string();
-    let output = Command::new(curl)
-        .args(["--fail", "--silent", "--location", "--proto", "=https", "--max-time", "20"])
+    let output = Command::new(curl())
+        .args(["--fail", "--silent", "--globoff", "--proto", "=https", "--max-time", "20"])
         .args(["--max-filesize", &limit, guesthouse_control::updates::LATEST_URL])
         .creation_flags(CREATE_NO_WINDOW)
-        .output()
-        .ok()?;
-    output.status.success().then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+        .output();
+    match output {
+        Ok(output) if output.status.success() => {
+            update::Fetched::Text(String::from_utf8_lossy(&output.stdout).into_owned())
+        }
+        _ => update::Fetched::Unreached,
+    }
+}
+
+/// The updater that reaches the file drop.
+pub struct Network;
+
+impl update::Updater for Network {
+    fn fetch(&self) -> update::Fetched {
+        fetch_latest()
+    }
+}
+
+/// The install folder, if this is an installed app: the folder above the app's own.
+pub fn install_folder() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let folder = exe.parent()?.parent()?;
+    folder.join("uninstall.exe").is_file().then(|| folder.to_path_buf())
+}
+
+/// Opens the licences of what's installed with Guesthouse, `THIRD-PARTY.md` in the install folder,
+/// in Notepad, as Windows may have nothing else for a .md file. A build of the repo has no install
+/// folder, so the repo's own file is opened in the browser. Returns words for the person when it
+/// couldn't.
+pub fn open_licences() -> Result<(), String> {
+    let Some(file) =
+        install_folder().map(|folder| folder.join("THIRD-PARTY.md")).filter(|file| file.is_file())
+    else {
+        return open_link(LICENCES_PAGE);
+    };
+    Command::new("notepad.exe")
+        .arg(&file)
+        .spawn()
+        .map(drop)
+        .map_err(|error| format!("Notepad didn't open: {error}. The licences are in {}", file.display()))
+}
+
+/// The licences of what Guesthouse is built with, in the repo.
+const LICENCES_PAGE: &str = "https://github.com/ruxnlabs/guesthouse/blob/main/THIRD-PARTY.md";
+
+/// Where Windows keeps what opens when this user signs in, and the app's name there.
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+const RUN_NAME: &str = "Guesthouse";
+
+/// What the Run key holds to open this app: its path, in quotes as a path with spaces needs.
+fn run_command() -> Option<String> {
+    Some(format!("\"{}\"", std::env::current_exe().ok()?.display()))
+}
+
+/// Whether this app opens when the person signs in: the Run key names this app's own exe.
+pub fn opens_at_sign_in() -> bool {
+    use windows_sys::Win32::Foundation::ERROR_SUCCESS;
+    use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW};
+    let (key, name) = (wide(RUN_KEY), wide(RUN_NAME));
+    let mut buffer = vec![0u16; LONGEST_PATH];
+    let mut bytes = (buffer.len() * size_of::<u16>()) as u32;
+    // SAFETY: both names end in a null, and `buffer` holds `bytes` bytes.
+    let found = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            key.as_ptr(),
+            name.as_ptr(),
+            RRF_RT_REG_SZ,
+            std::ptr::null_mut(),
+            buffer.as_mut_ptr().cast(),
+            &mut bytes,
+        )
+    };
+    if found != ERROR_SUCCESS {
+        return false;
+    }
+    let end = buffer.iter().position(|&unit| unit == 0).unwrap_or(buffer.len());
+    let held = String::from_utf16_lossy(&buffer[..end]);
+    run_command().is_some_and(|command| held.eq_ignore_ascii_case(&command))
+}
+
+/// Makes this app open when the person signs in, or not. Returns words for the person when Windows
+/// wouldn't.
+pub fn set_opens_at_sign_in(on: bool) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
+    use windows_sys::Win32::System::Registry::{
+        HKEY_CURRENT_USER, REG_SZ, RegDeleteKeyValueW, RegSetKeyValueW,
+    };
+    let (key, name) = (wide(RUN_KEY), wide(RUN_NAME));
+    let done = if on {
+        let command = wide(&run_command().ok_or("The app's own path isn't known.")?);
+        // SAFETY: both names end in a null, and the value is `command`'s bytes with its null, as a
+        // REG_SZ is kept.
+        unsafe {
+            RegSetKeyValueW(
+                HKEY_CURRENT_USER,
+                key.as_ptr(),
+                name.as_ptr(),
+                REG_SZ,
+                command.as_ptr().cast(),
+                (command.len() * size_of::<u16>()) as u32,
+            )
+        }
+    } else {
+        // SAFETY: both names end in a null.
+        match unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr()) } {
+            // Not there is off already.
+            ERROR_FILE_NOT_FOUND => ERROR_SUCCESS,
+            other => other,
+        }
+    };
+    if done == ERROR_SUCCESS {
+        Ok(())
+    } else {
+        Err(format!(
+            "Windows didn't keep that (error {done}). Try again, or use Task Manager's Startup apps."
+        ))
+    }
+}
+
+/// A string as Windows' calls take it, with its null.
+fn wide(text: &str) -> Vec<u16> {
+    text.encode_utf16().chain([0]).collect()
 }
 
 /// Opens a web page in the person's browser. Returns words for the person when it couldn't.

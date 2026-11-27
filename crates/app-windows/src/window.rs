@@ -12,8 +12,10 @@
 //!
 //! `home.rs` is Home, `machine.rs` a machine's page and its Overview, `settings.rs` its Hardware,
 //! Network and Storage, `remote_view.rs` its Remote View, `forms.rs` New machine and Report a
-//! problem, and `parts.rs` the pieces they're all made of.
+//! problem, `app_settings.rs` the app's own Settings, from the gear in the title bar, and
+//! `parts.rs` the pieces they're all made of.
 
+mod app_settings;
 mod forms;
 mod home;
 mod machine;
@@ -59,6 +61,7 @@ pub fn view(main: &Main, context: &mut ViewContext<Main>) -> View {
     }
     context.window_visuals(visuals);
     let body: View = match (&main.seen, main.page) {
+        (_, Page::AppSettings) => app_settings::page(main, context),
         (Err(_), Page::Report) => forms::report_page(main, context),
         (Err(words), _) => away(words, context),
         (Ok(_), Page::Home) => home::page(main, context),
@@ -111,8 +114,9 @@ fn can_go_back(main: &Main) -> bool {
         || main.viewing.as_ref().is_some_and(|viewing| viewing.removing.is_some());
     let page = match main.seen {
         Ok(_) => main.page != Page::Home,
-        // With the service away only the report page has somewhere to go back to.
-        Err(_) => main.page == Page::Report,
+        // With the service away only the report page and the app's settings have somewhere to go
+        // back to.
+        Err(_) => matches!(main.page, Page::Report | Page::AppSettings),
     };
     page && !asking
 }
@@ -153,9 +157,20 @@ fn title_bar(main: &Main, context: &ViewContext<Main>) -> TitleBar {
     let machine = main.machine().filter(|_| main.page == Page::Machine && main.seen.is_ok());
     let (left, right): (Option<View>, Option<View>) = match machine {
         Some(machine) => {
-            (Some(machine::switcher(main, machine, context)), Some(machine::actions(machine, context)))
+            (Some(machine::switcher(main, machine, context)), Some(machine::actions(main, machine, context)))
         }
-        None if main.page == Page::Home && main.seen.is_ok() => (None, home::actions(main, context)),
+        None if main.page == Page::Home && main.seen.is_ok() => (None, Some(home::actions(main, context))),
+        // The page that says the service can't be reached has the app's settings, as an update is
+        // what puts a service of another version right.
+        None if main.seen.is_err() && !matches!(main.page, Page::Report | Page::AppSettings) => (
+            None,
+            Some(
+                Border::new()
+                    .margin(Thickness::new(0.0, 0.0, 8.0, 0.0))
+                    .content(app_settings::gear(main, context))
+                    .into(),
+            ),
+        ),
         None => (None, None),
     };
     let mut bar = bar.margin(Thickness::new(0.0, 0.0, nudge(main), 0.0));
@@ -198,7 +213,7 @@ fn nudge(main: &Main) -> f64 {
         main.layout.narrow,
         main.status().map(|status| status.machines.len()),
         can_go_back(main),
-        main.update.is_some(),
+        main.updates.dot(),
     );
     TITLE_BAR.with_borrow_mut(|(held, nudge)| {
         if *held != holds {

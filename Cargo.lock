@@ -962,6 +962,7 @@ dependencies = [
  "guesthouse-control",
  "guesthouse-relay",
  "guesthouse-remote-view-core",
+ "serde",
  "serde_json",
  "windows-reactor",
  "windows-reactor-setup",

@@ -9,7 +9,8 @@
 //! viewer, `console.rs` a machine's own screen in Windows' Remote Desktop control, `report.rs` a bug
 //! report's making and sending, `log.rs` a log's lines, `pace.rs` how often the window is told
 //! things, `remote_view.rs` what the Remote View group shows and asks, `shell.rs` how
-//! the window gets about, and `system.rs` the rest of what's asked of Windows.
+//! the window gets about, `preferences.rs` the app's own settings, `update.rs` whether a newer
+//! Guesthouse is out, and `system.rs` the rest of what's asked of Windows.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
@@ -24,6 +25,8 @@ mod log;
 #[cfg(any(windows, test))]
 mod pace;
 #[cfg(any(windows, test))]
+mod preferences;
+#[cfg(any(windows, test))]
 mod remote_view;
 #[cfg(windows)]
 mod report;
@@ -33,6 +36,8 @@ mod screen;
 mod shell;
 #[cfg(windows)]
 mod system;
+#[cfg(any(windows, test))]
+mod update;
 #[cfg(windows)]
 mod window;
 

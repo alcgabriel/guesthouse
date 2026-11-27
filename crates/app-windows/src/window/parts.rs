@@ -46,6 +46,7 @@ pub mod glyph {
     pub const INFO: &str = "\u{E946}";
     pub const CHEVRON: &str = "\u{E76C}";
     pub const TERMINAL: &str = "\u{E756}";
+    pub const SETTINGS: &str = "\u{E713}";
 }
 
 pub fn logo() -> EncodedImage {

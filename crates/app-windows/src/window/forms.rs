@@ -6,7 +6,6 @@ use std::rc::Rc;
 use guesthouse_control::report::{KEPT_DAYS, ProblemKind, stage::size_words};
 use windows_reactor::*;
 
-use super::machine::update_card;
 use super::parts::*;
 use super::settings::{CARD_NOTE, card_box, tpm_words};
 use crate::app::{EDITIONS, FolderFor, Main, Message, Ready, ReportStage};
@@ -226,9 +225,6 @@ pub fn new_page(main: &Main, context: &ViewContext<Main>) -> View {
         );
         // Under the title, where it's seen at once, rather than under the form that started it.
         sections.insert(1, StackPanel::new().spacing(8.0).children(parts).into());
-    }
-    if let Some(update) = update_card(main, context) {
-        sections.insert(0, update);
     }
     scrolled(sections, FORM_WIDTH)
 }

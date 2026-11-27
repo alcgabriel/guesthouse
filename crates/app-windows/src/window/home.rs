@@ -4,7 +4,7 @@
 use guesthouse_control::{Machine, State};
 use windows_reactor::*;
 
-use super::machine::update_card;
+use super::app_settings::gear;
 use super::parts::*;
 use crate::app::{Main, Message};
 
@@ -15,18 +15,23 @@ const FIRST_RUN_LOGO: f64 = 240.0;
 /// The widest the first run's words are.
 const FIRST_RUN_WIDTH: f64 = 460.0;
 
-/// Home's part of the title bar: Report a problem and New machine. The first run's page has its own.
-pub fn actions(main: &Main, context: &ViewContext<Main>) -> Option<View> {
+/// Home's part of the title bar: Report a problem, the app's settings and New machine. The first
+/// run's page has its own Report a problem and New machine, so it has only the settings.
+pub fn actions(main: &Main, context: &ViewContext<Main>) -> View {
     let machines = main.status().map_or(0, |status| status.machines.len());
-    if machines == 0 {
-        return None;
+    let mut parts: Vec<View> = Vec::new();
+    if machines > 0 {
+        let report = square(glyph::FEEDBACK, "Report a problem")
+            .style(ButtonStyle::Subtle)
+            .on_click(context.message(Message::OpenReport))
+            .tooltip("Report a problem");
+        parts.push(report);
     }
-    let report = square(glyph::FEEDBACK, "Report a problem")
-        .style(ButtonStyle::Subtle)
-        .on_click(context.message(Message::OpenReport))
-        .tooltip("Report a problem");
-    let new = button("New machine", context.message(Message::NewMachine), true);
-    Some(side_by_side((report, new)).margin(Thickness::new(0.0, 0.0, 8.0, 0.0)).into())
+    parts.push(gear(main, context));
+    if machines > 0 {
+        parts.push(button("New machine", context.message(Message::NewMachine), true).into());
+    }
+    side_by_side(parts).margin(Thickness::new(0.0, 0.0, 8.0, 0.0)).into()
 }
 
 pub fn page(main: &Main, context: &ViewContext<Main>) -> View {
@@ -34,7 +39,7 @@ pub fn page(main: &Main, context: &ViewContext<Main>) -> View {
     if machines.is_empty() {
         return first_run(main, context);
     }
-    let mut parts: Vec<View> = update_card(main, context).into_iter().collect();
+    let mut parts: Vec<View> = Vec::new();
     let running = machines.iter().filter(|machine| machine.state == State::Running).count();
     let count = format!("{running} running · {} in all", machines.len());
     parts.push(
@@ -258,8 +263,7 @@ fn first_run(main: &Main, context: &ViewContext<Main>) -> View {
             .children((picture.horizontal_alignment(HorizontalAlignment::Center), words))
             .into()
     };
-    let mut parts: Vec<View> = update_card(main, context).into_iter().collect();
-    parts.push(both);
+    let parts: Vec<View> = vec![both];
     ScrollViewer::new()
         .horizontal_scroll_bar_visibility(ScrollBarVisibility::Disabled)
         .content(
