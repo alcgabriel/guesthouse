@@ -21,6 +21,10 @@
 //!   and the machine only gets its forward (`forward`) at a start with it on.
 //! - [`stand_in`] is a pretend helper to test any of this against, with no guest.
 //!
+//! The wire, the model, the geometry and `describe` call nothing and are
+//! `guesthouse_window_cells_core`'s, which every host can build on; their modules here keep the names
+//! they have always had.
+//!
 //! One helper takes one connection, so a viewer is the only long-lived client of a machine. A command
 //! that connects while a viewer is open takes the connection for a moment, and the viewer's client
 //! connects again after its wait.

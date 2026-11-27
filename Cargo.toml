@@ -44,6 +44,7 @@ default-members = [
     "crates/service-windows",
     "crates/transport",
     "crates/update-check",
+    "crates/window-cells",
     "tools/card-check",
     "tools/hcs-boot",
 ]
@@ -89,6 +90,7 @@ guesthouse-serial-words-core = { path = "crates/serial-words" }
 guesthouse-idle-core = { path = "crates/idle" }
 guesthouse-guest-names-core = { path = "crates/guest-names" }
 guesthouse-recipes-core = { path = "crates/recipes" }
+guesthouse-window-cells-core = { path = "crates/window-cells" }
 # The Mac host's graphics process and the guard in front of the framework it calls.
 guesthouse-pvg-sys = { path = "crates/pvg-sys" }
 

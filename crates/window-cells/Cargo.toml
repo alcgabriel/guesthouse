@@ -1,0 +1,16 @@
+[package]
+name = "guesthouse-window-cells-core"
+description = "App windows' model with no display: the JSON lines between a host and the helper in a Windows guest that parks each program's window in a cell of its own, the model of those cells a host keeps, where things are in them, and each cell in words. Nothing here calls the system, so every host can build on it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# The lines between the host and the helper are JSON.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints]
+workspace = true

@@ -944,6 +944,7 @@ dependencies = [
  "guesthouse-settings-core",
  "guesthouse-state-core",
  "guesthouse-update-check",
+ "guesthouse-window-cells-core",
  "jiff",
  "libc",
  "mdns-sd",
@@ -1350,6 +1351,14 @@ version = "0.11.0"
 
 [[package]]
 name = "guesthouse-update-check"
+version = "0.11.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "guesthouse-window-cells-core"
 version = "0.11.0"
 dependencies = [
  "serde",

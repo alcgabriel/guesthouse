@@ -1,0 +1,4 @@
+65814 C:\Windows\System32\notepad.exe "Untitled - Notepad" 886x593 at 0,41 [focus]
+131100 C:\Windows\System32\notepad.exe "" 190x280 at 5,113 [popup of 65814 at 5,72, picture 190x280 at 900,100]
+262338 C:\Program Files\App\app.exe "\"Quoted\" back\\slash\ttab\nline \u{1} été 日本" 160x28 at -32000,-32000 [minimized, picture 0x0 at 0,0]
+393410 C:\Tools\big.exe "Big" 1200x800 at 1700,900 [covered, overflow, picture 860x540 at 1700,900]

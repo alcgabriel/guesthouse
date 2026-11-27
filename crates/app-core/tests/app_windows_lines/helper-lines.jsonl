@@ -1,0 +1,14 @@
+{"t":"hello","v":1,"session":"3f2a9c1e4b5d46e8a7c0b1d2e3f4a5b6","screen":{"w":1920,"h":1080},"scale":125}
+{"t":"layout","seq":1,"screen":{"w":1920,"h":1080},"cells":[]}
+{"t":"layout","seq":7,"screen":{"w":2560,"h":1440},"cells":[{"id":"65814","pid":4120,"exe":"C:\\Windows\\System32\\notepad.exe","app":"C:\\Windows\\System32\\notepad.exe","name":"Notepad","cls":"Notepad","title":"Untitled - Notepad","cell":{"x":0,"y":41,"w":886,"h":593},"frame":{"x":0,"y":41,"w":886,"h":593},"popup":false,"parent":"","owner":"","rel":{"x":0,"y":0},"state":"shown","overflow":false,"focus":true,"caption":{"h":32,"buttons_w":138},"resizable":true,"corner":10},{"id":"131100","pid":4120,"exe":"C:\\Windows\\System32\\notepad.exe","app":"C:\\Windows\\System32\\notepad.exe","name":"Notepad","cls":"#32768","title":"","cell":{"x":900,"y":100,"w":190,"h":280},"frame":{"x":5,"y":113,"w":190,"h":280},"popup":true,"parent":"65814","owner":"","rel":{"x":5,"y":72},"state":"shown","overflow":false,"focus":false,"caption":{"h":0,"buttons_w":0},"resizable":false,"corner":0},{"id":"262338","pid":5012,"exe":"C:\\Program Files\\App\\app.exe","app":"aumid:Contoso.App_8wekyb3d8bbwe!App","name":"App","cls":"Chrome_WidgetWin_1","title":"\"Quoted\" back\\slash\ttab\nline \u0001 été 日本","cell":{"x":0,"y":0,"w":0,"h":0},"frame":{"x":-32000,"y":-32000,"w":160,"h":28},"popup":false,"parent":"","owner":"65814","rel":{"x":0,"y":0},"state":"minimized","overflow":false,"focus":false,"caption":{"h":31,"buttons_w":0},"resizable":true,"corner":8},{"id":"393410","pid":6020,"exe":"C:\\Tools\\big.exe","app":"","name":"","cls":"Big","title":"Big","cell":{"x":1700,"y":900,"w":860,"h":540},"frame":{"x":1700,"y":900,"w":1200,"h":800},"popup":false,"parent":"","owner":"","rel":{"x":0,"y":0},"state":"covered","overflow":true,"focus":false,"caption":{"h":30,"buttons_w":140},"resizable":true,"corner":8}]}
+{"t":"answer","re":3,"ok":true}
+{"t":"answer","re":4,"ok":false,"error":"no window 1234"}
+{"t":"answer","re":5,"ok":false,"error":"a \"quoted\" reason\nover two lines"}
+{"t":"answer","re":6,"ok":true,"apps":[{"id":"Accessories/Notepad","name":"Notepad","target":"C:\\Windows\\System32\\notepad.exe","icon":"","minor":false},{"id":"App/Uninstall App","name":"Uninstall App","target":"","icon":"iVBORw0KGgo=","minor":true}]}
+{"t":"answer","re":7,"ok":true,"apps":[]}
+{"t":"answer","re":8,"ok":true,"icon":"iVBORw0KGgoAAAANSUhEUg=="}
+{"t":"display","scale":150,"steps":[100,125,150,175,200,225]}
+{"t":"display","scale":100,"steps":[100,125],"need":{"w":2576,"h":1440}}
+{"t":"desktop","kind":"normal"}
+{"t":"desktop","kind":"secure"}
+{"t":"desktop","kind":"locked"}
