@@ -1,0 +1,21 @@
+{
+  "name": "Games",
+  "description": "Windows with room for games, and Steam.",
+  "guest": "windows",
+  "settings": {
+    "cores": 8,
+    "ram_gib": 16,
+    "disk_gib": 256,
+    "vram_gib": null
+  },
+  "steps": {
+    "packages": [
+      "Valve.Steam"
+    ],
+    "script": null
+  },
+  "lean": true,
+  "scan_exclusions": [
+    "C:\\Program Files (x86)\\Steam\\steamapps"
+  ]
+}

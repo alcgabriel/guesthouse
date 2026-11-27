@@ -1,0 +1,10 @@
+CUDA: Ubuntu with a compiler, Python and the CUDA toolkit from Ubuntu's archive.
+It comes with Guesthouse.
+It sets 8 cores, 16 GiB of RAM, a 120 GiB disk.
+Once Ubuntu is installed and up, it runs in the machine, as root:
+- Install the apt package build-essential
+- Install the apt package cmake
+- Install the apt package git
+- Install the apt package python3-pip
+- Install the apt package python3-venv
+- Install the apt package nvidia-cuda-toolkit

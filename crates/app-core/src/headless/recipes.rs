@@ -9,7 +9,9 @@ use crate::failure::{Failure, Result};
 use crate::gpu_maker::GpuMaker;
 use crate::library::Extras;
 use crate::machine::{Kind, Machine};
-use crate::recipe::{Chosen, Guest, Source, Usual, find, fit, list, read_chosen, what_it_will_run};
+use crate::recipe::{
+    Chosen, Guest, GuestKind, Source, Usual, find, fit, list, read_chosen, what_it_will_run,
+};
 use crate::settings::max_vram_gib_for;
 use crate::tasks::{State, status};
 use std::io::Write;

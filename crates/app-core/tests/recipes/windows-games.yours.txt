@@ -1,0 +1,46 @@
+Games: Windows with room for games, and Steam.
+It is your own recipe, from /srv/recipes/mine.toml. Nobody else has looked at it.
+It sets 8 cores, 16 GiB of RAM, a 256 GiB disk.
+It starts the machine as lean Windows, which you can turn off. Lean Windows takes out these apps where this Windows has them, before the account first logs on, and again after the install from every account. Some are only on older Windows, and the machine's settings say afterwards which it took out:
+- Phone Link (Microsoft.YourPhone): a program that runs in the background from logon
+- Teams (free) (MSTeams): a program that runs in the background from logon
+- Teams chat, of Windows 11's first releases (MicrosoftTeams): a program that runs in the background from logon
+- Cortana (Microsoft.549981C3F5F10): a program that runs in the background from logon
+- Copilot (Microsoft.Copilot): a program that can start at logon, and its updates
+- News (Microsoft.BingNews): disk space, and the Store keeping it up to date
+- Weather (Microsoft.BingWeather): disk space, and the Store keeping it up to date
+- Tips (Microsoft.Getstarted): the tips it shows after the first logon
+- Microsoft 365 (Office) (Microsoft.MicrosoftOfficeHub): disk space, and the Store keeping it up to date
+- Outlook (new) (Microsoft.OutlookForWindows): disk space, and the Store keeping it up to date
+- Mail and Calendar (microsoft.windowscommunicationsapps): disk space, and the Store keeping it up to date
+- Solitaire Collection (Microsoft.MicrosoftSolitaireCollection): disk space, and the Store keeping it up to date
+- Clipchamp (Clipchamp.Clipchamp): disk space, and the Store keeping it up to date
+- Power Automate (Microsoft.PowerAutomateDesktop): disk space, and the Store keeping it up to date
+- Microsoft To Do (Microsoft.Todos): disk space, and the Store keeping it up to date
+- Dev Home (Microsoft.Windows.DevHome): disk space, and the Store keeping it up to date
+- Feedback Hub (Microsoft.WindowsFeedbackHub): disk space, and the Store keeping it up to date
+- Maps (Microsoft.WindowsMaps): disk space, and its map updates
+- Movies & TV (Microsoft.ZuneVideo): disk space, and the Store keeping it up to date
+- Family (MicrosoftCorporationII.MicrosoftFamily): disk space, and the Store keeping it up to date
+- People, on Windows 10 (Microsoft.People): disk space, and the Store keeping it up to date
+- Skype, on Windows 10 (Microsoft.SkypeApp): disk space, and the Store keeping it up to date
+It sets these documented policies:
+- DisableWindowsConsumerFeatures = 1 in HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent: Windows puts no suggested apps from other makers in the new account. Enterprise, Education and IoT Enterprise honour this. Home and Pro ignore it.
+- AllowNewsAndInterests = 0 in HKLM\SOFTWARE\Policies\Microsoft\Dsh: Widgets are off, so their programs don't run from logon.
+- DisableFileSyncNGSC = 1 in HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive: OneDrive doesn't run or sync, so it isn't in the background from logon.
+- StartupBoostEnabled = 0 in HKLM\SOFTWARE\Policies\Microsoft\Edge: Edge doesn't start at logon to open faster later.
+- BackgroundModeEnabled = 0 in HKLM\SOFTWARE\Policies\Microsoft\Edge: Edge doesn't keep running after its last window closes.
+Windows then doesn't add these, which it otherwise adds after the first logon:
+- Start's companion content, such as the Phone Link panel (Microsoft.StartExperiencesApp): kept away with Phone Link, it seems
+- the runtime Widgets run on (Microsoft.WidgetsPlatformRuntime): kept away with Widgets switched off, it seems
+It leaves alone:
+- Defender, the firewall, SmartScreen, Windows Update, UAC, Secure Boot, the TPM and BitLocker, as Windows sets them. Leaving folders out of virus scanning is a choice of its own, off unless chosen.
+- The Store, App Installer and winget, which the recipes install with.
+- Every Xbox part, Game Bar and the Xbox identity provider, which games and Game Pass need.
+- Edge, and the WebView2 runtime many programs need.
+- Get Help, which is Windows 11's troubleshooters, and Quick Assist.
+- The tools: Photos, Media Player, Notepad, Paint, Calculator, Terminal, Snipping Tool, Camera, Clock, Sound Recorder and Sticky Notes, as well as the runtimes, languages, input methods and accessibility tools.
+Settings and Edge then say some settings are managed by your organization, as they do for any policy. An app comes back from the Store, and a policy goes by deleting its value.
+It names folders that Defender's scanning can leave out, C:\Program Files (x86)\Steam\steamapps, and that is off unless you turn it on.
+Once Windows is installed and up, it runs in the machine, as the account's administrator:
+- Install the winget package Valve.Steam

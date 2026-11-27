@@ -1,0 +1,10 @@
+{
+  "taken_out": [
+    "MSTeams",
+    "Microsoft.BingNews"
+  ],
+  "put_back": [
+    "Microsoft.Windows.DevHome"
+  ],
+  "still_back": "in use"
+}

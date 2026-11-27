@@ -1,0 +1,4 @@
+Clean box: A small Windows to try something out in. Nothing is added to it.
+It comes with Guesthouse.
+It sets 4 cores, 8 GiB of RAM, a 80 GiB disk.
+It runs nothing in the machine.
