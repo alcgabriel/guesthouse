@@ -4,3 +4,5 @@ crates/host-windows/guest/linux/** text eol=lf
 # Golden copies of what a report holds, compared byte for byte, so a checkout keeps them as they are.
 crates/app-core/tests/report-golden/** -text
 crates/control/tests/report-golden/** -text
+crates/app-core/tests/answers-golden/** -text
+crates/host-windows/tests/answers-golden/** -text

@@ -1,0 +1,23 @@
+first Windows 11 build: 22000, amd64: 9
+header 208 bytes, XML entry at 0x48, at most 67108864
+image ("Windows 11 Home", "Windows 11 Famille", 26100, "9")
+image ("Windows 11 Pro", "Windows 11 Pro", 26100, "9")
+image ("Windows 11 Pro", "Windows 11 Pro", 26100, "12")
+image ("Windows 10 Pro", "Windows 10 Pro", 19045, "9")
+image ("A &amp; B", "", 26200, "9")
+image ("Windows 11 IoT Enterprise LTSC 2024", "Windows 11 IoT Enterprise LTSC 2024", 26100, "9")
+field "<A>x</A>" A -> Some("x")
+field "<A></A>" A -> Some("")
+field "<A>x" A -> None
+field "<B>x</B>" A -> None
+field "<A><A>y</A></A>" A -> Some("<A>y")
+wim -> Some("<WIM><IMAGE INDEX=\"0\"><NAME>Windows 11 Home</NAME><WINDOWS><ARCH>9</ARCH><VERSION><BUILD>26300</BUILD></VERSION></WINDOWS></IMAGE><IMAGE INDEX=\"1\"><NAME>Windows 11 Pro</NAME><WINDOWS><ARCH>9</ARCH><VERSION><BUILD>26300</BUILD></VERSION></WINDOWS></IMAGE></WIM>")
+not a wim -> None
+cut short -> None
+utf-16 -> "Aé攬"
+same "Windows 11 Pro" "Windows 11 Pro" -> true
+same "Windows 11 IoT Enterprise LTSC 2024" "Windows 11 IoT Enterprise LTSC" -> true
+same "Windows 11 IoT Enterprise LTSC 202" "Windows 11 IoT Enterprise LTSC" -> false
+same "Windows 11 IoT Enterprise LTSC-2024" "Windows 11 IoT Enterprise LTSC" -> false
+same "Windows 11 Pro N" "Windows 11 Pro" -> false
+same "windows 11 pro" "Windows 11 Pro" -> false

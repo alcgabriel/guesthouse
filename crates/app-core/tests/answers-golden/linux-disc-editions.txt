@@ -1,0 +1,6 @@
+home-and-pro -> Windows "Windows 11 Pro" "Windows 11 Pro, build 26300" true
+pro-and-ltsc -> Windows "Windows 11 Pro" "Windows 11 Pro, build 26100" true
+ltsc-year -> Windows "Windows 11 IoT Enterprise LTSC 2024" "Windows 11 IoT Enterprise LTSC 2024, build 26100" true
+home-only -> Plain "" "Windows, but not 64-bit Windows 11 Pro or IoT Enterprise LTSC" true
+windows-10 -> Plain "" "Windows, but not 64-bit Windows 11 Pro or IoT Enterprise LTSC" true
+arm -> Plain "" "Windows, but not 64-bit Windows 11 Pro or IoT Enterprise LTSC" true

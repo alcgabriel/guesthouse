@@ -90,6 +90,10 @@ fn escape(text: &str) -> String {
 }
 
 #[cfg(test)]
+#[path = "guest_golden.rs"]
+mod answers_golden;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

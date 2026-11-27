@@ -1,0 +1,8 @@
+"guesthouse 0123456789abcdef0123456789abcdef\n"
+"a&b<c>\"d'e p&ss<w>\"o'rd\n"
+"Ana B fake pass word\n"
+"Zoë Ångström pässwörd-ñ-日本\n"
+"LongestNameLongestNa fake-longest-password-fake-longest-password-fake-longest-password-fake-longest-password-fake-longest-password-fake-longest-pass\n"
+"{user} {password} @PASSWORD@\n"
+" \n"
+"Ana.Ber-x_y Z fedcba9876543210fedcba9876543210\n"

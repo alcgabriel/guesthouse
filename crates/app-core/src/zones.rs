@@ -120,3 +120,7 @@ mod tests {
         assert_eq!(host_zone(&link), "", "not a zone");
     }
 }
+
+#[cfg(test)]
+#[path = "zones_golden.rs"]
+mod answers_golden;

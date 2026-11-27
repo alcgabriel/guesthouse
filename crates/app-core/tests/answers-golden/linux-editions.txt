@@ -1,0 +1,17 @@
+default: Windows 11 Pro
+Windows 11 Pro	W269N-WFGWX-YVC9B-4J6C9-T83GX
+Windows 11 IoT Enterprise LTSC	KBN8V-HFGQ4-MGXVD-347P6-PDQGT
+"Windows 11 Pro" -> Some("W269N-WFGWX-YVC9B-4J6C9-T83GX")
+"windows 11 pro" -> None
+"Windows 11 Pro " -> None
+"Windows 11 Pro N" -> None
+"Windows 11 Pro 2024" -> Some("W269N-WFGWX-YVC9B-4J6C9-T83GX")
+"Windows 11 Home" -> None
+"Windows 11 IoT Enterprise LTSC" -> Some("KBN8V-HFGQ4-MGXVD-347P6-PDQGT")
+"Windows 11 IoT Enterprise LTSC 2024" -> Some("KBN8V-HFGQ4-MGXVD-347P6-PDQGT")
+"Windows 11 IoT Enterprise LTSC 24" -> None
+"Windows 11 IoT Enterprise LTSC 20245" -> None
+"Windows 11 IoT Enterprise LTSC x024" -> None
+"Windows 11 IoT Enterprise LTSC\t2024" -> None
+"Windows 11 Enterprise LTSC" -> None
+"" -> None

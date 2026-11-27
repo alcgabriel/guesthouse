@@ -99,4 +99,7 @@ pub mod vm_host;
 pub mod writable_copy;
 pub mod zones;
 
+#[cfg(test)]
+mod answers_golden;
+
 pub use failure::{Failure, Result};

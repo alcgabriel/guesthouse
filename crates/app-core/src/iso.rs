@@ -463,3 +463,7 @@ mod tests {
         assert!(images_in(xml).is_empty());
     }
 }
+
+#[cfg(test)]
+#[path = "iso_golden.rs"]
+mod answers_golden;
