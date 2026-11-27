@@ -16,6 +16,7 @@ use guesthouse_hcs::drivers::copy_driver;
 use guesthouse_hcs::gpu::{self, Card};
 use guesthouse_hcs::host;
 use guesthouse_hcs::schema::{Attachment, AttachmentType};
+use guesthouse_remote_view_core::trust;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -192,6 +193,7 @@ fn refresh_windows_disk(
     card: Option<&Card>,
     nvapi_wrapper: bool,
     shares: &[Share],
+    hosts: Option<&str>,
     sink: &dyn Sink,
 ) -> Result<(), String> {
     let setup = screen_setup();
@@ -217,8 +219,11 @@ fn refresh_windows_disk(
         .map_err(|error| format!("{}: {error}", report.display()))?;
     give_share(&windows.root, shares, sink)?;
     match setup {
-        Some(setup) => give_screen(disk, &windows.root, &setup, card, sink),
-        None => Ok(()),
+        Some(setup) => give_screen(disk, &windows.root, &setup, card, hosts, sink),
+        None => {
+            keep_trust(disk, &windows.root, sink);
+            Ok(())
+        }
     }
 }
 
@@ -279,13 +284,14 @@ fn copy_if_changed(from: &Path, to: &Path) -> std::io::Result<bool> {
 }
 
 /// Puts what the guest needs for its screen in its screen folder: remoteman's installer, the script
-/// that runs it, the viewer as the one the guest trusts, the encoder for its card, and its account,
+/// that runs it, the devices the guest trusts, the encoder for its card, and its account,
 /// so it signs in by itself. The report, written before this, runs the script.
 fn give_screen(
     disk: &Path,
     root: &Path,
     setup: &Path,
     card: Option<&Card>,
+    hosts: Option<&str>,
     sink: &dyn Sink,
 ) -> Result<(), String> {
     let folder = root.join(screen::GUEST_FOLDER);
@@ -296,9 +302,16 @@ fn give_screen(
     std::fs::create_dir_all(&folder).map_err(|error| format!("{}: {error}", folder.display()))?;
     let state = screen::state_beside(disk);
     let viewer = screen::viewer_identity(&state)?;
-    write("trusted", &screen::trust_list(&viewer))?;
+    give_trust(&folder, root, &viewer)?;
     write("encoder.txt", card.map_or("auto", |card| screen::encoder_for(&card.instance_id)))?;
     write("screen.ps1", screen::SCRIPT)?;
+    // Who may reach remoteman's port. Without it the guest leaves its rules as they are.
+    match hosts {
+        Some(text) => write(screen::HOSTS_FILE, text)?,
+        None => {
+            let _ = std::fs::remove_file(folder.join(screen::HOSTS_FILE));
+        }
+    }
     let account = disk.with_extension("account.txt");
     if let Ok(text) = std::fs::read_to_string(&account) {
         write("logon.txt", &text)?;
@@ -313,6 +326,33 @@ fn give_screen(
     let _ = std::fs::remove_dir_all(folder.join("remoteman-host"));
     sink.note(format!("The guest has remoteman for its screen. The viewer's folder is {}.", state.display()));
     Ok(())
+}
+
+/// Writes whom the guest trusts in its screen folder: the viewer's line, which decides whether
+/// remoteman's installer runs again, and the list it's given when it does, the viewer and every
+/// device the guest has paired, read off its disk now (see `trust`).
+fn give_trust(folder: &Path, root: &Path, viewer: &str) -> Result<(), String> {
+    let given = trust::given(viewer, root)?;
+    for (name, text) in [("viewer.txt", &given.viewer), ("trusted", &given.trusted)] {
+        let path = folder.join(name);
+        std::fs::write(&path, text).map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    Ok(())
+}
+
+/// With no installer to give, a guest given one before still runs its script, which runs the
+/// installer when remoteman's service has gone. Its list is made again from the guest's own, so the
+/// installer never gets the one from an earlier boot, with a device revoked since on it.
+fn keep_trust(disk: &Path, root: &Path, sink: &dyn Sink) {
+    let folder = root.join(screen::GUEST_FOLDER);
+    if !folder.join("screen.ps1").is_file() {
+        return;
+    }
+    let kept = screen::viewer_identity(&screen::state_beside(disk))
+        .and_then(|viewer| give_trust(&folder, root, &viewer));
+    if let Err(error) = kept {
+        sink.problem(format!("The guest's list of devices to trust wasn't written: {error}"));
+    }
 }
 
 /// The NVAPI wrapper for NVIDIA guests, in the program's guest folder. Not beside the program, where
@@ -391,4 +431,58 @@ fn print_guest_report(disk: &Path, sink: &dyn Sink) {
 fn system_program(name: &str) -> PathBuf {
     let root = std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
     PathBuf::from(root).join("System32").join(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::events::Kept;
+
+    const PAIRED: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    /// A folder standing in for the machine's disk beside its viewer's state, and its Windows volume.
+    fn scratch(name: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let base = std::env::temp_dir().join(format!("gh-give-trust-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let root = base.join("volume");
+        std::fs::create_dir_all(&root).unwrap();
+        (base.join("machine.vhdx"), root.join(screen::GUEST_FOLDER), root)
+    }
+
+    #[test]
+    fn the_guest_is_given_the_viewers_line_and_every_device_it_trusts() {
+        let (disk, folder, root) = scratch("given");
+        let viewer = screen::viewer_identity(&screen::state_beside(&disk)).unwrap();
+        let live = root.join(trust::GUEST_TRUST_FILE);
+        std::fs::create_dir_all(live.parent().unwrap()).unwrap();
+        std::fs::write(&live, format!("{viewer} Guesthouse\r\n{PAIRED} Kitchen tablet\r\n")).unwrap();
+        std::fs::create_dir_all(&folder).unwrap();
+        give_trust(&folder, &root, &viewer).unwrap();
+        assert_eq!(std::fs::read_to_string(folder.join("viewer.txt")).unwrap(), screen::trust_list(&viewer));
+        assert_eq!(
+            std::fs::read_to_string(folder.join("trusted")).unwrap(),
+            format!("{viewer} Guesthouse\n{PAIRED} Kitchen tablet\n")
+        );
+        let _ = std::fs::remove_dir_all(disk.parent().unwrap());
+    }
+
+    #[test]
+    fn with_no_installer_a_guest_given_a_screen_before_has_its_list_made_again() {
+        let (disk, folder, root) = scratch("kept");
+        let sink = Kept::default();
+        keep_trust(&disk, &root, &sink);
+        assert!(
+            !folder.exists() && !screen::state_beside(&disk).exists(),
+            "a guest with no screen is left alone"
+        );
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("screen.ps1"), screen::SCRIPT).unwrap();
+        std::fs::write(folder.join("trusted"), format!("{PAIRED} Revoked since\n")).unwrap();
+        keep_trust(&disk, &root, &sink);
+        let viewer = screen::viewer_identity(&screen::state_beside(&disk)).unwrap();
+        assert_eq!(std::fs::read_to_string(folder.join("trusted")).unwrap(), screen::trust_list(&viewer));
+        assert_eq!(std::fs::read_to_string(folder.join("viewer.txt")).unwrap(), screen::trust_list(&viewer));
+        assert!(sink.0.lock().unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(disk.parent().unwrap());
+    }
 }

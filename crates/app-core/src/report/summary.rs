@@ -1,103 +1,22 @@
 //! The few facts that go with a report outside its bundle, so it can be sorted before anyone opens it:
-//! `summary.json` inside, and the same in the `X-Report-Summary` header.
+//! `summary.json` inside, and the same in the `X-Report-Summary` header. Every host keeps to the
+//! server's rules for them, so they're `guesthouse-report-core`'s.
 //!
 //! The server takes a flat object of strings, at most 20 of them, none longer than 2000 characters,
 //! and a header of at most 6000 characters once it's base64url.
 
-use crate::text::base64_encode;
-use serde_json::{Map, Value};
-use std::collections::BTreeMap;
-
-pub const VERSION: &str = "version";
-pub const CARD: &str = "card";
-pub const DRIVER: &str = "driver";
-pub const DISTRO: &str = "distro";
-pub const KERNEL: &str = "kernel";
-pub const SESSION: &str = "session";
-/// The guest's kind, never the machine's name, which is the user's.
-pub const MACHINE: &str = "machine";
-pub const KIND: &str = "kind";
-pub const DESCRIPTION: &str = "description";
-pub const CONTACT: &str = "contact";
-
-const MOST_KEYS: usize = 20;
-const MOST_VALUE_CHARS: usize = 2000;
-const MOST_HEADER_CHARS: usize = 6000;
-/// The start of the description goes in the summary. The whole of it is in the bundle.
-const DESCRIPTION_CHARS: usize = 1500;
-/// How much shorter the description gets each time the header is still too long.
-const DESCRIPTION_STEP: usize = 100;
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Summary(BTreeMap<String, String>);
-
-impl Summary {
-    /// Sets a fact, cut to what the server takes. An empty one is left out, as it says nothing.
-    pub fn set(&mut self, key: &str, value: &str) {
-        let value = value.trim();
-        let is_new = !self.0.contains_key(key);
-        if value.is_empty() || (is_new && self.0.len() >= MOST_KEYS) {
-            return;
-        }
-        let most = if key == DESCRIPTION { DESCRIPTION_CHARS } else { MOST_VALUE_CHARS };
-        self.0.insert(key.to_owned(), first_chars(value, most).to_owned());
-    }
-
-    pub fn get(&self, key: &str) -> Option<&str> {
-        self.0.get(key).map(String::as_str)
-    }
-
-    pub fn facts(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.0.iter().map(|(key, value)| (key.as_str(), value.as_str()))
-    }
-
-    pub fn to_json(&self) -> String {
-        let fields: Map<String, Value> =
-            self.0.iter().map(|(key, value)| (key.clone(), Value::String(value.clone()))).collect();
-        serde_json::to_string_pretty(&Value::Object(fields)).unwrap_or_default() + "\n"
-    }
-
-    /// The header's value. Text in other scripts takes more bytes for each character, so a long
-    /// description is cut until the whole fits, and as a last resort left out.
-    pub fn header(&self) -> String {
-        let mut summary = self.clone();
-        loop {
-            let compact = serde_json::to_string(&Value::Object(
-                summary.0.iter().map(|(key, value)| (key.clone(), Value::String(value.clone()))).collect(),
-            ))
-            .unwrap_or_default();
-            let encoded = base64url(compact.as_bytes());
-            if encoded.len() <= MOST_HEADER_CHARS {
-                return encoded;
-            }
-            let Some(description) = summary.0.get_mut(DESCRIPTION) else {
-                // Only the description can be long enough for this, so with none it's a few facts
-                // that can't be cut, and the server is better off with no summary than a wrong one.
-                return String::new();
-            };
-            let shorter = description.chars().count().saturating_sub(DESCRIPTION_STEP);
-            if shorter == 0 {
-                summary.0.remove(DESCRIPTION);
-            } else {
-                *description = first_chars(description, shorter).to_owned();
-            }
-        }
-    }
-}
-
-fn first_chars(text: &str, most: usize) -> &str {
-    text.char_indices().nth(most).map_or(text, |(at, _)| &text[..at])
-}
-
-/// base64 with the two letters that mean something in a URL changed, and no padding.
-fn base64url(data: &[u8]) -> String {
-    base64_encode(data).replace('+', "-").replace('/', "_").trim_end_matches('=').to_owned()
-}
+pub use guesthouse_report_core::summary::{
+    CARD, CONTACT, DESCRIPTION, DISTRO, DRIVER, KERNEL, KIND, MACHINE, SESSION, Summary, VERSION,
+};
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::text::base64_decode;
+    use guesthouse_report_core::summary::{
+        DESCRIPTION_CHARS, MOST_HEADER_CHARS, MOST_KEYS, MOST_VALUE_CHARS,
+    };
+    use serde_json::Value;
 
     fn decoded(header: &str) -> Value {
         let standard = header.replace('-', "+").replace('_', "/");

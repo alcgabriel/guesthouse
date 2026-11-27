@@ -139,63 +139,91 @@ fn a_device_let_in_by_someone_else_is_limited_too() {
     assert_eq!(lines, [LIMITS[0], LIMITS[1], "allow clipboard on", "allow files on"]);
 }
 
-/// Everything a Windows host must never be sent: the host-wide switches, and what cuts Guesthouse's
-/// own viewer.
+/// Everything a Windows host must never be sent: what cuts Guesthouse's own viewer, and anything
+/// naming it.
 fn forbidden(line: &str) -> bool {
-    line.starts_with("sharing") || line == "drop" || line.starts_with("allow ") || line.contains(VIEWER)
+    line.starts_with("sharing") || line == "drop" || line.contains(VIEWER)
+}
+
+/// Each host-wide switch a run turned off it turned on again by its end, so Guesthouse's own viewer
+/// has its clipboard and files back once pairing is over.
+fn given_back(sent: &[String]) {
+    for what in ["clipboard", "files"] {
+        let count = |on: &str| sent.iter().filter(|line| **line == format!("allow {what} {on}")).count();
+        assert_eq!(count("off"), count("on"), "{what}: {sent:?}");
+    }
 }
 
 #[test]
-fn a_windows_host_is_never_sent_what_would_cut_its_own_viewer() {
+fn a_windows_host_is_never_sent_what_would_cut_its_own_viewer_and_gets_its_switches_back() {
     let policy = Policy::windows(VIEWER);
     let on = |status: Status| Status { clipboard: Some(true), files: Some(true), ..status };
     let ours = (VIEWER, "Guesthouse");
-    let mut sent = Vec::new();
+    let idle = || {
+        let mut run = Run::new(policy.clone());
+        run.read(&on(reading(false, None, &[ours])));
+        run.sent.clear();
+        run
+    };
+    let mut runs = Vec::new();
 
     // Accepted, declined, stopped, run out, switched off, quit, opened twice, found open.
-    let mut run = Run::new(policy.clone());
-    run.read(&on(reading(false, None, &[ours])));
-    run.open(120);
+    let mut run = idle();
+    assert_eq!(run.open(120), ["allow clipboard off", "allow files off", "pair on"], "held while open");
     run.read(&on(reading(true, None, &[ours])));
     run.read(&on(reading(false, Some(pending(KITCHEN, "Tab", 50)), &[ours])));
     run.event(Event::Accept);
     run.read(&on(reading(false, None, &[ours, (KITCHEN, "Tab")])));
-    sent.extend(run.sent.clone());
+    // The new device is limited before the switches come back.
+    assert_eq!(
+        run.sent[run.sent.len() - 4..],
+        [
+            format!("device {KITCHEN} allow clipboard off"),
+            format!("device {KITCHEN} allow files off"),
+            "allow clipboard on".to_string(),
+            "allow files on".to_string()
+        ]
+    );
+    runs.push(run);
 
     for answer in [Event::Decline, Event::Stop] {
-        let mut run = Run::idle(policy.clone(), &[ours]);
+        let mut run = idle();
         run.open(120);
         run.open(300);
         run.read(&on(reading(true, None, &[ours])));
         run.read(&on(reading(false, Some(pending(PHONE, "Phone", 50)), &[ours])));
         run.event(answer);
-        sent.extend(run.sent.clone());
+        run.read(&on(reading(false, None, &[ours])));
+        run.read(&on(reading(false, None, &[ours])));
+        runs.push(run);
     }
     for event in [Event::SwitchOff, Event::Shutdown] {
-        let mut run = Run::idle(policy.clone(), &[ours]);
+        let mut run = idle();
         run.open(120);
         run.event(event);
-        sent.extend(run.sent.clone());
+        runs.push(run);
     }
-    let mut run = Run::idle(policy.clone(), &[ours]);
+    let mut run = idle();
     run.open(5);
     run.read(&on(reading(true, None, &[ours])));
     run.pass(5_000);
     run.read(&on(reading(true, None, &[ours])));
-    sent.extend(run.sent.clone());
+    runs.push(run);
 
     let mut run = Run::new(policy.clone());
     run.event(Event::Started { held: None });
     run.read(&on(reading(true, None, &[ours])));
-    sent.extend(run.sent.clone());
+    runs.push(run);
 
+    let sent: Vec<&String> = runs.iter().flat_map(|run| &run.sent).collect();
     assert!(sent.len() > 10, "{sent:?}");
     for line in &sent {
         assert!(!forbidden(line), "{line}");
     }
-    // The new device is still limited.
-    assert!(sent.contains(&format!("device {KITCHEN} allow clipboard off")));
-    assert_eq!(run.pairing.held(), None);
+    for run in &runs {
+        given_back(&run.sent);
+        assert_eq!(run.pairing.held(), None, "{:?}", run.sent);
+    }
 }
 
 #[test]

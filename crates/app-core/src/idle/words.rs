@@ -2,22 +2,14 @@
 
 use super::{Busy, GuestKind, IdleReading, Input, Limits, Verdict, judge};
 
+#[cfg(test)]
 const MINUTE: u64 = 60;
+#[cfg(test)]
 const HOUR: u64 = 60 * MINUTE;
 const PERCENT: f64 = 100.0;
 
 /// "45 seconds", "12 minutes", "3 hours 5 minutes".
-fn span(seconds: u64) -> String {
-    let plural = |count: u64, unit: &str| format!("{count} {unit}{}", if count == 1 { "" } else { "s" });
-    match seconds {
-        0..MINUTE => plural(seconds, "second"),
-        MINUTE..HOUR => plural(seconds / MINUTE, "minute"),
-        _ => match seconds % HOUR / MINUTE {
-            0 => plural(seconds / HOUR, "hour"),
-            minutes => format!("{} {}", plural(seconds / HOUR, "hour"), plural(minutes, "minute")),
-        },
-    }
-}
+use guesthouse_basics::words::span;
 
 fn percent(cores: f64) -> String {
     format!("{:.0}%", cores * PERCENT)
@@ -130,6 +122,32 @@ mod tests {
             said,
             ["1 second", "45 seconds", "1 minute", "12 minutes", "1 hour", "2 hours 5 minutes", "2 hours"]
         );
+    }
+
+    /// Each unit's edges, as today's wording says them: seconds are dropped once there are minutes, and
+    /// a part of a unit is dropped, not rounded.
+    #[test]
+    fn spans_at_the_edges_of_each_unit() {
+        for (seconds, said) in [
+            (0, "0 seconds"),
+            (1, "1 second"),
+            (2, "2 seconds"),
+            (59, "59 seconds"),
+            (60, "1 minute"),
+            (61, "1 minute"),
+            (119, "1 minute"),
+            (120, "2 minutes"),
+            (3599, "59 minutes"),
+            (3600, "1 hour"),
+            (3659, "1 hour"),
+            (3660, "1 hour 1 minute"),
+            (7199, "1 hour 59 minutes"),
+            (86_400, "24 hours"),
+            (90_061, "25 hours 1 minute"),
+            (u64::MAX, "5124095576030431 hours"),
+        ] {
+            assert_eq!(span(seconds), said, "{seconds} s");
+        }
     }
 
     #[test]

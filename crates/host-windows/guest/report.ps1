@@ -42,33 +42,163 @@ try {
     $port = $null
 }
 
+# Two threads write to the port, this one and the listener's below, and a line must never be cut
+# into by another, so each holds this while it writes. screen.ps1 writes through Send-Line too.
+$portLock = New-Object -TypeName System.Object
+
 function Send-Line([string]$Text) {
     Add-Content -LiteralPath $report -Value $Text -Encoding utf8
     if ($port) {
-        try { $port.WriteLine("guesthouse: $Text") } catch { $port = $null }
+        [System.Threading.Monitor]::Enter($portLock)
+        try { $port.WriteLine("guesthouse: $Text") } catch { $port = $null } finally { [System.Threading.Monitor]::Exit($portLock) }
     }
 }
+
+# ctl channel: begin
+# The host asks remoteman's host in the guest what it would ask with `remoteman-host.exe ctl`, on
+# this port, as it has no other way in: "guesthouse: ctl ask ID WORD...". The guest runs it and says
+# the answer back in base64, in numbered lines of its own, "guesthouse: ctl answer ID CODE N/TOTAL
+# CHUNK", or "guesthouse: ctl failed ID REASON" when it ran nothing. The answers go to the port only,
+# never to the report's file, as they can hold the names of a person's devices and pairing codes.
+# Only the words the host may send are run, by the grammar below, which the host checks too: every
+# word is lower-case letters, digits and '-', a device is named by its fingerprint, nothing is ever
+# quoted, and never `sharing off` or `drop`, which would cut Guesthouse's own viewer. The tests in
+# guest-scripts run this block on its own.
+function Test-CtlWords {
+    param([string[]]$Words)
+    if (-not $Words -or $Words.Count -eq 0) { return $false }
+    foreach ($word in $Words) {
+        if ($word -cnotmatch '\A[0-9a-z-]+\z') { return $false }
+    }
+    $fp = '[0-9a-f]{64}'
+    $grammar = "\A(status|pair (on|off|accept|decline)|revoke $fp|device $fp (allow (clipboard|files|sound|mic|camera) (on|off)|view-only (on|off))|allow (clipboard|files) (on|off)|set updates off|sharing on)\z"
+    return ($Words -join ' ') -cmatch $grammar
+}
+
+# The request on a line, if it is one with a number to answer: its number, its words and whether
+# they may be run. Nothing for any other line.
+function Read-CtlRequest {
+    param([string]$Line)
+    $ask = 'guesthouse: ctl ask '
+    $Line = $Line.TrimEnd([char]13, [char]10)
+    if (-not $Line.StartsWith($ask, [StringComparison]::Ordinal)) { return $null }
+    $parts = $Line.Substring($ask.Length).Split([char]' ')
+    if ($parts[0] -cnotmatch '\A[1-9][0-9]{0,9}\z' -or [uint64]$parts[0] -gt [uint32]::MaxValue) { return $null }
+    $words = [string[]]@($parts | Select-Object -Skip 1)
+    return [pscustomobject]@{ Id = [uint32]$parts[0]; Words = $words; Valid = (Test-CtlWords -Words $words) }
+}
+
+# The lines that answer request $Id: what ctl said, in base64, 1024 characters to a line, so each
+# line is far inside what the host takes, and up to 64 KB of it.
+function Get-CtlAnswerLines {
+    param([uint32]$Id, [int]$Code, [byte[]]$Bytes)
+    if ($null -eq $Bytes) { $Bytes = [byte[]]@() }
+    if ($Bytes.Length -gt 65536) { return , "guesthouse: ctl failed $Id toolong" }
+    $text = [Convert]::ToBase64String($Bytes)
+    $chunks = New-Object -TypeName System.Collections.Generic.List[string]
+    for ($at = 0; $at -lt $text.Length; $at += 1024) {
+        $chunks.Add($text.Substring($at, [Math]::Min(1024, $text.Length - $at)))
+    }
+    if ($chunks.Count -eq 0) { $chunks.Add('-') }
+    $total = $chunks.Count
+    for ($n = 0; $n -lt $total; $n += 1) { "guesthouse: ctl answer $Id $Code $($n + 1)/$total $($chunks[$n])" }
+}
+
+# Runs $Program with $Arguments for up to $Milliseconds: its exit code and everything it said, as
+# UTF-8, or why it didn't run. The arguments are joined into its command line, with no shell to read
+# it, and each is first checked to be letters, digits and . / - only, so each is one argument as the
+# program reads its command line, with nothing to quote. Windows PowerShell's .NET has no list of
+# arguments to start a process with.
+function Invoke-Ctl {
+    param([string]$Program, [string[]]$Arguments, [int]$Milliseconds)
+    foreach ($argument in $Arguments) {
+        if ($argument -cnotmatch '\A[0-9A-Za-z./-]+\z') { return [pscustomobject]@{ Failure = 'refused' } }
+    }
+    if (-not (Test-Path -LiteralPath $Program -PathType Leaf)) { return [pscustomobject]@{ Failure = 'missing' } }
+    $start = New-Object -TypeName System.Diagnostics.ProcessStartInfo
+    $start.FileName = $Program
+    $start.Arguments = $Arguments -join ' '
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $start.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $start.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+    try { $process = [System.Diagnostics.Process]::Start($start) } catch { return [pscustomobject]@{ Failure = 'error' } }
+    # Read as it comes, so a long answer can't fill the pipe and hold the program up.
+    $out = $process.StandardOutput.ReadToEndAsync()
+    $err = $process.StandardError.ReadToEndAsync()
+    if (-not $process.WaitForExit($Milliseconds)) {
+        try { $process.Kill() } catch { }
+        return [pscustomobject]@{ Failure = 'timeout' }
+    }
+    $process.WaitForExit()
+    $said = $out.Result + $err.Result
+    return [pscustomobject]@{ Failure = $null; Code = $process.ExitCode; Bytes = [System.Text.Encoding]::UTF8.GetBytes($said) }
+}
+
+# Writes an answer's lines together, holding the port's lock.
+function Write-CtlLines {
+    param($Port, $Lock, [string[]]$Lines)
+    [System.Threading.Monitor]::Enter($Lock)
+    try {
+        foreach ($line in $Lines) { $Port.WriteLine($line) }
+    } finally {
+        [System.Threading.Monitor]::Exit($Lock)
+    }
+}
+
+# Answers $Line if it is a request: true when it was one. remoteman's host is given 10 s, and the
+# host waits longer than that for the answer.
+function Receive-CtlLine {
+    param([string]$Line, $Port, $Lock, [string]$Program)
+    $request = Read-CtlRequest -Line $Line
+    if (-not $request) { return $false }
+    if (-not $request.Valid) {
+        $lines = @("guesthouse: ctl failed $($request.Id) refused")
+    } else {
+        $ran = Invoke-Ctl -Program $Program -Arguments (@('ctl', '--port', '7791') + $request.Words) -Milliseconds 10000
+        if ($ran.Failure) {
+            $lines = @("guesthouse: ctl failed $($request.Id) $($ran.Failure)")
+        } else {
+            $lines = @(Get-CtlAnswerLines -Id $request.Id -Code $ran.Code -Bytes $ran.Bytes)
+        }
+    }
+    Write-CtlLines -Port $Port -Lock $Lock -Lines $lines
+    return $true
+}
+
+# remoteman's host's program, where its installer puts it (screen.ps1 has the same).
+$ctlHost = 'C:\Program Files\remoteman host\remoteman-host.exe'
+# The channel's functions as text, for the listener's thread, which starts with none of this script's.
+$ctlCode = (('Test-CtlWords', 'Read-CtlRequest', 'Get-CtlAnswerLines', 'Invoke-Ctl', 'Write-CtlLines', 'Receive-CtlLine') |
+    ForEach-Object { "function $_ {$((Get-Item -LiteralPath "function:$_").Definition)}" }) -join "`n"
+# ctl channel: end
 
 Send-Line "started $(Get-Date -Format o)"
 
 # The host asks the guest to shut down on this port, as HCS's own request needs Hyper-V's
 # integration services, which a machine HCS makes doesn't have. The port is listened to on a thread
 # of its own from now on, while the report goes on, and for as long as the guest runs. Asked, the
-# guest shuts down as Windows does from Start, with programs closed if they don't close.
+# guest shuts down as Windows does from Start, with programs closed if they don't close. The host's
+# remoteman requests are answered on the same thread, one at a time.
 $listener = $null
 if ($port) {
     $listener = [powershell]::Create()
     [void]$listener.AddScript({
-        param($port)
+        param($port, $portLock, $ctlCode, $ctlHost)
+        . ([scriptblock]::Create($ctlCode))
         while ($true) {
             try { $line = $port.ReadLine() } catch [TimeoutException] { continue } catch { return }
             if ($line.Trim() -eq 'guesthouse: shutdown') {
-                try { $port.WriteLine('guesthouse: shutting down, as the host asked') } catch { }
+                [System.Threading.Monitor]::Enter($portLock)
+                try { $port.WriteLine('guesthouse: shutting down, as the host asked') } catch { } finally { [System.Threading.Monitor]::Exit($portLock) }
                 & shutdown.exe /s /f /t 0 /d p:0:0 /c 'Guesthouse: the host asked this machine to shut down'
                 return
             }
+            try { [void](Receive-CtlLine -Line $line -Port $port -Lock $portLock -Program $ctlHost) } catch { }
         }
-    }).AddArgument($port)
+    }).AddArgument($port).AddArgument($portLock).AddArgument($ctlCode).AddArgument($ctlHost)
     [void]$listener.BeginInvoke()
 }
 

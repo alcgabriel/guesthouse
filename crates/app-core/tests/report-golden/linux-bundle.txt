@@ -1,0 +1,352 @@
+== app/guesthouse.log (1040 bytes)
+10:00:01 app: could not read ~/.config/guesthouse/app.json
+10:00:02 <user>-desk task: start <machine> on <host> (<host>.local), not Marrowboxes
+10:00:03 disk ~/.local/share/guesthouse/machines/<machine>/disk.qcow2 and /home/quillonx/y
+10:00:04 {"machine": "<machine-3>"} and "<machine-2>" at /store/machines/<machine-2>/vars.fd, a tv show on windows, /machines/<machine-4>/x and w11-old
+10:00:05 uuid <uuid> {<uuid>} fixed <uuid>
+10:00:06 mac <mac> and 00-15-5D-12-34-56, not <mac>:dd, time 12:30:45, pci 0000:01:00.0
+10:00:07 mail <user>@example.org and Quill.Smith+gh@mail.example.co.uk., unit getty@tty1.service
+10:00:08 sid S-1-5-21-1004336348-1177238915-682003330-1001 and S-1-5-32-544 and S-1-5-18
+10:00:09 C:\Users\<user>\Downloads\x.iso and C:\\Users\\<user>\\y and c:/users/<user>/Desktop
+10:00:10 guesthouse-<user>-games-com1 and \\.\pipe\guesthouse-w11 and guesthouse-W11
+10:00:11 Quillon's PC, QUILLON, quillons and marrowboxes, al calls, HOME=~
+10:00:12 guest GuestAccount on DESKTOP-GUEST said: Pat signed in to "<machine-5>"
+== machine/run-1/daemon.log (19119 bytes)
+DEBUG [        0] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        1] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        2] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        3] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        4] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        5] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        6] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        7] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        8] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        9] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       10] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       11] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       12] message Some(QueryAdapter) process=0x400012c0
+WARN  [       13] queue 0x400e93c0 stops at ~/x
+DEBUG [       14] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       15] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       16] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       17] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       18] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       19] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       20] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       21] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       22] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       23] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       24] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       25] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       26] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       27] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       28] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       29] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       30] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       31] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       32] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       33] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       34] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       35] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       36] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       37] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       38] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       39] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       40] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       41] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       42] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       43] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       44] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       45] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       46] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       47] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       48] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       49] message Some(QueryAdapter) process=0x400012c0
+INFO  [       50] context node=1
+  and its next line
+DEBUG [       51] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       52] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       53] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       54] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       55] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       56] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       57] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       58] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       59] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       60] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       61] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       62] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       63] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       64] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       65] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       66] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       67] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       68] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       69] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       70] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       71] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       72] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       73] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       74] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       75] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       76] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       77] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       78] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       79] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       80] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       81] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       82] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       83] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       84] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       85] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       86] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       87] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       88] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       89] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       90] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       91] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       92] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       93] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       94] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       95] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       96] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       97] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       98] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       99] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      100] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      101] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      102] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      103] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      104] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      105] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      106] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      107] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      108] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      109] message Some(QueryAdapter) process=0x400012c0
+WARN  [      110] queue 0x400e93c0 stops at ~/x
+DEBUG [      111] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      112] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      113] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      114] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      115] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      116] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      117] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      118] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      119] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      120] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      121] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      122] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      123] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      124] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      125] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      126] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      127] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      128] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      129] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      130] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      131] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      132] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      133] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      134] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      135] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      136] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      137] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      138] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      139] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      140] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      141] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      142] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      143] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      144] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      145] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      146] message Some(QueryAdapter) process=0x400012c0
+INFO  [      147] context node=1
+  and its next line
+DEBUG [      148] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      149] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      150] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      151] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      152] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      153] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      154] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      155] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      156] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      157] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      158] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      159] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      160] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      161] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      162] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      163] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      164] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      165] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      166] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      167] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      168] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      169] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      170] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      171] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      172] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      173] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      174] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      175] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      176] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      177] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      178] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      179] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      180] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      181] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      182] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      183] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      184] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      185] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      186] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      187] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      188] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      189] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      190] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      191] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      192] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      193] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      194] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      195] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      196] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      197] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      198] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      199] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      200] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      201] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      202] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      203] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      204] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      205] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      206] message Some(QueryAdapter) process=0x400012c0
+WARN  [      207] queue 0x400e93c0 stops at ~/x
+DEBUG [      208] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      209] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      210] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      211] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      212] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      213] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      214] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      215] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      216] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      217] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      218] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      219] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      220] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      221] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      222] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      223] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      224] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      225] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      226] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      227] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      228] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      229] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      230] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      231] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      232] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      233] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      234] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      235] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      236] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      237] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      238] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      239] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      240] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      241] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      242] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      243] message Some(QueryAdapter) process=0x400012c0
+INFO  [      244] context node=1
+  and its next line
+DEBUG [      245] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      246] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      247] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      248] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      249] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      250] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      251] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      252] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      253] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      254] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      255] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      256] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      257] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      258] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      259] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      260] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      261] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      262] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      263] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      264] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      265] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      266] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      267] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      268] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      269] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      270] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      271] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      272] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      273] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      274] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      275] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      276] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      277] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      278] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      279] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      280] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      281] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      282] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      283] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      284] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      285] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      286] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      287] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      288] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      289] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      290] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      291] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      292] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      293] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      294] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      295] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      296] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      297] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      298] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      299] message Some(QueryAdapter) process=0x400012c0
+== description.txt (58 bytes)
+<machine> went black for quillon@example.org on marrowbox
+== summary.json (407 bytes)
+{
+  "card": "NVIDIA GeForce RTX 4080 on <host>",
+  "contact": "quillon on the Discord",
+  "description": "<machine> went black for quillon@example.org on marrowbox",
+  "distro": "Fedora Linux 42 on <host>",
+  "driver": "580.95.05 on <host>",
+  "kernel": "6.15.4 on <host>",
+  "kind": "crashed on <host>",
+  "machine": "windows on <host>",
+  "session": "wayland on <host>",
+  "version": "0.11.0 on <host>"
+}
+== manifest.txt (645 bytes)
+A Guesthouse bug report. It goes to the developer, is read by the developer and their automation tools, and is deleted after 30 days.
+The user name, host name and home folder were taken out of its files where they were found. That's a best effort on free-form logs, not a promise.
+
+Files:
+  app/guesthouse.log (1040 bytes)
+  machine/run-1/daemon.log (19119 bytes)
+  description.txt (58 bytes)
+  summary.json (407 bytes)
+  manifest.txt
+
+Not in it:
+  host/kernel-log.txt: this user may not read the kernel's log
+    to get it by hand: sudo dmesg
+  guest/events.txt: the machine isn't running
+
+Notes:
+  A note about quillon-games at /home/quillon.
+== header
+eyJjYXJkIjoiTlZJRElBIEdlRm9yY2UgUlRYIDQwODAgb24gPGhvc3Q-IiwiY29udGFjdCI6InF1aWxsb24gb24gdGhlIERpc2NvcmQiLCJkZXNjcmlwdGlvbiI6IjxtYWNoaW5lPiB3ZW50IGJsYWNrIGZvciBxdWlsbG9uQGV4YW1wbGUub3JnIG9uIG1hcnJvd2JveCIsImRpc3RybyI6IkZlZG9yYSBMaW51eCA0MiBvbiA8aG9zdD4iLCJkcml2ZXIiOiI1ODAuOTUuMDUgb24gPGhvc3Q-Iiwia2VybmVsIjoiNi4xNS40IG9uIDxob3N0PiIsImtpbmQiOiJjcmFzaGVkIG9uIDxob3N0PiIsIm1hY2hpbmUiOiJ3aW5kb3dzIG9uIDxob3N0PiIsInNlc3Npb24iOiJ3YXlsYW5kIG9uIDxob3N0PiIsInZlcnNpb24iOiIwLjExLjAgb24gPGhvc3Q-In0
