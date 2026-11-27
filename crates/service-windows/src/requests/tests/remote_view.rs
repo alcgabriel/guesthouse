@@ -220,6 +220,7 @@ fn a_bridged_machines_relay_leads_to_the_address_its_guest_has_on_this_pcs_netwo
                 description: "Ethernet".into(),
                 wifi: false,
             }],
+            hyper_v: HyperV::On,
         }
     });
     let setup = setup("view-bridged", Pretend { net: fake, ..Pretend::default() });

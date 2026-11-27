@@ -1,16 +1,21 @@
 //! The host's side of a machine's network, as Windows does it: `netsh.exe` from System32 for port
-//! forwards, the service list for IP Helper and Hyper-V, and the interface table for adapters.
+//! forwards, the service list for IP Helper and Hyper-V, `dism.exe` for Hyper-V's feature, and the
+//! interface table for adapters.
 //! What it says and how it's read is [`crate::network`]'s.
 
+use super::hyper_v::System32Dism;
+use crate::hyper_v;
 use crate::network::{self as portable, Netsh, Network, Protocol, Proxy, Run};
-use guesthouse_control::Bridging;
+use guesthouse_control::{Bridging, HyperV};
 use guesthouse_hcs::adapters;
+use guesthouse_hcs::host;
 use guesthouse_hcs::services::{self, Standing};
 use std::io::Read;
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -91,11 +96,13 @@ impl Run for System32Netsh {
 /// The real thing: `netsh`, the service list, and the interface table.
 pub struct RealNetwork {
     netsh: Netsh<System32Netsh>,
+    /// The last read of Hyper-V's feature, which is read beside a status, never in it.
+    kept: Arc<Mutex<hyper_v::Kept>>,
 }
 
 impl RealNetwork {
     pub fn new() -> Self {
-        RealNetwork { netsh: Netsh(System32Netsh) }
+        RealNetwork { netsh: Netsh(System32Netsh), kept: Arc::default() }
     }
 }
 
@@ -141,8 +148,41 @@ impl Network for RealNetwork {
     }
 
     fn bridging(&self) -> Bridging {
-        let hyper_v = services::standing(portable::HYPER_V_SERVICE) != Standing::Missing;
+        let service = services::standing(portable::HYPER_V_SERVICE) != Standing::Missing;
+        // The feature is read only when its service isn't there, and on a thread of its own, as
+        // DISM takes seconds: the last read is used meanwhile.
+        let hyper_v = if service {
+            HyperV::On
+        } else {
+            let (feature, begin) =
+                self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take(Instant::now());
+            if begin {
+                let kept = Arc::clone(&self.kept);
+                thread::spawn(move || {
+                    let read = hyper_v::read(&System32Dism);
+                    kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).put(Instant::now(), read);
+                });
+            }
+            hyper_v::hyper_v_from(&hyper_v::Reading {
+                service,
+                feature,
+                hypervisor: host::hypervisor_present(),
+                firmware: Some(host::virtualization_in_firmware()),
+            })
+        };
         // The adapters are only read when they'll be offered.
-        portable::bridging_from(hyper_v, if hyper_v { adapters::interfaces() } else { Ok(Vec::new()) })
+        let interfaces = if service { adapters::interfaces() } else { Ok(Vec::new()) };
+        portable::bridging_from(hyper_v, interfaces)
+    }
+
+    fn enable_hyper_v(&self, progress: &mut dyn FnMut(u8)) -> hyper_v::Enabled {
+        self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).turning = true;
+        let enabled = hyper_v::enable(&System32Dism, progress);
+        // What it is now, for the next status.
+        let read = hyper_v::read(&System32Dism);
+        let mut kept = self.kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        kept.put(Instant::now(), read);
+        kept.turning = false;
+        enabled
     }
 }

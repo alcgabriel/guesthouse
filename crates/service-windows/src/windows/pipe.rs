@@ -452,6 +452,9 @@ mod tests {
         fn bridging(&self) -> guesthouse_control::Bridging {
             guesthouse_control::Bridging::default()
         }
+        fn enable_hyper_v(&self, _: &mut dyn FnMut(u8)) -> guesthouse_host_windows::hyper_v::Enabled {
+            guesthouse_host_windows::hyper_v::Enabled::NotInEdition
+        }
     }
 
     impl Work for Nothing {

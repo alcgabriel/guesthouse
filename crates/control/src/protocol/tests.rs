@@ -62,3 +62,41 @@ fn a_new_app_tells_a_service_from_before_from_one_it_cant_read() {
     assert_eq!(answer_from(event), Ok(Answer::Event { event: Event::State(State::Off) }));
     assert_eq!(answer_from(json!({"answer": "nonsense"})), Err(Unreached::Garbled));
 }
+
+/// Turning Hyper-V on is a request and a status field added within version 2, as an app and a
+/// service of either age still read each other: the new request at an old service is a request it
+/// doesn't know, which it refuses in words an app shows, and the new field at an old app is one it
+/// passes over.
+#[test]
+fn turning_hyper_v_on_is_added_within_the_version_both_ways() {
+    assert_eq!(request_line(&Request::EnableHyperV), json!({"ask": "enable_hyper_v", "protocol": 2}));
+    assert_eq!(request_from(request_line(&Request::EnableHyperV)), Ok(Request::EnableHyperV));
+    // A service from before reads requests as these, and has no `enable_hyper_v`.
+    #[derive(serde::Deserialize, Debug)]
+    #[serde(tag = "ask", rename_all = "snake_case")]
+    #[allow(dead_code)]
+    enum Older {
+        Status,
+        Start { name: String },
+    }
+    assert!(serde_json::from_value::<Older>(json!({"ask": "enable_hyper_v", "protocol": 2})).is_err());
+    assert_eq!(
+        request_from(json!({"ask": "enable_hyper_v_now", "protocol": 2})),
+        Err(NOT_A_REQUEST.to_owned())
+    );
+    // An app from before reads a new service's bridging, Hyper-V and all, with what it knows.
+    let new = json!({"answer": "status", "version": "0.12.0", "protocol": 2, "machines": [], "cards": [],
+        "bridging": {"available": false, "reason": "Bridging needs Windows' Hyper-V feature.", "adapters": [],
+            "hyper_v": {"state": "restart_pending"}}});
+    #[derive(serde::Deserialize)]
+    struct OlderBridging {
+        available: bool,
+        reason: Option<String>,
+    }
+    let older: OlderBridging = serde_json::from_value(new["bridging"].clone()).unwrap();
+    assert!(!older.available && older.reason.is_some());
+    match answer_from(new) {
+        Ok(Answer::Status { bridging, .. }) => assert_eq!(bridging.hyper_v, crate::HyperV::RestartPending),
+        other => panic!("{other:?}"),
+    }
+}

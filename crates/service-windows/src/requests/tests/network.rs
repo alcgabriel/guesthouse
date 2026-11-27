@@ -2,7 +2,8 @@
 
 use super::*;
 use guesthouse_control::{AdapterInfo, Forward};
-use guesthouse_host_windows::network::{Protocol, Proxy, RULE_PREFIX};
+use guesthouse_host_windows::hyper_v::Enabled;
+use guesthouse_host_windows::network::{Protocol, Proxy, RULE_PREFIX, bridging_from};
 use std::net::Ipv4Addr;
 
 /// What the double's Windows holds, and what was asked of it, in order.
@@ -27,6 +28,10 @@ pub(super) struct NetState {
     pub refuse_view: bool,
     /// The machine's name is announced on the network already, by something else on this PC.
     pub name_taken: bool,
+    /// How turning Hyper-V on ends: on, and waiting for a restart, unless it says.
+    pub enable: Option<Enabled>,
+    /// Turning Hyper-V on waits, part way, while this is set.
+    pub enable_held: bool,
 }
 
 #[derive(Default)]
@@ -108,6 +113,23 @@ impl Network for FakeNet {
 
     fn bridging(&self) -> Bridging {
         self.state.lock().unwrap().bridging.clone()
+    }
+
+    /// Says 30% and waits while it's held, then 100%, and ends as `enable` says. Once on, Windows
+    /// says it waits for a restart, as DISM's would.
+    fn enable_hyper_v(&self, progress: &mut dyn FnMut(u8)) -> Enabled {
+        self.state.lock().unwrap().calls.push("enable_hyper_v".into());
+        progress(30);
+        while self.state.lock().unwrap().enable_held {
+            thread::sleep(Duration::from_millis(5));
+        }
+        progress(100);
+        let mut state = self.state.lock().unwrap();
+        let enabled = state.enable.clone().unwrap_or(Enabled::Done);
+        if enabled == Enabled::Done {
+            state.bridging = bridging_from(HyperV::RestartPending, Ok(Vec::new()));
+        }
+        enabled
     }
 }
 
@@ -397,6 +419,7 @@ fn ethernet_and_wifi() -> Bridging {
             AdapterInfo { name: "Ethernet".into(), description: "Realtek".into(), wifi: false },
             AdapterInfo { name: "Wi-Fi".into(), description: "Intel".into(), wifi: true },
         ],
+        hyper_v: HyperV::On,
     }
 }
 
@@ -472,6 +495,7 @@ fn bridging_is_refused_where_hyper_v_is_missing_and_a_vanished_adapter_doesnt_st
                 available: false,
                 reason: Some("Bridging needs Hyper-V.".into()),
                 adapters: Vec::new(),
+                hyper_v: HyperV::Off,
             }
         }),
         ..Pretend::default()

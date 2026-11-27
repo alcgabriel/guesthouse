@@ -9,7 +9,7 @@
 //! Windows' languages; and which adapters are offered. [`windows`](crate::windows) runs the real
 //! `netsh.exe`.
 
-use guesthouse_control::{AdapterInfo, Bridging};
+use guesthouse_control::{AdapterInfo, Bridging, HyperV};
 use guesthouse_hcs::adapters::{self, Interface};
 use std::net::Ipv4Addr;
 
@@ -246,24 +246,26 @@ pub trait Network: Send + Sync {
     fn port_free(&self, port: u16) -> bool;
     /// Whether IP Helper (iphlpsvc) runs, which listens for every portproxy entry.
     fn ip_helper_running(&self) -> bool;
-    /// Whether a machine can be bridged, and onto which adapters.
+    /// Whether a machine can be bridged, and onto which adapters, with where Hyper-V stands. Its
+    /// feature is read only while its service isn't there, as that read takes seconds.
     fn bridging(&self) -> Bridging;
+    /// Turns Windows' Hyper-V feature on, unless it's on already, handing `progress` how far it has
+    /// got, as [`crate::hyper_v::enable`] does. It never restarts the PC.
+    fn enable_hyper_v(&self, progress: &mut dyn FnMut(u8)) -> crate::hyper_v::Enabled;
 }
 
-/// What bridging offers when Hyper-V's service is there or not, and these interfaces are: the
-/// physical adapters that are up. Hyper-V's switch is what a bridged network is made on, and its
-/// virtual machine management service is there only with the feature turned on.
-pub fn bridging_from(hyper_v: bool, interfaces: Result<Vec<Interface>, String>) -> Bridging {
-    if !hyper_v {
+/// What bridging offers where Windows' Hyper-V feature stands as `hyper_v` says, and these
+/// interfaces are: the physical adapters that are up. Hyper-V's switch is what a bridged network is
+/// made on, and its virtual machine management service is there only with the feature turned on.
+/// `reason` says why it isn't offered in words an app from before `hyper_v` shows, and the service
+/// refuses a change to a bridged network with.
+pub fn bridging_from(hyper_v: HyperV, interfaces: Result<Vec<Interface>, String>) -> Bridging {
+    if hyper_v != HyperV::On {
         return Bridging {
             available: false,
-            reason: Some(
-                "Bridging needs Windows' Hyper-V feature, which isn't turned on, or isn't in this edition: \
-                 Windows Home has none. On Pro, Education and Enterprise, turn on Hyper-V in Windows Features \
-                 and restart."
-                    .into(),
-            ),
+            reason: Some(not_offered(&hyper_v)),
             adapters: Vec::new(),
+            hyper_v,
         };
     }
     match interfaces {
@@ -278,8 +280,31 @@ pub fn bridging_from(hyper_v: bool, interfaces: Result<Vec<Interface>, String>) 
                     wifi: adapter.kind == adapters::WIFI,
                 })
                 .collect(),
+            hyper_v,
         },
-        Err(reason) => Bridging { available: false, reason: Some(reason), adapters: Vec::new() },
+        Err(reason) => Bridging { available: false, reason: Some(reason), adapters: Vec::new(), hyper_v },
+    }
+}
+
+/// Why a machine can't be bridged while Hyper-V stands as `hyper_v` says.
+pub fn not_offered(hyper_v: &HyperV) -> String {
+    const NEEDS: &str = "Bridging needs Windows' Hyper-V feature";
+    match hyper_v {
+        HyperV::RestartPending => {
+            "Hyper-V is turned on, and Windows has to restart before a machine can be bridged.".to_owned()
+        }
+        HyperV::TurningOn { .. } => format!("{NEEDS}, which is being turned on."),
+        HyperV::NotInEdition => {
+            format!("{NEEDS}, which this edition of Windows doesn't have: Windows Home has none.")
+        }
+        HyperV::NoVirtualization => format!(
+            "{NEEDS}, and this PC's processor says virtualization is off in its firmware, or it has none."
+        ),
+        HyperV::Failed { reason, .. } => format!("{NEEDS}, which couldn't be turned on: {reason}"),
+        _ => format!(
+            "{NEEDS}, which isn't turned on, or isn't in this edition: Windows Home has none. On Pro, Education and \
+             Enterprise, turn on Hyper-V in Windows Features and restart."
+        ),
     }
 }
 
@@ -540,8 +565,8 @@ mod tests {
             interface("Wi-Fi", adapters::WIFI, true),
             interface("vEthernet (WSL)", adapters::ETHERNET, false),
         ];
-        let bridging = bridging_from(true, Ok(found.clone()));
-        assert!(bridging.available && bridging.reason.is_none());
+        let bridging = bridging_from(HyperV::On, Ok(found.clone()));
+        assert!(bridging.available && bridging.reason.is_none() && bridging.hyper_v == HyperV::On);
         assert_eq!(
             bridging.adapters,
             [
@@ -549,10 +574,24 @@ mod tests {
                 AdapterInfo { name: "Wi-Fi".into(), description: "Wi-Fi device".into(), wifi: true }
             ]
         );
-        let without = bridging_from(false, Ok(found));
-        assert!(!without.available && without.adapters.is_empty());
-        assert!(without.reason.unwrap().contains("Hyper-V"));
-        let broken = bridging_from(true, Err("couldn't list".into()));
+        // Every other case isn't offered, says why for an app from before them, and is passed on.
+        for hyper_v in [
+            HyperV::Off,
+            HyperV::NotInEdition,
+            HyperV::RestartPending,
+            HyperV::NoVirtualization,
+            HyperV::TurningOn { percent: Some(10) },
+            HyperV::Failed { reason: "No room.".into(), log: None },
+            HyperV::Unknown { reason: "DISM is busy.".into() },
+        ] {
+            let without = bridging_from(hyper_v.clone(), Ok(found.clone()));
+            assert!(!without.available && without.adapters.is_empty(), "{hyper_v:?}");
+            assert!(without.reason.unwrap().contains("Hyper-V"), "{hyper_v:?}");
+            assert_eq!(without.hyper_v, hyper_v);
+        }
+        assert!(bridging_from(HyperV::RestartPending, Ok(Vec::new())).reason.unwrap().contains("restart"));
+        assert!(bridging_from(HyperV::NotInEdition, Ok(Vec::new())).reason.unwrap().contains("Windows Home"));
+        let broken = bridging_from(HyperV::On, Err("couldn't list".into()));
         assert!(!broken.available && broken.reason.as_deref() == Some("couldn't list"));
     }
 }
