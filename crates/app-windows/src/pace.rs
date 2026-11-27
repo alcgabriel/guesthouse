@@ -1,7 +1,7 @@
 //! How often the window is told things. Every message to the window is followed by a render of the
 //! whole window on its thread, and Windows runs that thread's queue inside its loop for moving the
-//! window too, so a stream of messages makes a dragged window lag behind the mouse. This holds the
-//! messages back to what the window needs. It has nothing of Windows in it, so its tests run
+//! window too, so a stream of messages makes a dragged window lag behind the mouse. These hold the
+//! messages back to what the window needs. They have nothing of Windows in them, so their tests run
 //! on any system.
 
 // Off Windows only the tests use these.
@@ -52,6 +52,31 @@ impl<T> Batch<T> {
     /// Every item waiting, at once, as when the stream ends and nothing more will come.
     pub fn take_all(&mut self) -> Vec<T> {
         std::mem::take(&mut self.waiting)
+    }
+}
+
+/// The last value sent, so the same again isn't sent.
+pub struct Changes<T> {
+    last: Option<T>,
+}
+
+impl<T: Clone + PartialEq> Changes<T> {
+    pub fn new() -> Changes<T> {
+        Changes { last: None }
+    }
+
+    /// `value` if it's the first, or differs from the last one sent, which it then becomes.
+    pub fn news(&mut self, value: T) -> Option<T> {
+        if self.last.as_ref() == Some(&value) {
+            return None;
+        }
+        self.last = Some(value.clone());
+        Some(value)
+    }
+
+    /// Lets the next value go whatever it is.
+    pub fn forget(&mut self) {
+        self.last = None;
     }
 }
 
@@ -131,5 +156,31 @@ mod tests {
         assert_eq!(batch.take_all(), vec![2]);
         assert_eq!(batch.due(), None);
         assert_eq!(batch.take_all(), Vec::<i32>::new());
+    }
+
+    #[test]
+    fn the_first_value_goes_and_the_same_again_does_not() {
+        let mut changes = Changes::new();
+        assert_eq!(changes.news(Ok::<_, String>(1)), Some(Ok(1)));
+        assert_eq!(changes.news(Ok(1)), None);
+        assert_eq!(changes.news(Ok(2)), Some(Ok(2)));
+    }
+
+    #[test]
+    fn the_service_going_away_and_coming_back_both_go() {
+        let mut changes = Changes::new();
+        assert!(changes.news(Ok::<_, String>(1)).is_some());
+        assert_eq!(changes.news(Err("away".to_owned())), Some(Err("away".to_owned())));
+        assert_eq!(changes.news(Err("away".to_owned())), None);
+        // Back as it was before it went, which is still news to the window.
+        assert_eq!(changes.news(Ok(1)), Some(Ok(1)));
+    }
+
+    #[test]
+    fn a_forgotten_value_goes_again() {
+        let mut changes = Changes::new();
+        assert!(changes.news(1).is_some());
+        changes.forget();
+        assert_eq!(changes.news(1), Some(1));
     }
 }

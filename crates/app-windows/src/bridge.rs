@@ -5,7 +5,8 @@
 //! the asking goes on meanwhile.
 //!
 //! Each message is followed by a render of the whole window, so the window is told only what it
-//! needs: a machine's events a few times a second at most, however fast its guest writes.
+//! needs: how things stand only when that has changed, and a machine's events a few times a second
+//! at most, however fast its guest writes.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -20,7 +21,7 @@ use guesthouse_control::{Answer, Bridging, CardInfo, Event, Machine, MachineSett
 use windows_reactor::ComponentCompletion;
 
 use crate::app::Message;
-use crate::pace::Batch;
+use crate::pace::{Batch, Changes};
 
 /// How often the service is asked how things stand.
 const EVERY: Duration = Duration::from_secs(2);
@@ -112,6 +113,9 @@ pub fn start(window: Window) -> Sender<Job> {
     let (jobs, inbox) = mpsc::channel::<Job>();
     let failed = window.clone();
     let spawned = thread::Builder::new().name("service".into()).spawn(move || {
+        // What the window was last told, as an answer that's the same again changes nothing there.
+        // The first answer goes, and so does each change between the service being there and not.
+        let mut told = Changes::new();
         loop {
             match inbox.recv_timeout(EVERY) {
                 Ok(job) => {
@@ -119,12 +123,17 @@ pub fn start(window: Window) -> Sender<Job> {
                     if !window.tell(Message::Answered(job, answer)) {
                         return;
                     }
+                    // The window may have changed its own copy for the call, as for Grow, so it's
+                    // told how things stand after a call whether or not that has changed.
+                    told.forget();
                 }
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => return,
             }
             // After a call too, so what it changed shows at once.
-            if !window.tell(Message::Status(status())) {
+            if let Some(seen) = told.news(status())
+                && !window.tell(Message::Status(seen))
+            {
                 return;
             }
         }
