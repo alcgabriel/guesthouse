@@ -108,7 +108,6 @@ impl<W: Work> Service<W> {
                 None => return,
             };
             let Some(ctl) = ctl.filter(|_| on) else { continue };
-            let policy = policy(&self.machines.store.disk(name));
             let answered = self.sessions.with(name, |session| session.reading.is_some());
             let poll =
                 self.sessions.with(name, |session| session.pairing.as_ref().and_then(Pairing::poll_ms));
@@ -119,7 +118,7 @@ impl<W: Work> Service<W> {
             };
             if last.is_none_or(|at| at.elapsed() >= every) {
                 last = Some(Instant::now());
-                self.read_now(name, &ctl, &policy, true);
+                self.read_now(name, &ctl, true);
             }
         }
     }

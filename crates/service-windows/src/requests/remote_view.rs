@@ -205,7 +205,21 @@ impl<W: Work> Service<W> {
         };
         let _one_at_a_time = one.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let policy = policy(&self.machines.store.disk(name));
-        work(&Driver { sessions: &self.sessions, machine: name, policy: &policy, guest: ctl, now: &now_ms })
+        let began = Instant::now();
+        let done = work(&Driver {
+            sessions: &self.sessions,
+            machine: name,
+            policy: &policy,
+            guest: ctl,
+            now: &now_ms,
+        });
+        let answered = self.sessions.with(name, |session| {
+            let reading = session.reading.as_ref().filter(|_| session.reason.is_none())?;
+            let hidden = reading.devices.iter().filter(|device| policy.hides(&device.fingerprint)).count();
+            Some((reading.devices.len(), hidden))
+        });
+        self.told_answered(name, answered, began.elapsed());
+        done
     }
 
     /// A pairing that is open, a device that waits, or the host-wide clipboard and files held off
@@ -283,7 +297,7 @@ impl<W: Work> Service<W> {
             (true, Some(_)) => (view.state, view.reason),
         };
         if let (true, Some(ctl)) = (switch.allow_remote_view, ctl) {
-            self.read(&name, ctl, &policy);
+            self.read(&name, ctl);
         }
         let mut info = self
             .sessions
@@ -296,7 +310,7 @@ impl<W: Work> Service<W> {
 
     /// Reads remoteman's host through the shared driver if the last reading is old and none is
     /// being taken, and waits for it up to [`READ_WAIT`]. One that takes longer goes on behind.
-    fn read(self: &Arc<Self>, name: &str, ctl: GuestCtl, policy: &Policy) {
+    fn read(self: &Arc<Self>, name: &str, ctl: GuestCtl) {
         let begun = self.sessions.with(name, |session| {
             let begin = !session.busy && session.stale(now_ms());
             session.busy |= begin;
@@ -306,9 +320,9 @@ impl<W: Work> Service<W> {
             return;
         }
         let (done, finished) = mpsc::channel();
-        let (service, name, policy) = (Arc::clone(self), name.to_owned(), policy.clone());
+        let (service, name) = (Arc::clone(self), name.to_owned());
         thread::spawn(move || {
-            service.read_now(&name, &ctl, &policy, false);
+            service.read_now(&name, &ctl, false);
             service.sessions.with(&name, |session| session.busy = false);
             let _ = done.send(());
         });
@@ -316,32 +330,26 @@ impl<W: Work> Service<W> {
     }
 
     /// Reads remoteman's host through the shared driver, and lets pairing's clock go on after it
-    /// when `tick`, then says in the service's log if whether it answers has changed.
-    pub(super) fn read_now(&self, name: &str, ctl: &GuestCtl, policy: &Policy, tick: bool) {
-        let began = Instant::now();
+    /// when `tick`.
+    pub(super) fn read_now(&self, name: &str, ctl: &GuestCtl, tick: bool) {
         self.drive(name, ctl, |driver| {
             driver.step(StepEvent::Read);
             if tick {
                 driver.step(StepEvent::Plain(Event::Tick));
             }
         });
-        let answered = self.sessions.with(name, |session| {
-            let reading = session.reading.as_ref().filter(|_| session.reason.is_none())?;
-            let hidden = reading.devices.iter().filter(|device| policy.hides(&device.fingerprint)).count();
-            Some((reading.devices.len(), hidden))
-        });
-        self.told_answered(name, answered, began.elapsed());
     }
 
-    /// Writes in the service's log when the guest's remoteman first answers this run, and when that
-    /// changes: whether, how long a reading took, and how many devices it trusts, of which how many
-    /// are Guesthouse's own viewer. Nothing it said: no name, no fingerprint, no code.
+    /// Writes in the service's log when the guest's remoteman first answers this run, and whenever
+    /// whether it answers or how many devices it trusts changes: how long a reading took, and how
+    /// many devices, of which how many are Guesthouse's own viewer. Nothing it said: no name, no
+    /// fingerprint, no code.
     fn told_answered(&self, name: &str, answered: Option<(usize, usize)>, took: Duration) {
         let changed = {
             let mut entries = self.machines.lock();
             let Some(entry) = entries.get_mut(name).filter(|entry| entry.ctl.is_some()) else { return };
-            let changed = entry.view_answered != Some(answered.is_some());
-            entry.view_answered = Some(answered.is_some());
+            let changed = entry.view_answered != Some(answered);
+            entry.view_answered = Some(answered);
             changed
         };
         if changed {

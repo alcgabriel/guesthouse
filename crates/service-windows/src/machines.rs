@@ -45,9 +45,9 @@ pub struct Entry {
     pub ctl: Option<GuestCtl>,
     /// Where its remote view stands on this PC's network, as its keeper last left it.
     pub view: ViewStanding,
-    /// Whether the guest's remoteman answered when it was last asked this run, so a change is told
-    /// once.
-    pub view_answered: Option<bool>,
+    /// Whether the guest's remoteman answered when it was last asked this run, and how many devices
+    /// it trusted then and how many of them are Guesthouse's own viewer, so a change is told once.
+    pub view_answered: Option<Option<(usize, usize)>>,
     history: VecDeque<Event>,
     watchers: Vec<SyncSender<Event>>,
 }

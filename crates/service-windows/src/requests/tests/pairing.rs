@@ -112,6 +112,18 @@ fn a_device_pairs_waits_with_its_code_is_accepted_limited_and_pairing_closes_aft
         ]
     );
     let shown = shown(service, "win");
+    assert!(
+        service
+            .work
+            .logged
+            .lock()
+            .unwrap()
+            .last()
+            .unwrap()
+            .ends_with(": 2 devices trusted, 1 of them Guesthouse's own viewer."),
+        "{:?}",
+        service.work.logged.lock().unwrap()
+    );
     assert_eq!(shown.devices.len(), 1, "Guesthouse's own viewer is no device: {:?}", shown.devices);
     assert_eq!(shown.devices[0].fingerprint, PHONE);
     assert!(!shown.devices[0].permissions.clipboard && !shown.devices[0].permissions.files);
