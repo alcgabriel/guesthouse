@@ -8,8 +8,8 @@
 //! process's command line and `qemu_args` makes QEMU's for either path, by `Launch::graphics`.
 //! Lines of run.sh that are only for debugging (the `-trace` options) are left out.
 //!
-//! A Linux machine (`kind` `linux`) gets two things more: QEMU's user-mode network, which its
-//! packages come over, and the scale its desktop should draw at, as a firmware file the guest
+//! A Linux machine (`kind` `linux`) gets two things more: QEMU's user-mode network with a
+//! virtio card, which its packages come over, and the scale its desktop should draw at, as a firmware file the guest
 //! reads (`SCALE_FILE`). A Windows machine's line is run.sh's, as before.
 
 use std::path::{Path, PathBuf};
@@ -19,6 +19,11 @@ pub const DEFAULT_MODES: [&str; 4] = ["640x480@60", "1024x768@60", "1280x800@60"
 
 /// The `kind` in `machine.json` that gets a network and a scale.
 pub const LINUX: &str = "linux";
+
+/// A Linux machine's network card, on QEMU's user-mode network. With no option ROM: the
+/// firmware has no use for booting from the network, and QEMU then needs no `efi-virtio.rom`
+/// from its data folder, which a QEMU copied out of its build folder does not find.
+pub const NETWORK_DEVICE: &str = "virtio-net-pci,netdev=net,romfile=";
 
 /// The firmware file (QEMU's `-fw_cfg`) a Linux guest reads its scale from: `1` or `2`.
 pub const SCALE_FILE: &str = "opt/com.ruxn.guesthouse/scale";
@@ -181,14 +186,11 @@ pub fn qemu_args(launch: &Launch) -> Vec<String> {
     ]);
     // Only a Linux machine has a network, and its scale as a file for the guest to read.
     let linux = launch.kind == LINUX;
-    add(&[
-        "-nic",
-        if linux {
-            "user,model=virtio-net-pci"
-        } else {
-            "none"
-        },
-    ]);
+    if linux {
+        add(&["-netdev", "user,id=net", "-device", NETWORK_DEVICE]);
+    } else {
+        add(&["-nic", "none"]);
+    }
     add(&["-rtc", "base=localtime"]);
     if linux {
         add(&[
@@ -469,8 +471,8 @@ mod tests {
         assert_eq!(got.len(), want.len());
     }
 
-    /// A Linux machine's line is the Windows one with the user-mode network in place of `-nic
-    /// none` and the scale file after `-rtc`, on either path; nothing else moves.
+    /// A Linux machine's line is the Windows one with the user-mode network and its card in
+    /// place of `-nic none` and the scale file after `-rtc`, on either path; nothing else moves.
     #[test]
     fn a_linux_machine_gets_a_network_and_its_scale_and_nothing_else_changes() {
         for (graphics, windows) in [
@@ -487,15 +489,17 @@ mod tests {
             let mut want = windows.clone();
             let nic = want.iter().position(|arg| arg == "-nic").unwrap();
             assert_eq!(want[nic + 1], "none");
-            want[nic + 1] = "user,model=virtio-net-pci".into();
             assert_eq!(want[nic + 2], "-rtc");
-            want.splice(
-                nic + 4..nic + 4,
-                [
-                    "-fw_cfg".to_string(),
-                    "name=opt/com.ruxn.guesthouse/scale,string=1".to_string(),
-                ],
-            );
+            let network = [
+                "-netdev",
+                "user,id=net",
+                "-device",
+                "virtio-net-pci,netdev=net,romfile=",
+            ];
+            want.splice(nic..nic + 2, network.map(String::from));
+            let rtc = want.iter().position(|arg| arg == "-rtc").unwrap();
+            let scale = ["-fw_cfg", "name=opt/com.ruxn.guesthouse/scale,string=1"];
+            want.splice(rtc + 2..rtc + 2, scale.map(String::from));
             for (index, (got, want)) in got.iter().zip(&want).enumerate() {
                 assert_eq!(got, want, "argument {index}");
             }
