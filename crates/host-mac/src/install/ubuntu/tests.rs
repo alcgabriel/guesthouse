@@ -40,7 +40,7 @@ fn a_list_with_no_such_image_or_a_bad_checksum_is_said_not_guessed() {
 
 #[test]
 fn the_answers_install_with_no_questions_and_say_how_it_ended_on_the_serial_port() {
-    let text = user_data("nick", "guesthouse");
+    let text = user_data("nick", "guesthouse", "Europe/Berlin");
     assert!(text.starts_with("#cloud-config\nautoinstall:"));
     assert!(text.contains("username: nick"));
     // The password comes from the account file on the disc, so no command the installer prints
@@ -54,6 +54,31 @@ fn the_answers_install_with_no_questions_and_say_how_it_ended_on_the_serial_port
     assert!(text.contains(FINISHED) && text.contains(FAILED));
     assert!(text.contains("shutdown: poweroff"));
     assert!(text.contains("size: largest"));
+    assert!(text.contains("timezone: 'Europe/Berlin'"));
+}
+
+#[test]
+fn the_time_zone_is_the_mac_s_as_its_link_names_it_and_utc_otherwise() {
+    use std::path::Path;
+    let zone = |link: &str| time_zone_of(Some(Path::new(link)));
+    assert_eq!(
+        zone("/var/db/timezone/zoneinfo/Europe/Berlin"),
+        "Europe/Berlin"
+    );
+    assert_eq!(
+        zone("/usr/share/zoneinfo/America/Argentina/Buenos_Aires"),
+        "America/Argentina/Buenos_Aires"
+    );
+    assert_eq!(zone("/var/db/timezone/zoneinfo/Etc/GMT+1"), "Etc/GMT+1");
+    assert_eq!(
+        zone("/var/db/timezone/zoneinfo/../../etc/passwd"),
+        "Etc/UTC"
+    );
+    assert_eq!(zone("/var/db/timezone/zoneinfo/Europe/Ber'lin"), "Etc/UTC");
+    assert_eq!(zone("/etc/somewhere"), "Etc/UTC");
+    assert_eq!(time_zone_of(None), "Etc/UTC");
+    // This Mac's own reads as a name.
+    assert!(!mac_time_zone().is_empty());
 }
 
 #[test]
@@ -79,7 +104,7 @@ fn the_installer_runs_with_no_questions_and_its_console_on_the_screen() {
 
 #[test]
 fn the_answers_put_the_drivers_service_into_the_installed_system_before_saying_finished() {
-    let text = user_data("nick", "guesthouse");
+    let text = user_data("nick", "guesthouse", "Europe/Berlin");
     let enable = text
         .find(&format!("systemctl enable {DRIVER_SERVICE_FILE}"))
         .unwrap();

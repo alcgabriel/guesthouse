@@ -179,11 +179,30 @@ fn yaml(text: &str) -> String {
     format!("'{}'", text.replace('\'', "''"))
 }
 
+/// The Mac's time zone as Ubuntu names it (`Europe/Berlin`): where `/etc/localtime` points,
+/// after `zoneinfo/`. `Etc/UTC` when it points nowhere a zone's name can be read from.
+pub fn mac_time_zone() -> String {
+    time_zone_of(std::fs::read_link("/etc/localtime").ok().as_deref())
+}
+
+/// The zone a link to the zone database names, or `Etc/UTC`.
+fn time_zone_of(link: Option<&std::path::Path>) -> String {
+    let text = link.and_then(|link| link.to_str()).unwrap_or_default();
+    let name = text.rsplit_once("zoneinfo/").map_or("", |(_, name)| name);
+    let plain = name
+        .split('/')
+        .all(|part| !part.is_empty() && !part.starts_with('.'))
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b));
+    if plain { name } else { "Etc/UTC" }.to_string()
+}
+
 /// The autoinstall answers: no questions, the largest disk, an account named after the Mac's user
 /// whose password is set at the end from the answer disc's account file (`ACCOUNT_FILE`), so the
-/// first console sign-in uses it, the driver's service from the answer disc, and what is said on
-/// the serial port when it ends.
-pub fn user_data(account: &str, hostname: &str) -> String {
+/// first console sign-in uses it, the clock in `time_zone` (the Mac's, `mac_time_zone`), the
+/// driver's service from the answer disc, and what is said on the serial port when it ends.
+pub fn user_data(account: &str, hostname: &str, time_zone: &str) -> String {
     format!(
         "#cloud-config
 autoinstall:
@@ -211,7 +230,7 @@ autoinstall:
   drivers:
     install: false
   user-data:
-    timezone: Etc/UTC
+    timezone: {zone}
   shutdown: poweroff
   error-commands:
     - tail -n 100 /var/log/installer/subiquity-server-debug.log > /dev/ttyAMA0 || true
@@ -229,6 +248,7 @@ autoinstall:
 ",
         host = hostname,
         user = account,
+        zone = yaml(time_zone),
         account_file = ACCOUNT_FILE,
         failed = FAILED,
         finished = FINISHED,
