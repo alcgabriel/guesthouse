@@ -217,6 +217,9 @@ pub(crate) fn delete_tag(context: &Context, machine: &Machine, tag: &str) -> Res
 }
 
 #[cfg(test)]
+mod pins;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::actions::{Task, grow};

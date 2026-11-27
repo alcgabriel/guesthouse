@@ -421,4 +421,7 @@ fn guest_facts(folder: &Path, kind: Kind) -> Result<()> {
 mod accepted;
 
 #[cfg(test)]
+mod tag_pins;
+
+#[cfg(test)]
 mod tests;

@@ -10,6 +10,8 @@ crates/host-windows/tests/answers-golden/** -text
 crates/app-core/tests/recipes/** -text
 # App windows' lines between the host and the guest's helper, compared byte for byte.
 crates/app-core/tests/app_windows_lines/** -text
+# The Windows host's snapshot index as its code writes it, compared byte for byte.
+crates/host-windows/tests/snapshot-golden/** -text
 # The Linux host's answer-file templates and zone table, which the shared answers crate holds as text, keep
 # their line endings on any checkout.
 guest/autounattend.xml text eol=lf

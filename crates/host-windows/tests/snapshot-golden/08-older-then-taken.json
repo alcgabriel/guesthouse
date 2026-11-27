@@ -1,0 +1,20 @@
+{
+  "snapshots": [
+    {
+      "id": 1,
+      "label": "old",
+      "taken": 5,
+      "parent": null,
+      "hidden": false
+    },
+    {
+      "id": 1,
+      "label": "next",
+      "taken": 6,
+      "parent": 1,
+      "hidden": false
+    }
+  ],
+  "current": 1,
+  "next_id": 2
+}
