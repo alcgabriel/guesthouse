@@ -932,6 +932,7 @@ dependencies = [
  "guesthouse-carry-core",
  "guesthouse-catalog-core",
  "guesthouse-daemon",
+ "guesthouse-guest-names-core",
  "guesthouse-idle-core",
  "guesthouse-jail",
  "guesthouse-relay",
@@ -1110,6 +1111,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "guesthouse-guest-names-core"
+version = "0.11.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "guesthouse-guest-scripts"
 version = "0.11.0"
 dependencies = [
@@ -1149,6 +1157,7 @@ dependencies = [
  "guesthouse-account-core",
  "guesthouse-answers-core",
  "guesthouse-control",
+ "guesthouse-guest-names-core",
  "guesthouse-hcs",
  "guesthouse-jail",
  "guesthouse-remote-view-core",

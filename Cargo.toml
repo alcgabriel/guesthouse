@@ -21,6 +21,7 @@ default-members = [
     "crates/core",
     "crates/daemon",
     "crates/frame-socket",
+    "crates/guest-names",
     "crates/guest-scripts",
     "crates/hcs",
     "crates/idle",
@@ -83,6 +84,7 @@ guesthouse-carry-core = { path = "crates/carry" }
 guesthouse-catalog-core = { path = "crates/catalog" }
 guesthouse-serial-words-core = { path = "crates/serial-words" }
 guesthouse-idle-core = { path = "crates/idle" }
+guesthouse-guest-names-core = { path = "crates/guest-names" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

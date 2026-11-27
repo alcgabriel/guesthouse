@@ -23,6 +23,8 @@ guesthouse-control.workspace = true
 guesthouse-hcs.workspace = true
 # A Windows guest's screen, through remoteman: the part that no host differs in.
 guesthouse-remote-view-core.workspace = true
+# What a shared folder is called in the guest.
+guesthouse-guest-names-core.workspace = true
 # What a guest says on its serial port and how it is read, as each host has them.
 guesthouse-serial-words-core.workspace = true
 # The record beside each disk, and events and settings as the service's pipe carries them.

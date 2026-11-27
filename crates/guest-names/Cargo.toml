@@ -1,0 +1,15 @@
+[package]
+name = "guesthouse-guest-names-core"
+description = "The rules for names and paths in a Windows guest: file names Windows takes, the folders Defender may leave out, and what a shared folder is called. Nothing here calls the system, so every host can build on it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# The folders are given to the guest's script as JSON.
+serde_json = "1"
+
+[lints]
+workspace = true
