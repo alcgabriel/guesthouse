@@ -180,3 +180,57 @@ fn the_helper_in_the_repo_is_the_version_the_app_expects() {
     let port = format!("const int Port = {};", crate::network::GUEST_FILES_PORT);
     assert!(helper.contains(&port));
 }
+
+/// Each name as Windows gets it today, and each copy's number, before the rules move.
+#[test]
+fn each_name_maps_as_today() {
+    for (name, windows) in [
+        ("plain.txt", "plain.txt"),
+        ("a<b>c:d\"e/f\\g|h?i*j", "a_b_c_d_e_f_g_h_i_j"),
+        ("tab\there\u{7f}", "tab_here_"),
+        ("new\nline", "new_line"),
+        ("caf\u{e9} \u{1f600}.txt", "caf\u{e9} \u{1f600}.txt"),
+        ("trailing space ", "trailing space_"),
+        ("dots and spaces. .", "dots and spaces. _"),
+        ("..", "._"),
+        (".", "_"),
+        ("", "_"),
+        ("CON", "_CON"),
+        ("con.tar.gz", "_con.tar.gz"),
+        ("Lpt9.txt", "_Lpt9.txt"),
+        ("LPT0", "LPT0"),
+        ("COM10", "COM10"),
+        ("CONSOLE", "CONSOLE"),
+        ("aux ", "aux_"),
+        ("nul.", "nul_"),
+        (".nul", ".nul"),
+    ] {
+        assert_eq!(for_windows(name), windows, "{name:?}");
+    }
+    let taken: Vec<String> =
+        ["Photo.JPG", "photo (2).jpg", "archive.tar.gz", "README"].map(str::to_owned).into();
+    for (name, kept) in [
+        ("photo.jpg", "photo (3).jpg"),
+        ("archive.tar.gz", "archive.tar (2).gz"),
+        ("readme", "readme (2)"),
+        ("new.txt", "new.txt"),
+    ] {
+        assert_eq!(not_among(name.to_owned(), &taken), kept, "{name}");
+    }
+    assert_eq!(not_among("x".to_owned(), &["X".to_owned(), "x (2)".to_owned(), "X (3)".to_owned()]), "x (4)");
+    assert_eq!(not_among(".env".to_owned(), &[".ENV".to_owned()]), ".env (2)");
+    for (part, one) in [
+        ("photo.jpg", true),
+        ("...", true),
+        (" ", true),
+        ("a\\b", true),
+        ("CON", true),
+        ("a\0b", false),
+        ("/", false),
+        (".", false),
+        ("..", false),
+        ("", false),
+    ] {
+        assert_eq!(is_one_name(part), one, "{part:?}");
+    }
+}
