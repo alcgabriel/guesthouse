@@ -1,0 +1,91 @@
+; SPDX-License-Identifier: GPL-2.0
+;
+; ruxnwddm-full.inf: installs ruxnwddm.sys on the paravirtualized graphics
+; PCI device as a full render and display driver (milestone 2), with its
+; user-mode driver ruxnumd.dll when the package carries one. The same
+; driver file as ruxnwddm.inf; FullDriver under the service's Parameters
+; makes it register as a full driver. Unlike ruxnpvg's INF the class is
+; Display: the device becomes the display adapter and Windows hands the
+; desktop to this driver. It replaces ruxnpvg on the device.
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = Display
+ClassGuid   = {4d36e968-e325-11ce-bfc1-08002be10318}
+Provider    = %ruxn%
+CatalogFile = ruxnwddm-full.cat
+DriverVer = 11/27/2026,0.3.64.0
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%
+
+[SourceDisksFiles]
+ruxnwddm.sys  = 1
+ruxnumd.dll   = 1
+winemetal.dll = 1
+ruxndxgi.dll  = 1
+ruxnd3d11.dll = 1
+
+[Manufacturer]
+%ruxn% = ruxn, NTarm64
+
+[ruxn.NTarm64]
+%DeviceDesc% = ruxnwddm_Install, PCI\VEN_106B&DEV_EEEE
+
+; Display drivers must name a feature score, by which Windows ranks them (a
+; lower one wins). F9 is the value viogpu-wddm's display INFs use.
+[ruxnwddm_Install.NT]
+FeatureScore = F9
+CopyFiles    = ruxnwddm_Files, ruxnwddm_Umd
+AddReg       = ruxnwddm_UmdName
+
+[ruxnwddm_Files]
+ruxnwddm.sys
+
+; The user-mode driver and what it draws with (umd_inner.c): DXMT's
+; Direct3D 11 under our names and our winemetal, loaded from beside it.
+[ruxnwddm_Umd]
+ruxnumd.dll
+winemetal.dll
+ruxndxgi.dll
+ruxnd3d11.dll
+
+; The user-mode drivers by Direct3D version: none for Direct3D 9 ("<>" is
+; the graphics kernel's word for none), ruxnumd.dll for 10 and 11, none for
+; 12. Windows refuses to start a full driver without this value.
+[ruxnwddm_UmdName]
+HKR,, UserModeDriverName, 0x00010000, "<>", %13%\ruxnumd.dll, %13%\ruxnumd.dll, "<>"
+
+; The device has no interrupt pin, only MSI, so it opts in, with two
+; messages as ruxnpvg asks.
+[ruxnwddm_Install.NT.HW]
+AddReg = ruxnwddm_Msi
+
+[ruxnwddm_Msi]
+HKR, "Interrupt Management", , 0x00000010
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", , 0x00000010
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", MSISupported, 0x00010001, 1
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, 0x00010001, 2
+
+[ruxnwddm_Install.NT.Services]
+AddService = ruxnwddm, 0x00000002, ruxnwddm_Service
+
+[ruxnwddm_Service]
+AddReg        = ruxnwddm_Full
+DisplayName   = %DeviceDesc%
+ServiceType   = 1               ; kernel driver
+StartType     = 3               ; started by PnP
+ErrorControl  = 1               ; log and carry on
+ServiceBinary = %13%\ruxnwddm.sys
+
+[ruxnwddm_Full]
+HKR, "Parameters", FullDriver, 0x00010001, 1
+
+[Strings]
+ruxn       = "ruxn"
+DeviceDesc = "ruxn PV Graphics Display"
+DiskName   = "ruxn PV Graphics Display Driver Disk"
