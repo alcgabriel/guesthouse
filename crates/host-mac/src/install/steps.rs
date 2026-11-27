@@ -5,7 +5,7 @@
 //! What touches the system outside this file is behind two traits: `Transport` (the network) and
 //! `MachineControl` (making a disc, starting the machine, reading its serial port, the clock). The
 //! tests give them stand-ins, so the whole sequence runs with no network and no guest. What cannot
-//! be proved this way is listed in `notes/mac-app-install.md`.
+//! be proved this way is a real guest's side of it, which has not been run.
 
 use super::fetch::{self, FetchError, Outcome, Request, Transport};
 use super::plan::{Guest, Step, space_needed_gb};

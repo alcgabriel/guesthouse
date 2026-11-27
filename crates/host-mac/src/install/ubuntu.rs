@@ -12,7 +12,7 @@
 //! the Windows driver does. The answers put a service into the installed system that installs it
 //! from that disk when it is there, once for each version (`DRIVER_SERVICE`, `DRIVER_RUNNER`).
 //! With no package, the driver step says so (`DRIVER_PLACEHOLDER`) and offers to open Ubuntu
-//! without it. `notes/mac-app-install.md` has the rest.
+//! without it.
 
 /// Ubuntu's release folder for arm64 and its checksum list.
 pub const RELEASE_URL: &str = "https://cdimage.ubuntu.com/ubuntu/releases/26.04/release/";

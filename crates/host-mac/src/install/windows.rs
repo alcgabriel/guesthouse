@@ -7,7 +7,7 @@
 //! hosts (`docs/windows-host.md` of the public repo, the Linux app) take a Windows ISO the person
 //! has, and so does this: Guesthouse opens Microsoft's own page and the person saves the file
 //! (`INSTALLER_PAGE`). Automating the page would mean answering its check as a browser, which is
-//! not done. `notes/mac-app-install.md` has the whole reasoning for the owner.
+//! not done.
 
 use super::driver;
 use guesthouse_account_core::common::{MOST_WINDOWS_NAME_CHARS, WINDOWS_RESERVED};

@@ -9,7 +9,7 @@
 //! a guest whose driver follows the device's modes (our Linux driver does) takes it. At most one
 //! a second for each machine, the last one winning. QEMU's own device takes no size from the
 //! app. The scaling is not sent: a Linux guest is given its scale when it starts
-//! (`launch::SCALE_FILE`). `notes/mac-app-screen-size.md` says what each side provides.
+//! (`launch::SCALE_FILE`).
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};

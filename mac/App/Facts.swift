@@ -51,7 +51,7 @@ struct FactCards: View {
     // MARK: Screen
 
     /// Whether the machine's screen follows its window: on the protected path, with the Hardware
-    /// tab's switch on (see `notes/mac-app-screen-size.md`). QEMU's own device takes no size.
+    /// tab's switch on. QEMU's own device takes no size.
     private var follows: Bool {
         machine.graphics != "qemu" && ScreenPrefs.follows(machine.id)
     }

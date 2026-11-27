@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //! The graphics driver's package for a Windows guest, as a release publishes it, and how it is got.
 //!
-//! **What a release must produce** (written down for whoever builds releases; `notes/mac-app-install.md`
-//! has it too). The signing happens where releases are built, with a key that never leaves there
+//! **What a release must produce** (written down for whoever builds releases). The signing happens where releases are built, with a key that never leaves there
 //! and is not in git. The package carries only what the guest needs to trust and load the driver:
 //!
 //! - `install.ps1`: trusts the certificate, turns test signing on and installs the driver from its
