@@ -5,27 +5,25 @@
 //! needs no compression of its own.
 
 use super::collect::Collection;
-use super::endpoint::{KEPT_DAYS, MOST_REPORT_BYTES};
+use super::endpoint::MOST_REPORT_BYTES;
 use super::scrub::Scrubber;
 use super::summary::{self, Summary};
 use super::trim::trim;
 use crate::failure::{Failure, Result};
+use guesthouse_report_core::manifest::{DESCRIPTION_FILE, MANIFEST_FILE, SUMMARY_FILE, manifest_from};
 use jiff::ZonedDateTime;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// What the server is told the archive is.
-pub const FORMAT: &str = "tar.gz";
+pub use guesthouse_report_core::contract::FORMAT;
 const NAME_START: &str = "guesthouse-report-";
 /// The most a single log keeps at first. Logs are mostly text, which compresses about tenfold, so the
 /// whole stays well under the server's limit on most PCs.
 const FIRST_MOST_FILE_BYTES: usize = 16 << 20;
 /// A bundle that's still too big tries again with every log at half the room, this many times.
 const SHRINK_ROUNDS: u32 = 6;
-const MANIFEST: &str = "manifest.txt";
-const DESCRIPTION_FILE: &str = "description.txt";
-const SUMMARY_FILE: &str = "summary.json";
 
 /// A written report.
 #[derive(Debug, Clone)]
@@ -94,7 +92,7 @@ fn write_files(
     let summary = summary_of(collection, words, scrubber);
     put(top, &mut files, SUMMARY_FILE, &summary.to_json())?;
     let manifest = manifest(collection, &files);
-    put(top, &mut files, MANIFEST, &manifest)?;
+    put(top, &mut files, MANIFEST_FILE, &manifest)?;
     Ok((summary, files))
 }
 
@@ -118,33 +116,7 @@ fn summary_of(collection: &Collection, words: &Words, scrubber: &Scrubber) -> Su
 }
 
 fn manifest(collection: &Collection, files: &[(String, usize)]) -> String {
-    let mut text = format!(
-        "A Guesthouse bug report. It goes to the developer, is read by the developer and their automation \
-         tools, and is deleted after {KEPT_DAYS} days.\n\
-         The user name, host name and home folder were taken out of its files where they were found. That's \
-         a best effort on free-form logs, not a promise.\n\n\
-         Files:\n"
-    );
-    for (name, bytes) in files {
-        text.push_str(&format!("  {name} ({bytes} bytes)\n"));
-    }
-    text.push_str(&format!("  {MANIFEST}\n"));
-    if !collection.missing.is_empty() {
-        text.push_str("\nNot in it:\n");
-        for missing in &collection.missing {
-            text.push_str(&format!("  {}: {}\n", missing.name, missing.reason));
-            if let Some(how) = &missing.how {
-                text.push_str(&format!("    to get it by hand: {how}\n"));
-            }
-        }
-    }
-    if !collection.notes.is_empty() {
-        text.push_str("\nNotes:\n");
-        for note in &collection.notes {
-            text.push_str(&format!("  {note}\n"));
-        }
-    }
-    text
+    manifest_from(None, files, &collection.missing, &collection.notes)
 }
 
 fn pack(staging: &Path, name: &str, archive: &Path) -> Result<()> {

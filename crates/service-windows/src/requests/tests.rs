@@ -1,4 +1,6 @@
 use super::*;
+use guesthouse_host_windows::guest_ctl::LineWriter;
+use guesthouse_remote_view_core::ctl_wire::{answer_lines, read_request};
 use std::path::PathBuf;
 use std::sync::mpsc::{Sender, channel};
 
@@ -19,6 +21,117 @@ struct Pretend {
     /// The bytes free wherever a machine is moved to. Plenty, unless it says.
     free_space: Option<u64>,
     disks: FileDisks,
+    /// remoteman's host in the guest, at the far end of its serial port.
+    remoteman: Arc<Remoteman>,
+    /// The service's log.
+    logged: Mutex<Vec<String>>,
+    /// The address of this PC's that packets to a guest leave from, when a test says.
+    source: Mutex<Option<std::net::Ipv4Addr>>,
+}
+
+/// This PC's address on its network, in these tests.
+const THIS_PC: std::net::Ipv4Addr = std::net::Ipv4Addr::new(192, 168, 1, 20);
+
+/// remoteman's host in a pretend Windows guest: it keeps the words of each `ctl` request that
+/// reaches it, answers `status` with `status`, and everything else with `ok`.
+#[derive(Default)]
+struct Remoteman {
+    status: Mutex<String>,
+    asked: Mutex<Vec<String>>,
+    model: Mutex<Model>,
+}
+
+/// What remoteman's host holds, as far as pairing goes. It answers `status` from this when no
+/// answer is set, and the commands change it as remoteman's would.
+#[derive(Default)]
+struct Model {
+    pairing: bool,
+    /// A device waiting: its name, fingerprint and code.
+    pending: Option<(String, String, String)>,
+    /// The devices trusted: fingerprint, name, and their own clipboard and files.
+    devices: Vec<(String, String, bool, bool)>,
+    /// The host-wide clipboard and files.
+    clipboard: bool,
+    files: bool,
+    /// The name of the device that leads.
+    client: Option<String>,
+}
+
+impl Model {
+    fn status(&self) -> String {
+        let device = |(fingerprint, name, clipboard, files): &(String, String, bool, bool)| {
+            serde_json::json!({"fingerprint": fingerprint, "name": name, "connected": self.client.as_ref() == Some(name),
+                "permissions": {"clipboard": clipboard, "files": files}})
+        };
+        serde_json::json!({
+            "pairing": self.pairing,
+            "pending": self.pending.as_ref().map(|(name, fingerprint, code)| serde_json::json!({"name": name, "fingerprint": fingerprint, "code": code, "seconds": 55})),
+            "client": self.client.as_ref().map(|name| serde_json::json!({"name": name})),
+            "devices": self.devices.iter().map(device).collect::<Vec<_>>(),
+            "clipboard": self.clipboard,
+            "files": self.files,
+        })
+        .to_string()
+    }
+
+    fn run(&mut self, words: &[String]) {
+        let words: Vec<&str> = words.iter().map(String::as_str).collect();
+        match words.as_slice() {
+            ["pair", "on"] => self.pairing = true,
+            ["pair", "off"] => (self.pairing, self.pending) = (false, None),
+            ["pair", "accept"] => {
+                if let Some((name, fingerprint, _)) = self.pending.take() {
+                    self.devices.push((fingerprint, name, true, true));
+                }
+            }
+            ["pair", "decline"] => self.pending = None,
+            ["allow", "clipboard", on] => self.clipboard = *on == "on",
+            ["allow", "files", on] => self.files = *on == "on",
+            ["device", fingerprint, "allow", what, on] => {
+                for device in self.devices.iter_mut().filter(|device| device.0 == *fingerprint) {
+                    match *what {
+                        "clipboard" => device.2 = *on == "on",
+                        "files" => device.3 = *on == "on",
+                        _ => {}
+                    }
+                }
+            }
+            ["revoke", fingerprint] => self.devices.retain(|device| device.0 != *fingerprint),
+            _ => {}
+        }
+    }
+}
+
+impl Remoteman {
+    fn asked(&self) -> Vec<String> {
+        self.asked.lock().unwrap().clone()
+    }
+}
+
+/// The guest's serial port, as `ctl` writes to it: each request is answered at once, through the
+/// handle, as the reader of the port would.
+struct Port {
+    remoteman: Arc<Remoteman>,
+    ctl: GuestCtl,
+}
+
+impl LineWriter for Port {
+    fn write_line(&self, line: &[u8]) -> io::Result<()> {
+        let line = String::from_utf8_lossy(line).trim_end().to_owned();
+        let Some(Ok((id, words))) = read_request(&line) else { return Ok(()) };
+        self.remoteman.asked.lock().unwrap().push(words.join(" "));
+        let said = if words == ["status"] {
+            let set = self.remoteman.status.lock().unwrap().clone();
+            if set.is_empty() { self.remoteman.model.lock().unwrap().status() } else { set }
+        } else {
+            self.remoteman.model.lock().unwrap().run(&words);
+            "ok".into()
+        };
+        for part in answer_lines(id, 0, said.as_bytes()).unwrap() {
+            self.ctl.take_line(&part);
+        }
+        Ok(())
+    }
 }
 
 impl Work for Pretend {
@@ -44,9 +157,11 @@ impl Work for Pretend {
         settings: &BootSettings,
         sink: Arc<dyn Sink>,
         stop: Arc<AtomicBool>,
+        ctl: GuestCtl,
     ) -> Result<(), String> {
         self.booted.lock().unwrap().push(settings.clone());
         sink.state(State::Running);
+        ctl.attach(Arc::new(Port { remoteman: Arc::clone(&self.remoteman), ctl: ctl.clone() }), true);
         if !self.silent.load(Ordering::SeqCst) {
             sink.event(Event::Guest("guesthouse: address: 172.29.1.2".into()));
         }
@@ -102,8 +217,52 @@ impl Work for Pretend {
         !self.busy_ports.lock().unwrap().contains(&port)
     }
 
+    fn log(&self, text: &str) {
+        self.logged.lock().unwrap().push(text.to_owned());
+    }
+
+    fn this_pcs_addresses(&self) -> Vec<std::net::Ipv4Addr> {
+        vec![THIS_PC]
+    }
+
+    fn source_towards(&self, _: std::net::Ipv4Addr) -> Option<std::net::Ipv4Addr> {
+        *self.source.lock().unwrap()
+    }
+
+    fn udp_port_free(&self, port: u16) -> bool {
+        !self.net.state.lock().unwrap().busy_udp.contains(&port)
+    }
+
+    /// A relay that's only an entry in the double's calls, made as it opens and as it closes.
+    fn open_view(&self, view: &ViewSettings) -> Result<Opened, String> {
+        let mut state = self.net.state.lock().unwrap();
+        state.calls.push(format!("open_view {} {}", view.port, view.upstream));
+        if state.refuse_view {
+            return Err("the port is taken".into());
+        }
+        state.views.push(view.port);
+        let unlisted = state
+            .name_taken
+            .then(|| "The machine isn't announced on the network: the name is taken.".to_owned());
+        Ok(Opened { relay: Box::new(Relay { net: Arc::clone(&self.net.state), port: view.port }), unlisted })
+    }
+
     fn free_space(&self, _: &Path) -> Result<u64, String> {
         Ok(self.free_space.unwrap_or(u64::MAX))
+    }
+}
+
+/// A pretend relay, which says in the double's calls when it closes.
+struct Relay {
+    net: Arc<Mutex<network::NetState>>,
+    port: u16,
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        let mut state = self.net.lock().unwrap();
+        state.calls.push(format!("close_view {}", self.port));
+        state.views.retain(|port| *port != self.port);
     }
 }
 
@@ -1014,7 +1173,9 @@ fn a_file_that_is_a_link_is_not_followed() {
 }
 
 mod network;
+mod pairing;
 mod places;
+mod remote_view;
 use network::FakeNet;
 #[test]
 fn nested_virtualization_is_off_until_asked_for_and_reaches_the_next_boot() {

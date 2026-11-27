@@ -6,6 +6,10 @@
 //! nothing here can promise a report holds nothing personal.
 //!
 //! Every match ignores case, and `\` and `/` are the same separator.
+//!
+//! This is the Windows host's scrubber. The Linux host has its own in app-core, which takes out a
+//! different list in different marks, and the two are kept apart until it's decided which one every
+//! host should use.
 
 const HOME_MARK: &str = "~";
 const USER_MARK: &str = "<user>";

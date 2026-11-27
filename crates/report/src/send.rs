@@ -1,6 +1,6 @@
-//! How a report is sent, as the Linux host sends it: with the system's `curl`, which Windows has
-//! had since 10, so the workspace needs no HTTP of its own. The arguments are built here, and what
-//! curl said is read here, so both are tested anywhere. Running curl is the app's.
+//! How a report is sent, as every host sends it: with the system's `curl`, which Linux hosts have
+//! and Windows has had since 10, so the workspace needs no HTTP of its own. The arguments are built
+//! here, and what curl said is read here, so both are tested anywhere. Running curl is each host's.
 
 use super::answer::read_answer;
 use super::contract::{FORMAT, FORMAT_HEADER, SUMMARY_HEADER};
@@ -8,8 +8,8 @@ use std::ffi::OsString;
 use std::path::Path;
 
 /// A report is small, but a slow line can take a while with one near the limit.
-const MOST_SECONDS: &str = "600";
-const CONNECT_SECONDS: &str = "20";
+pub const MOST_SECONDS: &str = "600";
+pub const CONNECT_SECONDS: &str = "20";
 
 /// What curl is run with to post the archive at `archive` to `address`, with the server's answer
 /// written to `answer`. `summary` is the `X-Report-Summary` header's value, which may be empty.
@@ -68,8 +68,6 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    const SEND: &str = include_str!("../../../app-core/src/report/send.rs");
-
     fn arguments(address: &str, summary: &str) -> Vec<String> {
         curl_arguments(address, summary, &PathBuf::from("report.tar.gz"), &PathBuf::from("report.answer"))
             .iter()
@@ -93,13 +91,9 @@ mod tests {
         ] {
             assert!(line.contains(expected), "{expected} is not in {line}");
         }
-        // The Linux host's own words, so the two stay the same.
-        for word in ["\"--proto\"", "\"Content-Type: application/octet-stream\"", "\"Expect:\""] {
-            assert!(SEND.contains(word), "{word}");
-        }
-        assert!(SEND.contains("\"--max-time\", MOST_SECONDS"));
-        assert!(SEND.contains(&format!("const MOST_SECONDS: &str = \"{MOST_SECONDS}\";")));
-        assert!(SEND.contains(&format!("const CONNECT_SECONDS: &str = \"{CONNECT_SECONDS}\";")));
+        // The Linux host's own values, pinned now that both hosts post with these arguments.
+        assert_eq!(MOST_SECONDS, "600");
+        assert_eq!(CONNECT_SECONDS, "20");
     }
 
     #[test]

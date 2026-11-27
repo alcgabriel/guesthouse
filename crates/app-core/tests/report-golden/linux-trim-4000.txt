@@ -1,0 +1,69 @@
+DEBUG [        0] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        1] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        2] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        3] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        4] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        5] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        6] message Some(QueryAdapter) process=0x400012c0
+[123792 bytes left out here, all but the 12 lines below that aren't debug lines or name a guest program]
+WARN  [     1565] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1602] context node=1
+  and its next line
+WARN  [     1662] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1699] context node=1
+  and its next line
+WARN  [     1759] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1796] context node=1
+  and its next line
+WARN  [     1856] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1893] context node=1
+  and its next line
+[the log's end follows]
+WARN  [     1953] queue 0x400e93c0 stops at /home/quillon/x
+DEBUG [     1954] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1955] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1956] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1957] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1958] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1959] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1960] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1961] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1962] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1963] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1964] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1965] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1966] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1967] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1968] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1969] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1970] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1971] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1972] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1973] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1974] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1975] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1976] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1977] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1978] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1979] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1980] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1981] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1982] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1983] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1984] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1985] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1986] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1987] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1988] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1989] message Some(QueryAdapter) process=0x400012c0
+INFO  [     1990] context node=1
+  and its next line
+DEBUG [     1991] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1992] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1993] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1994] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1995] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1996] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1997] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1998] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1999] message Some(QueryAdapter) process=0x400012c0

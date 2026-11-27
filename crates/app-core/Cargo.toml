@@ -54,6 +54,8 @@ guesthouse-card-check.workspace = true
 guesthouse-relay.workspace = true
 # What a machine's remote view shows and how its pairing goes, which every host shares.
 guesthouse-remote-view-core.workspace = true
+# What a bug report is, which every host shares.
+guesthouse-report-core.workspace = true
 # The host card's readings, which the daemon's sensor thread publishes and the overlay shows.
 guesthouse-sensors.workspace = true
 # Local time for the log and for snapshot dates. The standard library has no time zones.

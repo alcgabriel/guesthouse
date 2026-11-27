@@ -27,6 +27,7 @@ default-members = [
     "crates/relay",
     "crates/remote-view",
     "crates/replay",
+    "crates/report",
     "crates/sensors",
     "crates/share-windows",
     "crates/service-windows",
@@ -64,6 +65,7 @@ guesthouse-hcs = { path = "crates/hcs" }
 guesthouse-relay = { path = "crates/relay" }
 guesthouse-host-windows = { path = "crates/host-windows" }
 guesthouse-remote-view-core = { path = "crates/remote-view" }
+guesthouse-report-core = { path = "crates/report" }
 guesthouse-basics = { path = "crates/basics" }
 
 [workspace.lints.rust]
