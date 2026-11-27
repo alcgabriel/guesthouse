@@ -1,0 +1,21 @@
+{
+  "name": "Windows 11 été",
+  "cores": 8,
+  "ram_gib": 16,
+  "share": 0.5,
+  "on": true,
+  "nothing": null,
+  "empty": [],
+  "none_of_them": {},
+  "forwards": [
+    {
+      "host": 2222,
+      "guest": 22
+    },
+    {
+      "host": 8080,
+      "guest": 80
+    }
+  ],
+  "note": "a \"quote\", a back\\slash, a tab\there and a line\nend, and \u0001"
+}

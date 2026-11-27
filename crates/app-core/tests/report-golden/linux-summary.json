@@ -1,0 +1,12 @@
+{
+  "card": "NVIDIA GeForce RTX 4080",
+  "contact": "someone@example.org",
+  "description": "It went black. 画面が真っ黒になりました。",
+  "distro": "Fedora Linux 42",
+  "driver": "580.95.05",
+  "kernel": "6.15.4",
+  "kind": "crashed",
+  "machine": "windows",
+  "session": "wayland",
+  "version": "0.11.0"
+}

@@ -1,9 +1,10 @@
 //! What differs between hosts in how pairing is run, and what a host keeps out of sight.
 //!
-//! remoteman's host in a guest serves a clipboard and files itself, so on a host that has no other
-//! use for the host-wide switches for those they are turned off while a device is being let in.
-//! On a host whose own viewer depends on them (Guesthouse's on Windows) they are never touched,
-//! and that viewer's trust entry is kept out of the list of devices and out of reach of commands.
+//! remoteman's host in a guest serves a clipboard and files itself, so the host-wide switches for
+//! those are turned off while a device is being let in, and put back once its own are off. On a host
+//! whose own viewer uses that remoteman too (Guesthouse's on Windows), that viewer's clipboard and
+//! files pause while pairing is open, and its trust entry is kept out of the list of devices and out
+//! of reach of commands.
 
 use crate::ctl::{self, Words, check_fingerprint};
 
@@ -14,7 +15,7 @@ pub const HIDDEN_DEVICE: &str = "That is Guesthouse's own viewer, which cannot b
 pub struct Policy {
     /// Turn the host-wide clipboard and files off while pairing is open and a device waits, and
     /// put them back once the new device's own are off, so that a device has neither in the moment
-    /// between its being let in and being limited. Only for a host where nothing else uses them.
+    /// between its being let in and being limited.
     pub hold_host_wide: bool,
     /// The fingerprint of a viewer that is on the host's list but is not a person's device, in
     /// lower case: it is left out of the devices and no command may name it.
@@ -27,10 +28,10 @@ impl Policy {
         Policy { hold_host_wide: true, hide: None }
     }
 
-    /// A Windows host, where Guesthouse's own viewer uses the host-wide switches and has `viewer`
-    /// as its fingerprint.
+    /// A Windows host, where Guesthouse's own viewer has `viewer` as its fingerprint. The switches
+    /// are held as on Linux: the viewer's clipboard and files pause while pairing is open.
     pub fn windows(viewer: &str) -> Policy {
-        Policy { hold_host_wide: false, hide: Some(viewer.to_ascii_lowercase()) }
+        Policy { hold_host_wide: true, hide: Some(viewer.to_ascii_lowercase()) }
     }
 
     /// Whether this is the fingerprint that is kept out of sight.

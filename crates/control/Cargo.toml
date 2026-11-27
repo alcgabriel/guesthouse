@@ -8,6 +8,10 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
+# The ssh line, and reading and writing a JSON line, as every host may.
+guesthouse-basics.workspace = true
+# Which names a guest's administrator takes, as each host has them.
+guesthouse-account-core.workspace = true
 # The checks of a machine's settings that take plain values, as each host has them.
 guesthouse-settings-core.workspace = true
 # Each request and answer is a line of JSON.
@@ -15,6 +19,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The version check the hosts share.
 guesthouse-update-check.workspace = true
+# Where viewing a machine from other devices stands, in the words every host answers with.
+guesthouse-remote-view-core.workspace = true
+# What a bug report is, which every host shares.
+guesthouse-report-core.workspace = true
 
 # The console example reads and writes the console's pipe overlapped, so a read waiting on it never
 # holds up a write.

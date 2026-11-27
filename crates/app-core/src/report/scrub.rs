@@ -4,6 +4,10 @@
 //!
 //! Logs are free text, so this catches the shapes it knows and nothing more. It's a best effort, and
 //! nothing here can promise a report holds nothing personal.
+//!
+//! The Windows host scrubs with its own, in `guesthouse-report-core`, which takes out more shapes
+//! and ignores case. Which of the two every host should use is still to be decided, so this one
+//! stays as it is.
 
 use regex::Regex;
 use rustix::process::getuid;

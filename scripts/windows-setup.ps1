@@ -10,7 +10,7 @@
 #    with the Windows App Runtime beside it. With none of those the installer is built without the
 #    app, and this says so;
 # 3. gets remoteman, for a Windows guest's screen, unless -NoScreen says not to: the two release
-#    files windows\remoteman.json pins, remoteman's host's installer (remoteman-host-setup-V.exe)
+#    files crates\remote-view\remoteman.json pins, remoteman's host's installer (remoteman-host-setup-V.exe)
 #    and its Windows viewer (remoteman-viewer-windows-V.zip), downloaded from the pin's base into
 #    target\remoteman-cache\V\ (a cached file is used when its SHA-256 is the pin's, and downloaded
 #    again when it isn't), or taken from -RemotemanFrom FOLDER. Each file's SHA-256 has to be the
@@ -50,7 +50,7 @@ if (-not $Version) {
     # The Windows host's own version line, apart from the Linux host's in Cargo.toml.
     $Version = (Get-Content -Raw -LiteralPath (Join-Path $root 'windows\version.txt')).Trim()
 }
-$unpinnedWarning = "-RemotemanUnpinned: remoteman's files are NOT checked against windows\remoteman.json. Only for trying a local build of remoteman; never hand this installer to anyone."
+$unpinnedWarning = "-RemotemanUnpinned: remoteman's files are NOT checked against crates\remote-view\remoteman.json. Only for trying a local build of remoteman; never hand this installer to anyone."
 if ($RemotemanUnpinned -and -not $NoScreen) {
     # Never unchecked from the network or the cache: only a local build, named by its folder.
     if (-not $RemotemanFrom) { throw '-RemotemanUnpinned is for a local build of remoteman only: give -RemotemanFrom FOLDER with it.' }
@@ -65,10 +65,10 @@ function Invoke-Native([string]$What, [scriptblock]$Command) {
 
 function Get-Sha256([string]$Path) { (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant() }
 
-# windows\remoteman.json: the version of remoteman this installer carries, where its release files
+# crates\remote-view\remoteman.json: the version of remoteman this installer carries, where its release files
 # are, and each file's name and SHA-256.
 function Read-Pin {
-    $file = Join-Path $root 'windows\remoteman.json'
+    $file = Join-Path $root 'crates\remote-view\remoteman.json'
     $pin = Get-Content -Raw $file | ConvertFrom-Json
     foreach ($key in 'host_setup', 'viewer_zip') {
         $entry = $pin.$key
@@ -97,7 +97,7 @@ function Get-RemotemanFile($Pin, $Entry, [string]$Pattern) {
         if ($RemotemanUnpinned) {
             Write-Warning "$path is used unchecked (SHA-256 $(Get-Sha256 $path))."
         } elseif ((Get-Sha256 $path) -ne $want) {
-            throw "$path has SHA-256 $(Get-Sha256 $path), and windows\remoteman.json pins $want. Refused."
+            throw "$path has SHA-256 $(Get-Sha256 $path), and crates\remote-view\remoteman.json pins $want. Refused."
         }
         return $path
     }
@@ -109,7 +109,7 @@ function Get-RemotemanFile($Pin, $Entry, [string]$Pattern) {
             Write-Information "remoteman: $($Entry.file) from the cache, $cache." -InformationAction Continue
             return $path
         }
-        Write-Warning "The cached $path isn't what windows\remoteman.json pins; downloading it again."
+        Write-Warning "The cached $path isn't what crates\remote-view\remoteman.json pins; downloading it again."
         Remove-Item -LiteralPath $path -Force
     }
     $url = $Pin.base.TrimEnd('/') + '/' + $Entry.file
@@ -128,7 +128,7 @@ function Get-RemotemanFile($Pin, $Entry, [string]$Pattern) {
     $got = Get-Sha256 $part
     if ($got -ne $want) {
         Remove-Item -LiteralPath $part -Force
-        throw "$url has SHA-256 $got, and windows\remoteman.json pins $want. Refused: nothing of it is kept."
+        throw "$url has SHA-256 $got, and crates\remote-view\remoteman.json pins $want. Refused: nothing of it is kept."
     }
     Move-Item -LiteralPath $part $path -Force
     $path
@@ -161,7 +161,7 @@ function Add-Remoteman($Pin, [string]$To) {
     Write-Output "remoteman's viewer carries: $(($notices | ForEach-Object Name) -join ', ')."
 
     # The installer's THIRD-PARTY.md says which remoteman it carries.
-    $which = if ($RemotemanUnpinned) { 'remoteman (a trial build: NOT checked against windows\remoteman.json)' } else { "remoteman $($Pin.version)" }
+    $which = if ($RemotemanUnpinned) { 'remoteman (a trial build: NOT checked against crates\remote-view\remoteman.json)' } else { "remoteman $($Pin.version)" }
     $lines = @(
         '',
         '## remoteman in this installer',

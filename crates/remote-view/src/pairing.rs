@@ -194,6 +194,16 @@ impl Pairing {
         self.held
     }
 
+    /// Owes back `held` as well as what this already owes. For a program that sent some of a
+    /// step's commands and not the rest, and goes on from the pairing before that step: what the
+    /// step had turned off may be off now.
+    pub fn owe(&mut self, held: Option<HostWide>) {
+        let Some(more) = held else { return };
+        let had = self.held.unwrap_or(HostWide { clipboard: false, files: false });
+        self.held =
+            Some(HostWide { clipboard: had.clipboard || more.clipboard, files: had.files || more.files });
+    }
+
     /// How often to read the status now, or `None` when nothing needs it sooner than the program's
     /// own pace.
     pub fn poll_ms(&self) -> Option<Millis> {
