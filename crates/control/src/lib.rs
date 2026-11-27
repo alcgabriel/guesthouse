@@ -95,6 +95,20 @@ pub enum Request {
     /// Where a machine's viewing from other devices stands now, answered with `Share`. The app asks
     /// it every few seconds while it shows it.
     RemoteView { name: String },
+    /// Closes an open pairing at once. A device waiting is turned away. Answered with `Share`.
+    PairClose { name: String },
+    /// Lets in the device waiting to pair, whose code the person compared. Its clipboard and files
+    /// go off as soon as it's seen. Answered with `Share`.
+    PairAccept { name: String },
+    /// Turns away the device waiting to pair. Answered with `Share`.
+    PairDecline { name: String },
+    /// Allows or refuses a paired device one thing: `what` is `input` (control; off is view-only),
+    /// `clipboard`, `files`, `sound`, `mic` or `camera`. Answered with `Share`. There is no
+    /// `device_drop` on this host: remoteman's `drop` cuts whichever device leads, which may be
+    /// Guesthouse's own window.
+    DeviceAllow { name: String, fingerprint: String, what: String, on: bool },
+    /// Stops trusting a device: it's disconnected and has to pair again. Answered with `Share`.
+    DeviceRevoke { name: String, fingerprint: String },
 }
 
 /// What a machine is given at each boot, which can be changed while it's off.
@@ -611,6 +625,32 @@ mod tests {
             (&json!("share"), &json!(7792), &json!("off"))
         );
         assert_eq!(serde_json::from_value::<Answer>(answer).unwrap(), Answer::Share { info });
+    }
+
+    #[test]
+    fn pairing_and_devices_are_asked_for_with_the_other_hosts_words() {
+        for (request, json) in [
+            (Request::PairClose { name: "win".into() }, json!({"ask": "pair_close", "name": "win"})),
+            (Request::PairAccept { name: "win".into() }, json!({"ask": "pair_accept", "name": "win"})),
+            (Request::PairDecline { name: "win".into() }, json!({"ask": "pair_decline", "name": "win"})),
+            (
+                Request::DeviceAllow {
+                    name: "win".into(),
+                    fingerprint: "ab".repeat(32),
+                    what: "clipboard".into(),
+                    on: true,
+                },
+                json!({"ask": "device_allow", "name": "win", "fingerprint": "ab".repeat(32), "what": "clipboard", "on": true}),
+            ),
+            (
+                Request::DeviceRevoke { name: "win".into(), fingerprint: "ab".repeat(32) },
+                json!({"ask": "device_revoke", "name": "win", "fingerprint": "ab".repeat(32)}),
+            ),
+        ] {
+            assert_eq!(serde_json::to_value(&request).unwrap(), json);
+            assert_eq!(serde_json::from_value::<Request>(json).unwrap(), request);
+        }
+        assert!(serde_json::from_value::<Request>(json!({"ask": "device_drop", "name": "win"})).is_err());
     }
 
     #[test]

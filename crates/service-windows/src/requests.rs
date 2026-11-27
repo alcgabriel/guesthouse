@@ -19,6 +19,7 @@ use guesthouse_host_windows::record::Record;
 use guesthouse_host_windows::settings::{self as host_settings, BootSettings, GpuChoice, PrepareSettings};
 use guesthouse_host_windows::snapshots::{self, Disks};
 use guesthouse_host_windows::ssh;
+use guesthouse_remote_view_core::pairing::Event as PairingEvent;
 use guesthouse_remote_view_core::session::Sessions;
 use std::collections::BTreeMap;
 use std::fs;
@@ -143,6 +144,8 @@ pub struct Service<W: Work> {
     switching: Mutex<()>,
     /// What was last read of each running machine's remoteman, and its pairing.
     sessions: Sessions,
+    /// Each machine's pairing is driven one step at a time.
+    driving: Mutex<std::collections::HashMap<String, Arc<Mutex<()>>>>,
 }
 
 impl<W: Work> Service<W> {
@@ -188,6 +191,7 @@ impl<W: Work> Service<W> {
             cleaned: AtomicBool::new(false),
             switching: Mutex::new(()),
             sessions: Sessions::default(),
+            driving: Mutex::default(),
         });
         // Port forwards a stopped service left behind are no use to anyone, and hold their ports.
         // Listing the firewall's rules takes seconds, and the service manager is waiting for the
@@ -225,8 +229,19 @@ impl<W: Work> Service<W> {
             Request::Account { name } => self.account(&name),
             Request::Watch { name } => return self.watch(&name, connection),
             Request::ReportFiles { machine } => return self.report_files(machine, connection),
-            Request::Share { name, on, pairing, .. } => self.share(&name, on, pairing),
+            Request::Share { name, on, pairing, pairing_seconds } => {
+                self.share(&name, on, pairing, pairing_seconds)
+            }
             Request::RemoteView { name } => self.remote_view(&name),
+            Request::PairClose { name } => self.pairing_event(&name, PairingEvent::Stop),
+            Request::PairAccept { name } => self.pairing_event(&name, PairingEvent::Accept),
+            Request::PairDecline { name } => self.pairing_event(&name, PairingEvent::Decline),
+            Request::DeviceAllow { name, fingerprint, what, on } => {
+                self.device(&name, |policy| policy.device_allow(&fingerprint, &what, on))
+            }
+            Request::DeviceRevoke { name, fingerprint } => {
+                self.device(&name, |policy| policy.device_revoke(&fingerprint))
+            }
         };
         let _ = connection.send(&answer);
     }
@@ -683,12 +698,17 @@ impl<W: Work> Service<W> {
                 let (service, name, over) = (Arc::clone(&service), name.clone(), Arc::clone(&over));
                 thread::spawn(move || service.keep_remote_view(&name, &over))
             };
+            let pairer = {
+                let (service, name, over) = (Arc::clone(&service), name.clone(), Arc::clone(&over));
+                thread::spawn(move || service.keep_pairing(&name, &over))
+            };
             if let Err(error) = service.work.boot(&settings, Arc::clone(&sink), stop, ctl) {
                 sink.problem(error);
             }
             over.store(true, Ordering::SeqCst);
             let _ = forwarder.join();
             let _ = viewer.join();
+            let _ = pairer.join();
             service.view_stopped(&name);
             drop(held);
             let mut entries = service.machines.lock();
@@ -1639,6 +1659,7 @@ fn size_words(bytes: u64) -> String {
 }
 
 mod forwards;
+mod pairing;
 mod remote_view;
 
 #[cfg(test)]

@@ -9,12 +9,12 @@ use std::net::Ipv4Addr;
 
 /// Guesthouse's own viewer's certificate, beside the machine's disk.
 const VIEWER_CERTIFICATE: &[u8] = b"the viewer's certificate";
-const HOST: &str = "abababababababababababababababababababababababababababababababab";
-const PHONE: &str = "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd";
+pub(super) const HOST: &str = "abababababababababababababababababababababababababababababababab";
+pub(super) const PHONE: &str = "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd";
 const RULE: &str = "Guesthouse remote view win 7792";
 
 /// A Windows machine `name` that has been set up, with its viewer's identity beside its disk.
-fn windows_machine(setup: &Setup, name: &str) {
+pub(super) fn windows_machine(setup: &Setup, name: &str) {
     ask(&setup.service, Request::Create { machine: new_machine(setup, name) });
     let disk = setup.service.machines().store.disk(name);
     let record = Record { installed: true, screen: Some(HOST.into()), ..Record::default() };
@@ -24,27 +24,27 @@ fn windows_machine(setup: &Setup, name: &str) {
     fs::write(client.join("cert.der"), VIEWER_CERTIFICATE).unwrap();
 }
 
-fn viewer() -> String {
+pub(super) fn viewer() -> String {
     guesthouse_host_windows::screen::fingerprint(VIEWER_CERTIFICATE)
 }
 
-fn share(service: &Arc<Service<Pretend>>, name: &str, on: Option<bool>) -> Answer {
+pub(super) fn share(service: &Arc<Service<Pretend>>, name: &str, on: Option<bool>) -> Answer {
     let request = Request::Share { name: name.into(), on, pairing: None, pairing_seconds: None };
     ask(service, request).pop().unwrap()
 }
 
-fn info(answer: Answer) -> ShareInfo {
+pub(super) fn info(answer: Answer) -> ShareInfo {
     match answer {
         Answer::Share { info } => info,
         other => panic!("{other:?}"),
     }
 }
 
-fn shown(service: &Arc<Service<Pretend>>, name: &str) -> ShareInfo {
+pub(super) fn shown(service: &Arc<Service<Pretend>>, name: &str) -> ShareInfo {
     info(ask(service, Request::RemoteView { name: name.into() }).pop().unwrap())
 }
 
-fn refused(answer: Answer) -> String {
+pub(super) fn refused(answer: Answer) -> String {
     match answer {
         Answer::Refused { reason } => reason,
         other => panic!("{other:?}"),
@@ -69,7 +69,7 @@ fn says(service: &Arc<Service<Pretend>>, rest: &str) {
 }
 
 /// Waits for the keeper to have left the machine's view as `state`.
-fn wait_view(service: &Arc<Service<Pretend>>, name: &str, state: ShareState) {
+pub(super) fn wait_view(service: &Arc<Service<Pretend>>, name: &str, state: ShareState) {
     for _ in 0..400 {
         if service.machines().lock()[name].view.state == state {
             return;
@@ -137,17 +137,8 @@ fn it_is_refused_for_an_ubuntu_guest_one_without_a_network_and_one_not_set_up_an
 
     // Off is never refused, as a machine turned on before its network went off must be turnable off.
     assert_eq!(info(share(service, "win", Some(false))).state, ShareState::Off);
-    assert_eq!(
-        refused(
-            ask(
-                service,
-                Request::Share { name: "win".into(), on: None, pairing: Some(true), pairing_seconds: None }
-            )
-            .pop()
-            .unwrap()
-        ),
-        crate::requests::remote_view::NO_PAIRING_YET
-    );
+    let pairing = Request::Share { name: "win".into(), on: None, pairing: Some(true), pairing_seconds: None };
+    assert_eq!(refused(ask(service, pairing).pop().unwrap()), crate::requests::pairing::NOT_ON);
     assert!(matches!(share(service, "nothing", Some(true)), Answer::Refused { .. }));
 }
 
@@ -323,7 +314,7 @@ fn rules_left_behind_are_swept_at_start_and_neither_sweep_touches_the_others() {
 }
 
 #[test]
-fn what_remoteman_says_is_read_when_asked_with_guesthouses_own_viewer_kept_out_of_sight() {
+fn what_remoteman_says_is_read_as_it_starts_and_when_asked_with_guesthouses_own_viewer_kept_out_of_sight() {
     let setup = setup("view-status", Pretend::default());
     let service = &setup.service;
     windows_machine(&setup, "win");
@@ -331,7 +322,14 @@ fn what_remoteman_says_is_read_when_asked_with_guesthouses_own_viewer_kept_out_o
     says(service, "");
     start_and_run(service, "win");
     wait_view(service, "win", ShareState::Listening);
-    assert!(service.work.remoteman.asked().is_empty(), "nothing is read until the app asks");
+    // Read once by the service as the guest first answers, which closes a pairing found open, and
+    // then only when the app asks, while nothing is pairing.
+    for _ in 0..100 {
+        if !service.work.remoteman.asked().is_empty() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
 
     let idle = shown(service, "win");
     assert_eq!((idle.state, idle.port, idle.reason.as_deref()), (ShareState::Listening, Some(7792), None));
@@ -381,7 +379,8 @@ fn a_device_found_waiting_is_shown_and_nothing_it_said_reaches_a_log() {
     wait_view(service, "win", ShareState::Listening);
 
     let shown = shown(service, "win");
-    let waiting = shown.pending.unwrap();
+    let waiting =
+        shown.pending.clone().unwrap_or_else(|| panic!("{shown:?} {:?}", service.work.remoteman.asked()));
     assert_eq!((waiting.name.as_str(), waiting.code.as_str()), ("Zoë's phone", "123 456"));
     assert_eq!(
         service.work.remoteman.asked(),
@@ -420,8 +419,9 @@ fn a_guest_that_doesnt_answer_is_said_and_the_app_is_answered_anyway() {
     share(service, "win", Some(true));
     start_and_run(service, "win");
     wait_view(service, "win", ShareState::Listening);
-    // A guest whose report is too old to know the channel: remoteman's answer isn't JSON.
-    *service.work.remoteman.status.lock().unwrap() = String::new();
+    // A guest whose remoteman isn't up: what ctl says isn't a status.
+    *service.work.remoteman.status.lock().unwrap() = "Error: no host is answering".into();
+    thread::sleep(Duration::from_millis(2_100));
     let shown = shown(service, "win");
     assert_eq!(shown.state, ShareState::Listening);
     assert!(shown.reason.is_some());

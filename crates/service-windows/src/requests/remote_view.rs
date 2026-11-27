@@ -33,7 +33,7 @@ use guesthouse_remote_view_core::announce::{Announcement, Announcer};
 use guesthouse_remote_view_core::pairing::{Event, Millis};
 use guesthouse_remote_view_core::policy::Policy;
 use guesthouse_remote_view_core::session::{Driver, StepEvent};
-use guesthouse_remote_view_core::share::ShareState;
+use guesthouse_remote_view_core::share::{ShareState, pairing_seconds};
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::Path;
@@ -51,8 +51,6 @@ const POLL: Duration = Duration::from_millis(100);
 const READ_WAIT: Duration = Duration::from_secs(3);
 
 pub const NOT_WINDOWS: &str = "Only a Windows machine can be viewed from other devices.";
-/// What `share` says when asked to pair, which a later service does.
-pub const NO_PAIRING_YET: &str = "This version of the service can't pair a device yet.";
 
 /// What a machine's remote view is opened with on this PC.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,7 +120,7 @@ fn standing(state: ShareState, reason: Option<String>) -> ViewStanding {
     ViewStanding { state, reason }
 }
 
-fn now_ms() -> Millis {
+pub(super) fn now_ms() -> Millis {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_millis() as Millis)
 }
 
@@ -145,17 +143,28 @@ fn refusal(name: &str, record: &Record, network: bool) -> Option<String> {
 /// The pairing policy for the machine whose disk is `disk`: Guesthouse's own viewer, by its
 /// fingerprint beside the disk, is kept out of sight. A machine that never had a viewer made has
 /// none to hide.
-fn policy(disk: &Path) -> Policy {
+pub(super) fn policy(disk: &Path) -> Policy {
     let certificate = state_beside(disk).join("client").join("cert.der");
     fs::read(certificate).map_or_else(|_| Policy::linux(), |der| Policy::windows(&screen::fingerprint(&der)))
 }
 
 impl<W: Work> Service<W> {
-    /// Turns the machine's remote view on or off, and answers where it stands.
-    pub(super) fn share(self: &Arc<Self>, asked: &str, on: Option<bool>, pairing: Option<bool>) -> Answer {
+    /// Turns the machine's remote view on or off, opens or closes pairing, and answers where it
+    /// stands.
+    pub(super) fn share(
+        self: &Arc<Self>,
+        asked: &str,
+        on: Option<bool>,
+        pairing: Option<bool>,
+        seconds: Option<u32>,
+    ) -> Answer {
         let Some(name) = self.machines.find(asked) else { return no_machine(asked) };
-        if pairing == Some(true) {
-            return Answer::Refused { reason: NO_PAIRING_YET.into() };
+        let seconds = match pairing_seconds(seconds.map(u64::from)) {
+            Ok(seconds) => seconds,
+            Err(reason) => return Answer::Refused { reason },
+        };
+        if pairing == Some(true) && on == Some(false) {
+            return Answer::Refused { reason: "Pairing needs viewing from other devices on.".into() };
         }
         if let Some(on) = on
             && let Err(reason) = self.turn(&name, on)
@@ -165,14 +174,45 @@ impl<W: Work> Service<W> {
         if on == Some(false) {
             self.end_pairing(&name);
         }
+        match pairing {
+            Some(true) => {
+                if let Err(reason) = self.open_pairing(&name, seconds) {
+                    return Answer::Refused { reason };
+                }
+            }
+            // Closing a pairing that isn't open is no failure here.
+            Some(false) => {
+                if let Some(ctl) = self.running_ctl(&name) {
+                    self.drive(&name, &ctl, |driver| driver.step(StepEvent::Plain(Event::Stop)));
+                }
+            }
+            None => {}
+        }
         self.remote_view(&name)
+    }
+
+    /// The way into the machine's guest, while it runs.
+    pub(super) fn running_ctl(&self, name: &str) -> Option<GuestCtl> {
+        self.machines.lock().get(name).and_then(|entry| entry.ctl.clone())
+    }
+
+    /// Runs `work` with the shared driver for the running machine `name`, one at a time per
+    /// machine, as each step reads and writes the machine's pairing whole.
+    pub(super) fn drive<R>(&self, name: &str, ctl: &GuestCtl, work: impl FnOnce(&Driver) -> R) -> R {
+        let one = {
+            let mut driving = self.driving.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            Arc::clone(driving.entry(name.to_owned()).or_default())
+        };
+        let _one_at_a_time = one.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let policy = policy(&self.machines.store.disk(name));
+        work(&Driver { sessions: &self.sessions, machine: name, policy: &policy, guest: ctl, now: &now_ms })
     }
 
     /// A pairing that is open, a device that waits, or the host-wide clipboard and files held off
     /// for either, end with the switch: pairing closes, the device is turned away, and what was held
     /// is given back. Nothing that would cut Guesthouse's own window is sent.
     fn end_pairing(&self, name: &str) {
-        let Some(ctl) = self.machines.lock().get(name).and_then(|entry| entry.ctl.clone()) else { return };
+        let Some(ctl) = self.running_ctl(name) else { return };
         let busy = self.sessions.with(name, |session| {
             session.pairing.as_ref().is_some_and(|pairing| {
                 let view = pairing.view();
@@ -180,15 +220,7 @@ impl<W: Work> Service<W> {
             })
         });
         if busy {
-            let policy = policy(&self.machines.store.disk(name));
-            let driver = Driver {
-                sessions: &self.sessions,
-                machine: name,
-                policy: &policy,
-                guest: &ctl,
-                now: &now_ms,
-            };
-            driver.step(StepEvent::Plain(Event::SwitchOff));
+            self.drive(name, &ctl, |driver| driver.step(StepEvent::Plain(Event::SwitchOff)));
         }
     }
 
@@ -276,26 +308,29 @@ impl<W: Work> Service<W> {
         let (done, finished) = mpsc::channel();
         let (service, name, policy) = (Arc::clone(self), name.to_owned(), policy.clone());
         thread::spawn(move || {
-            let began = Instant::now();
-            let driver = Driver {
-                sessions: &service.sessions,
-                machine: &name,
-                policy: &policy,
-                guest: &ctl,
-                now: &now_ms,
-            };
-            driver.step(StepEvent::Read);
-            let answered = service.sessions.with(&name, |session| {
-                session.busy = false;
-                let reading = session.reading.as_ref().filter(|_| session.reason.is_none())?;
-                let hidden =
-                    reading.devices.iter().filter(|device| policy.hides(&device.fingerprint)).count();
-                Some((reading.devices.len(), hidden))
-            });
-            service.told_answered(&name, answered, began.elapsed());
+            service.read_now(&name, &ctl, &policy, false);
+            service.sessions.with(&name, |session| session.busy = false);
             let _ = done.send(());
         });
         let _ = finished.recv_timeout(READ_WAIT);
+    }
+
+    /// Reads remoteman's host through the shared driver, and lets pairing's clock go on after it
+    /// when `tick`, then says in the service's log if whether it answers has changed.
+    pub(super) fn read_now(&self, name: &str, ctl: &GuestCtl, policy: &Policy, tick: bool) {
+        let began = Instant::now();
+        self.drive(name, ctl, |driver| {
+            driver.step(StepEvent::Read);
+            if tick {
+                driver.step(StepEvent::Plain(Event::Tick));
+            }
+        });
+        let answered = self.sessions.with(name, |session| {
+            let reading = session.reading.as_ref().filter(|_| session.reason.is_none())?;
+            let hidden = reading.devices.iter().filter(|device| policy.hides(&device.fingerprint)).count();
+            Some((reading.devices.len(), hidden))
+        });
+        self.told_answered(name, answered, began.elapsed());
     }
 
     /// Writes in the service's log when the guest's remoteman first answers this run, and when that

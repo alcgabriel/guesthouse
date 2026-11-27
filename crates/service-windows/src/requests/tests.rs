@@ -33,6 +33,68 @@ struct Pretend {
 struct Remoteman {
     status: Mutex<String>,
     asked: Mutex<Vec<String>>,
+    model: Mutex<Model>,
+}
+
+/// What remoteman's host holds, as far as pairing goes. It answers `status` from this when no
+/// answer is set, and the commands change it as remoteman's would.
+#[derive(Default)]
+struct Model {
+    pairing: bool,
+    /// A device waiting: its name, fingerprint and code.
+    pending: Option<(String, String, String)>,
+    /// The devices trusted: fingerprint, name, and their own clipboard and files.
+    devices: Vec<(String, String, bool, bool)>,
+    /// The host-wide clipboard and files.
+    clipboard: bool,
+    files: bool,
+    /// The name of the device that leads.
+    client: Option<String>,
+}
+
+impl Model {
+    fn status(&self) -> String {
+        let device = |(fingerprint, name, clipboard, files): &(String, String, bool, bool)| {
+            serde_json::json!({"fingerprint": fingerprint, "name": name, "connected": self.client.as_ref() == Some(name),
+                "permissions": {"clipboard": clipboard, "files": files}})
+        };
+        serde_json::json!({
+            "pairing": self.pairing,
+            "pending": self.pending.as_ref().map(|(name, fingerprint, code)| serde_json::json!({"name": name, "fingerprint": fingerprint, "code": code, "seconds": 55})),
+            "client": self.client.as_ref().map(|name| serde_json::json!({"name": name})),
+            "devices": self.devices.iter().map(device).collect::<Vec<_>>(),
+            "clipboard": self.clipboard,
+            "files": self.files,
+        })
+        .to_string()
+    }
+
+    fn run(&mut self, words: &[String]) {
+        let words: Vec<&str> = words.iter().map(String::as_str).collect();
+        match words.as_slice() {
+            ["pair", "on"] => self.pairing = true,
+            ["pair", "off"] => (self.pairing, self.pending) = (false, None),
+            ["pair", "accept"] => {
+                if let Some((name, fingerprint, _)) = self.pending.take() {
+                    self.devices.push((fingerprint, name, true, true));
+                }
+            }
+            ["pair", "decline"] => self.pending = None,
+            ["allow", "clipboard", on] => self.clipboard = *on == "on",
+            ["allow", "files", on] => self.files = *on == "on",
+            ["device", fingerprint, "allow", what, on] => {
+                for device in self.devices.iter_mut().filter(|device| device.0 == *fingerprint) {
+                    match *what {
+                        "clipboard" => device.2 = *on == "on",
+                        "files" => device.3 = *on == "on",
+                        _ => {}
+                    }
+                }
+            }
+            ["revoke", fingerprint] => self.devices.retain(|device| device.0 != *fingerprint),
+            _ => {}
+        }
+    }
 }
 
 impl Remoteman {
@@ -53,8 +115,13 @@ impl LineWriter for Port {
         let line = String::from_utf8_lossy(line).trim_end().to_owned();
         let Some(Ok((id, words))) = read_request(&line) else { return Ok(()) };
         self.remoteman.asked.lock().unwrap().push(words.join(" "));
-        let said =
-            if words == ["status"] { self.remoteman.status.lock().unwrap().clone() } else { "ok".into() };
+        let said = if words == ["status"] {
+            let set = self.remoteman.status.lock().unwrap().clone();
+            if set.is_empty() { self.remoteman.model.lock().unwrap().status() } else { set }
+        } else {
+            self.remoteman.model.lock().unwrap().run(&words);
+            "ok".into()
+        };
         for part in answer_lines(id, 0, said.as_bytes()).unwrap() {
             self.ctl.take_line(&part);
         }
@@ -1090,6 +1157,7 @@ fn a_file_that_is_a_link_is_not_followed() {
 }
 
 mod network;
+mod pairing;
 mod places;
 mod remote_view;
 use network::FakeNet;
