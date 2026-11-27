@@ -101,6 +101,40 @@ fn progress_from_a_step_reaches_the_state() {
 }
 
 #[test]
+fn a_download_s_many_reports_are_told_at_most_every_tenth_of_a_second_and_its_end_always() {
+    let folder = dir("pace");
+    let seen = Mutex::new(Vec::new());
+    let mut changed = |info: &InstallInfo| seen.lock().unwrap().push(info.clone());
+    // A thousand chunks within 50 ms of a clock that moves 50 microseconds a chunk.
+    let tick = std::sync::atomic::AtomicU64::new(0);
+    let clock = || tick.fetch_add(1, Ordering::Relaxed) / 20;
+    let mut runner = runner(&folder, &seen, &mut changed, &clock);
+    let mut steps = Scripted::new(vec![]);
+    steps.report = (1..=1000)
+        .map(|done| Report::Bytes(done, Some(1000)))
+        .collect();
+    runner.run(&mut steps);
+    let seen = seen.lock().unwrap();
+    let during = seen
+        .iter()
+        .filter(|i| {
+            let fraction = i.steps[0].progress.fraction;
+            fraction > 0.0 && fraction < 1.0
+        })
+        .count();
+    assert!(
+        during <= 2,
+        "{during} changes told for 1000 chunks in 50 ms"
+    );
+    assert!(
+        seen.iter().any(|i| i.steps[0].progress.fraction == 1.0),
+        "the end is told"
+    );
+    drop(seen);
+    let _ = std::fs::remove_dir_all(folder);
+}
+
+#[test]
 fn a_failure_stops_the_run_with_its_code_and_choices_and_try_again_goes_on_from_there() {
     let folder = dir("fail");
     let seen = Mutex::new(Vec::new());

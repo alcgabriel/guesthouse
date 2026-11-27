@@ -53,6 +53,11 @@ pub enum Report {
 /// A step's way to say how far it has got. It answers whether to go on.
 pub type Progress<'a> = &'a mut dyn FnMut(Report) -> bool;
 
+/// Progress is saved and told at most this often. A download reports every chunk it gets, some
+/// thousand a second, and each told change goes to the app as an event and to disk as the state.
+/// The step's end is always told, as the run records it after the step.
+pub const PROGRESS_EVERY_MS: u64 = 100;
+
 pub trait Steps {
     /// Does one step. `info` is the state as it is, for what a step needs of earlier ones (the
     /// source of the installer, the guest).
@@ -102,13 +107,18 @@ impl Runner<'_> {
             let cancel = self.cancel.clone();
             let clock = self.clock;
             let (info, folder, changed) = (&mut self.info, &self.folder, &mut *self.changed);
+            let mut told_at: Option<u64> = None;
             let mut progress = |report: Report| {
+                let now = clock();
                 match report {
-                    Report::Bytes(done, total) => info.progress(step, done, total, clock()),
+                    Report::Bytes(done, total) => info.progress(step, done, total, now),
                     Report::Fraction(fraction) => info.progress_fraction(step, fraction),
                 }
-                let _ = state::save(folder, info);
-                changed(info);
+                if told_at.is_none_or(|at| now.saturating_sub(at) >= PROGRESS_EVERY_MS) {
+                    told_at = Some(now);
+                    let _ = state::save(folder, info);
+                    changed(info);
+                }
                 !cancel.load(Ordering::Relaxed)
             };
             match steps.run(step, &snapshot, &mut progress) {
