@@ -1,0 +1,30 @@
+[package]
+name = "guesthouse-pvg-host"
+description = "One process per VM on a macOS host: owns the paravirtualized graphics device and serves its registers to QEMU over a socket."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+# The serving loop, for the program and for a daemon that takes its place.
+[lib]
+name = "guesthouse_pvg_host"
+path = "src/lib.rs"
+
+[[bin]]
+name = "guesthouse-pvg-host"
+path = "src/main.rs"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# The device, and the guard on what the guest says to it.
+guesthouse-pvg-sys.workspace = true
+# recvmsg for the files QEMU hands over, mmap for the guest's memory in them, and poll.
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+guesthouse-pvg-sys.workspace = true
+libc = "0.2"
+
+[lints]
+workspace = true
