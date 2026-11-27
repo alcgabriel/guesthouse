@@ -232,11 +232,7 @@ fn size_of_folder(folder: &Path) -> u64 {
 }
 
 /// A name Ubuntu takes for a user, and that the install script reads back whole.
-fn valid_user(name: &str) -> bool {
-    let mut characters = name.chars();
-    characters.next().is_some_and(|first| first.is_ascii_lowercase())
-        && characters.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
-}
+use guesthouse_account_core::windows_host::valid_ubuntu_user as valid_user;
 
 #[cfg(test)]
 mod tests {

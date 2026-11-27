@@ -261,15 +261,7 @@ pub fn shares_refusal(shares: &[Share]) -> Option<String> {
 
 /// Whether `name` can be a guest's administrator in both systems: Ubuntu's rule for a user, which
 /// Windows takes too, and not one of Windows' own accounts, which are disabled.
-pub fn valid_user(name: &str) -> bool {
-    const LONGEST: usize = 20;
-    const WINDOWS_OWN: [&str; 4] = ["administrator", "defaultaccount", "guest", "wdagutilityaccount"];
-    let mut characters = name.chars();
-    name.len() <= LONGEST
-        && characters.next().is_some_and(|first| first.is_ascii_lowercase())
-        && characters.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
-        && !WINDOWS_OWN.contains(&name)
-}
+pub use guesthouse_account_core::windows_host::valid_user;
 
 /// The `ssh` line that reaches an Ubuntu guest through the port the service listens on, on this PC's
 /// loopback, which needs no network in the guest.

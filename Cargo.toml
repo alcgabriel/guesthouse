@@ -6,6 +6,7 @@ members = ["crates/*", "tools/card-check", "tools/hcs-boot"]
 exclude = ["vendor/windows-reactor", "vendor/windows-rs"]
 # The app needs GTK's development files, which nothing else here does. Build it with `-p guesthouse-app`.
 default-members = [
+    "crates/account",
     "crates/app-core",
     "crates/backend",
     "crates/backend-intel",
@@ -63,6 +64,7 @@ guesthouse-hcs = { path = "crates/hcs" }
 guesthouse-relay = { path = "crates/relay" }
 guesthouse-host-windows = { path = "crates/host-windows" }
 guesthouse-remote-view-core = { path = "crates/remote-view" }
+guesthouse-account-core = { path = "crates/account" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
