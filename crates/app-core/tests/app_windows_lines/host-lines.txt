@@ -1,0 +1,15 @@
+focus false {"id":"65814","n":0,"t":"focus"}
+minimize false {"id":"65814","n":1,"t":"minimize"}
+restore false {"id":"65814","n":2,"t":"restore"}
+close false {"id":"65814","n":41,"t":"close"}
+resize false {"h":-1,"id":"65814","n":18446744073709551615,"t":"resize","w":1280}
+launch false {"app":"Accessories/Notepad","n":0,"t":"launch"}
+launch false {"app":"A \"quoted\" name\\ with a\nline and \u0001 été","n":1,"t":"launch"}
+launch false {"args":"","n":2,"path":"C:\\Program Files\\App\\app.exe","t":"launch"}
+launch false {"args":"--open \"D:\\a b.txt\"\t2","n":41,"path":"C:\\Tools\\t.exe","t":"launch"}
+apps true {"icons":true,"n":18446744073709551615,"t":"apps"}
+apps true {"icons":false,"n":0,"t":"apps"}
+icon true {"id":"65814","n":1,"size":48,"t":"icon"}
+layout false {"n":2,"t":"layout"}
+scale false {"n":41,"percent":150,"t":"scale"}
+screen false {"ceiling":{"h":4320,"w":7680},"floor":{"h":720,"w":1280},"n":18446744073709551615,"t":"screen"}

@@ -8,6 +8,8 @@ crates/app-core/tests/answers-golden/** -text
 crates/host-windows/tests/answers-golden/** -text
 # What a recipe and lean Windows show and keep, compared byte for byte.
 crates/app-core/tests/recipes/** -text
+# App windows' lines between the host and the guest's helper, compared byte for byte.
+crates/app-core/tests/app_windows_lines/** -text
 # The Linux host's answer-file templates and zone table, which the shared answers crate holds as text, keep
 # their line endings on any checkout.
 guest/autounattend.xml text eol=lf
