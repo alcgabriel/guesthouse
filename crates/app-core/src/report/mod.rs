@@ -20,6 +20,9 @@ pub mod send;
 pub mod summary;
 pub(crate) mod trim;
 
+#[cfg(test)]
+mod golden;
+
 pub use bundle::{Bundle, Words, write_bundle};
 pub use collect::{Collection, Request, chosen_machine, collect, latest_machine};
 pub use kind::ProblemKind;

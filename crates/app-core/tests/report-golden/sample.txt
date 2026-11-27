@@ -1,0 +1,12 @@
+10:00:01 app: could not read /home/quillon/.config/guesthouse/app.json
+10:00:02 quillon-desk task: start quillon-games on marrowbox (MARROWBOX.local), not Marrowboxes
+10:00:03 disk /home/quillon/.local/share/guesthouse/machines/quillon-games/disk.qcow2 and /home/quillonx/y
+10:00:04 {"machine": "w11"} and "tv" at /store/machines/tv/vars.fd, a tv show on windows, /machines/windows/x and w11-old
+10:00:05 uuid 3f2a9c1e-77b0-4d5e-9a1c-0b2c3d4e5f60 {4F2A1C3E-9B7D-4E6A-8C1F-2D3E4F5A6B7C} fixed dcc079ae-60ba-4d07-847c-3493609c0870
+10:00:06 mac 52:54:00:12:ab:CD and 00-15-5D-12-34-56, not 00:15:5d:aa:bb:cc:dd, time 12:30:45, pci 0000:01:00.0
+10:00:07 mail quillon@example.org and Quill.Smith+gh@mail.example.co.uk., unit getty@tty1.service
+10:00:08 sid S-1-5-21-1004336348-1177238915-682003330-1001 and S-1-5-32-544 and S-1-5-18
+10:00:09 C:\Users\quillon\Downloads\x.iso and C:\\Users\\quillon\\y and c:/users/quillon/Desktop
+10:00:10 guesthouse-quillon-games-com1 and \\.\pipe\guesthouse-w11 and guesthouse-W11
+10:00:11 Quillon's PC, QUILLON, quillons and marrowboxes, al calls, HOME=/home/quillon
+10:00:12 guest GuestAccount on DESKTOP-GUEST said: Pat signed in to "work-box"

@@ -1,0 +1,276 @@
+DEBUG [        0] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        1] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        2] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        3] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        4] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        5] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        6] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        7] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        8] message Some(QueryAdapter) process=0x400012c0
+DEBUG [        9] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       10] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       11] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       12] message Some(QueryAdapter) process=0x400012c0
+WARN  [       13] queue 0x400e93c0 stops at /home/quillon/x
+DEBUG [       14] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       15] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       16] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       17] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       18] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       19] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       20] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       21] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       22] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       23] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       24] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       25] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       26] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       27] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       28] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       29] message Some(QueryAdapter) process=0x400012c0
+DEBUG [       30] message Some(QueryAdapter) process=0x400012c0
+[111729 bytes left out here, all but the 53 lines below that aren't debug lines or name a guest program]
+INFO  [      147] context node=1
+  and its next line
+WARN  [      207] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [      244] context node=1
+  and its next line
+WARN  [      304] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [      341] context node=1
+  and its next line
+WARN  [      401] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [      438] context node=1
+  and its next line
+WARN  [      498] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [      535] context node=1
+  and its next line
+WARN  [      595] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [      632] context node=1
+  and its next line
+WARN  [      692] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [      729] context node=1
+  and its next line
+WARN  [      789] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [      826] context node=1
+  and its next line
+WARN  [      886] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [      923] context node=1
+  and its next line
+WARN  [      983] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1020] context node=1
+  and its next line
+WARN  [     1080] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1117] context node=1
+  and its next line
+WARN  [     1177] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1214] context node=1
+  and its next line
+WARN  [     1274] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1311] context node=1
+  and its next line
+WARN  [     1371] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1408] context node=1
+  and its next line
+WARN  [     1468] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1505] context node=1
+  and its next line
+WARN  [     1565] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1602] context node=1
+  and its next line
+WARN  [     1662] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1699] context node=1
+  and its next line
+WARN  [     1759] queue 0x400e93c0 stops at /home/quillon/x
+INFO  [     1796] context node=1
+  and its next line
+[the log's end follows]
+DEBUG [     1812] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1813] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1814] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1815] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1816] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1817] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1818] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1819] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1820] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1821] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1822] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1823] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1824] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1825] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1826] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1827] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1828] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1829] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1830] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1831] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1832] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1833] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1834] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1835] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1836] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1837] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1838] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1839] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1840] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1841] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1842] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1843] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1844] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1845] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1846] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1847] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1848] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1849] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1850] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1851] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1852] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1853] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1854] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1855] message Some(QueryAdapter) process=0x400012c0
+WARN  [     1856] queue 0x400e93c0 stops at /home/quillon/x
+DEBUG [     1857] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1858] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1859] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1860] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1861] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1862] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1863] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1864] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1865] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1866] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1867] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1868] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1869] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1870] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1871] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1872] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1873] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1874] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1875] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1876] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1877] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1878] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1879] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1880] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1881] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1882] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1883] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1884] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1885] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1886] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1887] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1888] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1889] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1890] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1891] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1892] message Some(QueryAdapter) process=0x400012c0
+INFO  [     1893] context node=1
+  and its next line
+DEBUG [     1894] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1895] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1896] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1897] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1898] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1899] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1900] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1901] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1902] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1903] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1904] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1905] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1906] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1907] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1908] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1909] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1910] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1911] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1912] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1913] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1914] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1915] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1916] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1917] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1918] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1919] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1920] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1921] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1922] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1923] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1924] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1925] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1926] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1927] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1928] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1929] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1930] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1931] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1932] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1933] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1934] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1935] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1936] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1937] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1938] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1939] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1940] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1941] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1942] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1943] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1944] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1945] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1946] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1947] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1948] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1949] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1950] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1951] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1952] message Some(QueryAdapter) process=0x400012c0
+WARN  [     1953] queue 0x400e93c0 stops at /home/quillon/x
+DEBUG [     1954] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1955] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1956] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1957] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1958] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1959] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1960] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1961] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1962] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1963] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1964] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1965] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1966] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1967] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1968] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1969] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1970] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1971] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1972] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1973] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1974] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1975] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1976] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1977] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1978] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1979] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1980] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1981] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1982] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1983] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1984] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1985] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1986] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1987] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1988] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1989] message Some(QueryAdapter) process=0x400012c0
+INFO  [     1990] context node=1
+  and its next line
+DEBUG [     1991] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1992] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1993] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1994] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1995] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1996] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1997] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1998] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1999] message Some(QueryAdapter) process=0x400012c0
