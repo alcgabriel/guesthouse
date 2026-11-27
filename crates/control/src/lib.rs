@@ -19,7 +19,7 @@ pub use events::{Event, State};
 pub use guesthouse_remote_view_core::share::ShareInfo;
 
 use serde::{Deserialize, Serialize};
-use std::io::{self, BufRead, Read, Write};
+use std::io::{self, BufRead};
 use std::path::PathBuf;
 
 /// The Windows host's version: the service's, the app's and the installer's, from
@@ -472,25 +472,14 @@ fn on() -> bool {
     true
 }
 
-/// Reads one line of JSON, at most `REQUEST_LIMIT` long, as a `T`.
+/// Reads one line of JSON, at most `REQUEST_LIMIT` long, as a `T`. Every host's JSON lines are in
+/// `guesthouse_basics::json_lines`.
 pub fn read_line<T: for<'de> Deserialize<'de>>(reader: &mut impl BufRead) -> io::Result<Option<T>> {
-    let mut line = String::new();
-    let read = reader.by_ref().take(REQUEST_LIMIT as u64).read_line(&mut line)?;
-    if read == 0 {
-        return Ok(None);
-    }
-    serde_json::from_str(line.trim_end())
-        .map(Some)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    guesthouse_basics::json_lines::read_line_within(reader, REQUEST_LIMIT)
 }
 
 /// Writes `value` as one line of JSON, and flushes it so the other end has it at once.
-pub fn write_line<T: Serialize>(writer: &mut impl Write, value: &T) -> io::Result<()> {
-    let mut line = serde_json::to_string(value).map_err(io::Error::other)?;
-    line.push('\n');
-    writer.write_all(line.as_bytes())?;
-    writer.flush()
-}
+pub use guesthouse_basics::json_lines::write_line;
 
 /// The IPv4 address in one of a guest's report lines, other than loopback. A Windows guest writes
 /// `address: 172.29.1.2`; an Ubuntu guest writes what `ip -o address` says, such as

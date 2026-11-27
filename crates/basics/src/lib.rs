@@ -6,6 +6,7 @@
 
 pub mod clock;
 pub mod json_file;
+pub mod json_lines;
 pub mod random;
 pub mod text;
 pub mod words;
