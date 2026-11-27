@@ -375,8 +375,18 @@ fn a_device_found_waiting_is_shown_and_nothing_it_said_reaches_a_log() {
     let shown = shown(service, "win");
     let waiting = shown.pending.unwrap();
     assert_eq!((waiting.name.as_str(), waiting.code.as_str()), ("Zoë's phone", "123 456"));
+    assert_eq!(
+        service.work.remoteman.asked(),
+        ["status", "allow clipboard off", "allow files off", "status"],
+        "met with the host-wide switches held off, as on Linux"
+    );
+
+    // Switched off, the device is turned away and the switches come back, and nothing cuts
+    // Guesthouse's own window. The guest has no device waiting once it's declined.
+    says(service, "");
+    assert_eq!(info(share(service, "win", Some(false))).state, ShareState::Off);
     let asked = service.work.remoteman.asked();
-    assert_eq!(asked[0], "status");
+    assert_eq!(asked[4..], ["pair decline", "allow clipboard on", "allow files on", "status"]);
     for line in &asked {
         assert!(!line.starts_with("sharing") && line != "drop" && !line.contains(&viewer()), "{line}");
     }

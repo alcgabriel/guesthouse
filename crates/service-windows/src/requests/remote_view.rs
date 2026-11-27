@@ -19,7 +19,8 @@
 use super::{Service, Work, no_machine};
 use crate::machines::{ViewStanding, write_switch};
 use crate::store::Held;
-use guesthouse_control::{Answer, Event};
+use guesthouse_control::Answer;
+use guesthouse_control::Event as MachineEvent;
 use guesthouse_host_windows::guest_ctl::GuestCtl;
 use guesthouse_host_windows::machine::Guest;
 use guesthouse_host_windows::network::{
@@ -29,7 +30,7 @@ use guesthouse_host_windows::record::Record;
 use guesthouse_host_windows::screen::{self, state_beside};
 use guesthouse_relay::{Lan, LanSettings, ShareState as RelayState};
 use guesthouse_remote_view_core::announce::{Announcement, Announcer};
-use guesthouse_remote_view_core::pairing::Millis;
+use guesthouse_remote_view_core::pairing::{Event, Millis};
 use guesthouse_remote_view_core::policy::Policy;
 use guesthouse_remote_view_core::session::{Driver, StepEvent};
 use guesthouse_remote_view_core::share::ShareState;
@@ -161,7 +162,34 @@ impl<W: Work> Service<W> {
         {
             return Answer::Refused { reason };
         }
+        if on == Some(false) {
+            self.end_pairing(&name);
+        }
         self.remote_view(&name)
+    }
+
+    /// A pairing that is open, a device that waits, or the host-wide clipboard and files held off
+    /// for either, end with the switch: pairing closes, the device is turned away, and what was held
+    /// is given back. Nothing that would cut Guesthouse's own window is sent.
+    fn end_pairing(&self, name: &str) {
+        let Some(ctl) = self.machines.lock().get(name).and_then(|entry| entry.ctl.clone()) else { return };
+        let busy = self.sessions.with(name, |session| {
+            session.pairing.as_ref().is_some_and(|pairing| {
+                let view = pairing.view();
+                view.open || view.pending.is_some() || pairing.held().is_some()
+            })
+        });
+        if busy {
+            let policy = policy(&self.machines.store.disk(name));
+            let driver = Driver {
+                sessions: &self.sessions,
+                machine: name,
+                policy: &policy,
+                guest: &ctl,
+                now: &now_ms,
+            };
+            driver.step(StepEvent::Plain(Event::SwitchOff));
+        }
     }
 
     /// Turns the switch, giving it a port the first time: one no other machine has, which a relay
@@ -198,7 +226,7 @@ impl<W: Work> Service<W> {
             } else {
                 "Viewing from other devices is turned off."
             };
-            self.machines.tell(name, Event::Note(said.into()));
+            self.machines.tell(name, MachineEvent::Note(said.into()));
         }
         Ok(())
     }
@@ -360,7 +388,9 @@ impl<W: Work> Service<W> {
         let failed = |reason: String| {
             self.machines.tell(
                 name,
-                Event::Problem(format!("Other devices can't view it at this PC's port {port}: {reason}")),
+                MachineEvent::Problem(format!(
+                    "Other devices can't view it at this PC's port {port}: {reason}"
+                )),
             );
             Made { wanted, rule: None, relay: None, standing: standing(ShareState::Failed, Some(reason)) }
         };
@@ -381,7 +411,7 @@ impl<W: Work> Service<W> {
             Ok(relay) => {
                 self.machines.tell(
                     name,
-                    Event::Note(format!(
+                    MachineEvent::Note(format!(
                         "Other devices on this PC's network can view it at port {port}, passed on to the guest, {}.",
                         wanted.guest
                     )),
@@ -412,14 +442,14 @@ impl<W: Work> Service<W> {
             if let Err(error) = self.work.network().delete_rule(&rule) {
                 self.machines.tell(
                     name,
-                    Event::Problem(format!(
+                    MachineEvent::Problem(format!(
                         "The firewall rule for its remote view couldn't be deleted: {error}"
                     )),
                 );
             }
         }
         if was_open {
-            self.machines.tell(name, Event::Note("Other devices can't view it now.".into()));
+            self.machines.tell(name, MachineEvent::Note("Other devices can't view it now.".into()));
         }
     }
 
@@ -444,7 +474,7 @@ impl<W: Work> Service<W> {
                 );
                 eprintln!("{text}");
                 if let Some(name) = self.machines.find(name) {
-                    self.machines.tell(&name, Event::Note(text));
+                    self.machines.tell(&name, MachineEvent::Note(text));
                 }
             }
         }
