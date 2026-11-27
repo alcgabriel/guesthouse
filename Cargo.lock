@@ -932,6 +932,7 @@ dependencies = [
  "guesthouse-carry-core",
  "guesthouse-catalog-core",
  "guesthouse-daemon",
+ "guesthouse-idle-core",
  "guesthouse-jail",
  "guesthouse-relay",
  "guesthouse-remote-view-core",
@@ -1155,6 +1156,13 @@ dependencies = [
  "if-addrs",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "guesthouse-idle-core"
+version = "0.11.0"
+dependencies = [
+ "guesthouse-basics",
 ]
 
 [[package]]

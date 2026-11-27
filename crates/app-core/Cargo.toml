@@ -66,6 +66,8 @@ guesthouse-relay.workspace = true
 guesthouse-remote-view-core.workspace = true
 # What a bug report is, which every host shares.
 guesthouse-report-core.workspace = true
+# Whether a running machine looks idle: the verdict, the reading of the guest's answer and the words.
+guesthouse-idle-core.workspace = true
 # What a guest says on its serial port and how it is read, as each host has them.
 guesthouse-serial-words-core.workspace = true
 # The checks of a machine's settings that take plain values, as each host has them.

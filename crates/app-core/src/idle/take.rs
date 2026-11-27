@@ -1,7 +1,7 @@
 //! Takes a reading of a running machine: the host reads the VM's QEMU, and for a Windows guest the
 //! agent runs the idle script. Nothing here changes anything in the machine or its settings.
 
-use super::parse::parse_report;
+use super::parse_report;
 use super::vcpu::{LEAST_WINDOW, first_look};
 use super::{GuestKind, IdleReading, Unread};
 use crate::agent::guest_script;
