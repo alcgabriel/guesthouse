@@ -1,17 +1,18 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Builds guesthouse-pvg-host, the graphics process (crates/pvg-host), for macOS on Apple silicon,
-# and puts it in the folder that mac/nightly.sh takes as its helpers (--helpers), beside the QEMU
-# that qemu/mac/build.sh makes: target/mac-helpers/helpers unless told otherwise. Run from anywhere.
+# and puts it in the helpers folder that mac/nightly.sh --helpers takes, beside the QEMU that
+# qemu/mac/build.sh makes: target/mac-helpers unless told otherwise. Run from anywhere. In the app
+# it is signed with the hardened runtime and no entitlements, which is all it needs.
 #
-#   sh mac/build-pvg-host.sh [--out FOLDER]
+#   sh mac/build-pvg-host.sh [--helpers FOLDER]
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
-out=$here/../target/mac-helpers/helpers
+out=$here/../target/mac-helpers
 while [ $# -gt 0 ]; do
     case $1 in
-        --out) out=${2:?--out wants a folder}; shift 2 ;;
-        -h | --help) sed -n 3,7p "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --helpers) out=${2:?--helpers wants a folder}; shift 2 ;;
+        -h | --help) sed -n 3,8p "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "build-pvg-host.sh: unknown argument $1" >&2; exit 2 ;;
     esac
 done

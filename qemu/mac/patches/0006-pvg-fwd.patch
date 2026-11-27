@@ -17,6 +17,11 @@ memory backend.
 
 On a macOS host the other process is Guesthouse's graphics process,
 guesthouse-pvg-host, which keeps the framework's device behind a guard.
+
+Its author's note: this was written with Claude. It carries no
+Signed-off-by, as a Signed-off-by is the DCO statement for QEMU and
+QEMU's docs/devel/code-provenance.rst declines code written with AI
+tools. None of this goes to QEMU.
 ---
  hw/display/Kconfig      |   5 +
  hw/display/meson.build  |   4 +
