@@ -36,13 +36,8 @@ impl Share {
 }
 
 /// What the folder in a machine's settings at `slot` is called, to HCS and in the guest: `shared`
-/// for the first, as when there could be only one, then `shared2` and on.
-pub fn share_name(slot: usize) -> String {
-    match slot {
-        0 => "shared".to_owned(),
-        _ => format!("shared{}", slot + 1),
-    }
-}
+/// for the first, then `shared2` and on.
+pub use guesthouse_guest_names_core::windows_host::share_name;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrepareSettings {
