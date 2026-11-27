@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-/// One device and the socket that speaks for it towards the loopback port.
+/// One device and the socket that speaks for it towards the guest's port.
 pub(crate) struct Client {
     peer: SocketAddr,
     pub(crate) upstream: UdpSocket,
@@ -122,7 +122,7 @@ fn start(shared: &Arc<Shared>, peer: SocketAddr) -> io::Result<Arc<Client>> {
     Ok(client)
 }
 
-/// The thread of one device: answers from the loopback port go back to it. When the device has been
+/// The thread of one device: answers from the guest's port go back to it. When the device has been
 /// quiet for too long it takes itself out of the table and ends.
 ///
 /// A datagram that arrives from the device in the moment between this thread deciding to end and
@@ -148,6 +148,8 @@ fn carry_out(shared: &Arc<Shared>, client: &Arc<Client>) {
                 }
             }
             Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            // Windows says here that an earlier send was refused, as `ConnectionReset`, when nothing
+            // listens on the guest's port. The socket still works, and the next datagram may find it.
             Err(_) => shared.stats.error(),
         }
     }

@@ -27,7 +27,7 @@ const THREAD_STACK: usize = 128 * 1024;
 pub struct Config {
     /// The address and port that other devices send to. Port 0 takes any free one.
     pub listen: SocketAddr,
-    /// The loopback port the datagrams go to.
+    /// The guest's port the datagrams go to: a loopback port, or an address of the guest's own.
     pub upstream: SocketAddr,
     /// A device that has sent nothing for this long is dropped, and gets a new socket if it comes back.
     pub idle_timeout: Duration,
@@ -125,6 +125,8 @@ fn carry_in(shared: &Arc<Shared>) {
                 continue;
             }
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            // Windows says here, as `ConnectionReset`, that an answer to a device that has gone was
+            // refused. The socket still works for every other device.
             Err(_) => {
                 shared.stats.error();
                 continue;

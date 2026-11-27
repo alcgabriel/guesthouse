@@ -1,4 +1,5 @@
-//! The relay on loopback: a stand-in for QEMU's forward on one side and devices on the other.
+//! The relay on loopback: a stand-in for QEMU's forward on one side and devices on the other. These run
+//! on Linux and on Windows, and bind nothing but loopback.
 
 use guesthouse_relay::{Config, Relay};
 use std::net::{SocketAddr, UdpSocket};
@@ -158,7 +159,7 @@ fn a_burst_for_one_device_arrives_whole_and_in_order() {
     let (relay, forward) = relay_with(|_| {});
     let device = socket();
     // The whole burst is on its way before the test reads any of it, and the default buffer would not hold it.
-    rustix::net::sockopt::set_socket_recv_buffer_size(&device, 4 << 20).unwrap();
+    socket2::SockRef::from(&device).set_recv_buffer_size(4 << 20).unwrap();
     device.send_to(b"start", relay.local_addr()).unwrap();
     let (_, source) = receive(&forward);
     const BURST: u32 = 139;
@@ -212,4 +213,42 @@ fn a_port_in_use_is_an_error_and_not_a_panic() {
     let taken = socket();
     let config = Config::new(taken.local_addr().unwrap(), "127.0.0.1:9".parse().unwrap());
     assert!(Relay::start(config).is_err());
+}
+
+#[test]
+fn a_guest_port_nobody_listens_on_is_counted_and_the_device_carries_on_once_it_does() {
+    // The port is free between the two binds, so another test can take it. Then it starts again.
+    for _ in 0..10 {
+        if refused_then_found() {
+            return;
+        }
+    }
+    panic!("the freed port was taken every time");
+}
+
+/// False when the guest's port was taken by something else before the stand-in got it back.
+fn refused_then_found() -> bool {
+    let gone = socket();
+    let upstream = gone.local_addr().unwrap();
+    drop(gone);
+    let relay = Relay::start(Config::new("127.0.0.1:0".parse().unwrap(), upstream)).unwrap();
+    let device = socket();
+    device.send_to(b"lost", relay.local_addr()).unwrap();
+    if cfg!(windows) {
+        // Windows hands the refusal to the device's socket as `ConnectionReset` on its next receive.
+        wait_until("the refusal to be counted", || relay.counters().errors == 1);
+    } else {
+        // Linux tells an unconnected socket nothing of it.
+        wait_until("the send to be counted", || relay.counters().up_packets == 1);
+        assert_eq!(relay.counters().errors, 0);
+    }
+    let Ok(forward) = UdpSocket::bind(upstream) else { return false };
+    forward.set_read_timeout(Some(WAIT)).unwrap();
+    device.send_to(b"found", relay.local_addr()).unwrap();
+    let (got, from) = receive(&forward);
+    assert_eq!(got, b"found");
+    forward.send_to(b"video", from).unwrap();
+    assert_eq!(receive(&device).0, b"video");
+    assert_eq!(relay.counters().clients_started, 1, "the device kept its socket");
+    true
 }

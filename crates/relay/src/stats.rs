@@ -1,16 +1,17 @@
 //! What a relay counts, and how it is read back.
 
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::time::Duration;
 
-/// Totals since the relay was started.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// Totals since the relay was started. A [`RelayStatus`](crate::RelayStatus) carries them as they are.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Counters {
     /// Datagrams from devices that were passed on, and their bytes.
     pub up_packets: u64,
     pub up_bytes: u64,
-    /// Datagrams from the loopback port that were passed on to a device, and their bytes.
+    /// Datagrams from the guest's port that were passed on to a device, and their bytes.
     pub down_packets: u64,
     pub down_bytes: u64,
     /// Devices that got a socket of their own, and how many of them have gone since.
@@ -18,7 +19,8 @@ pub struct Counters {
     pub clients_expired: u64,
     /// Datagrams from a new device that were dropped because the relay already had as many as it allows.
     pub refused_full: u64,
-    /// Sends and receives that failed. A loopback port nobody listens on shows up here.
+    /// Sends and receives that failed. On Windows that includes each datagram to a guest's port nobody
+    /// listens on, as the device's socket's next receive fails with it. Linux says nothing of those.
     pub errors: u64,
 }
 
