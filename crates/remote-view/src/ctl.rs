@@ -47,6 +47,13 @@ pub fn pair_open() -> Words {
     words(&["pair", "on"])
 }
 
+/// `pair on SECONDS`: the same, for a host that keeps pairing's time itself and closes it when the
+/// time is up. remoteman's own host takes `pair on` with no time; a host that keeps the time takes
+/// these words, or its own for them.
+pub fn pair_open_for(seconds: u64) -> Words {
+    words(&["pair", "on", &seconds.to_string()])
+}
+
 /// `pair off`: closes pairing. A device that is waiting is declined by it.
 pub fn pair_close() -> Words {
     words(&["pair", "off"])
