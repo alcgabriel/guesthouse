@@ -51,6 +51,7 @@ impl RealSteps<'_> {
                     &self.setup.id,
                     &ubuntu::mac_time_zone(),
                     self.setup.desktop,
+                    crate::keyboard_layout::mac_layout(),
                 ),
             ),
             (ubuntu::ACCOUNT_FILE, ubuntu::account_file(account, secret)),

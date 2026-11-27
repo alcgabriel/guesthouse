@@ -351,6 +351,9 @@ impl Agent {
             }
             launch.scale = scale;
         }
+        if launch.kind == launch::LINUX {
+            launch.keyboard = crate::keyboard_layout::mac_layout().map(|xkb| xkb.text());
+        }
         let run = self.begin(id, Event::Start).map_err(|refused| refused.0)?;
         self.remember_rmhost(id, rmhost);
         if let Err(reason) = self.spawn(id, run, &launch, qemu, pvg_host) {

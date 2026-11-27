@@ -306,6 +306,8 @@ fn launch_for(folder: &Path, id: &str, settings: &Settings) -> Option<Launch> {
         kind: settings.kind.clone(),
         // The app says Sharp or Standard when it starts the machine.
         scale: DEFAULT_SCALE,
+        // The Mac's, when the machine starts (agent).
+        keyboard: None,
         host_socket: run_dir.join("host.sock"),
         host_control: run_dir.join("control.sock"),
         cores: settings.cores,

@@ -9,6 +9,7 @@ pub mod create;
 pub mod driver_version;
 pub mod input;
 pub mod install;
+pub mod keyboard_layout;
 pub mod keys;
 pub mod launch;
 pub mod link;

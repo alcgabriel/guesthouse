@@ -29,6 +29,10 @@ pub const NETWORK_DEVICE: &str = "virtio-net-pci,netdev=net,romfile=";
 /// The firmware file (QEMU's `-fw_cfg`) a Linux guest reads its scale from: `1` or `2`.
 pub const SCALE_FILE: &str = "opt/com.ruxn.guesthouse/scale";
 
+/// The firmware file a Linux guest reads its keyboard's layout from, as XKB names it: the layout,
+/// and the variant after a space (`de`, `ch fr`). Only when the Mac's is known.
+pub const KEYBOARD_FILE: &str = "opt/com.ruxn.guesthouse/keyboard";
+
 /// The scales a guest is started with: 2 for Sharp, 1 for Standard.
 pub const SCALES: [u32; 2] = [1, 2];
 
@@ -86,6 +90,9 @@ pub struct Launch {
     /// The scale a Linux guest draws its desktop at, from the app's Sharp or Standard when it
     /// starts the machine (`SCALES`). Not passed to other guests.
     pub scale: u32,
+    /// The Mac's keyboard layout for a Linux guest, as XKB names it (`KEYBOARD_FILE`), when it is
+    /// known: set when the machine starts. Not passed to other guests.
+    pub keyboard: Option<String>,
     pub cores: u32,
     pub memory_mb: u64,
     pub disk: PathBuf,
@@ -211,6 +218,12 @@ pub fn qemu_args(launch: &Launch) -> Vec<String> {
             "-fw_cfg",
             &format!("name={SCALE_FILE},string={}", launch.scale),
         ]);
+        if let Some(keyboard) = &launch.keyboard {
+            add(&[
+                "-fw_cfg",
+                &format!("name={KEYBOARD_FILE},string={keyboard}"),
+            ]);
+        }
     }
     add(&[
         "-device",
@@ -332,6 +345,7 @@ mod tests {
         Launch {
             kind: "windows".into(),
             scale: DEFAULT_SCALE,
+            keyboard: None,
             cores: 4,
             memory_mb: 6144,
             disk: "/m/win/win.img".into(),
@@ -533,6 +547,34 @@ mod tests {
             }
             assert_eq!(got.len(), want.len());
         }
+    }
+
+    #[test]
+    fn a_linux_machine_is_told_the_mac_s_keyboard_after_its_scale_and_other_kinds_are_not() {
+        let linux = Launch {
+            kind: LINUX.into(),
+            keyboard: Some("ch fr".into()),
+            ..guarded()
+        };
+        let args = qemu_args(&linux);
+        let scale = args
+            .iter()
+            .position(|arg| arg.contains("guesthouse/scale"))
+            .unwrap();
+        assert_eq!(args[scale + 1], "-fw_cfg");
+        assert_eq!(
+            args[scale + 2],
+            "name=opt/com.ruxn.guesthouse/keyboard,string=ch fr"
+        );
+        let windows = Launch {
+            keyboard: Some("de".into()),
+            ..guarded()
+        };
+        assert!(
+            !qemu_args(&windows)
+                .iter()
+                .any(|arg| arg.contains("keyboard"))
+        );
     }
 
     #[test]

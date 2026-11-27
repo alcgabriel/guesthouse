@@ -232,9 +232,23 @@ impl Desktop {
 /// The autoinstall answers: no questions, the largest disk, an account named after the Mac's user
 /// whose password is set at the end from the answer disc's account file (`ACCOUNT_FILE`), so the
 /// first console sign-in uses it, the clock in `time_zone` (the Mac's, `mac_time_zone`), the
-/// driver's service from the answer disc, the desktop the driver package is to install, and what
-/// is said on the serial port when it ends.
-pub fn user_data(account: &str, hostname: &str, time_zone: &str, desktop: Desktop) -> String {
+/// driver's service from the answer disc, the desktop the driver package is to install, the
+/// keyboard's layout (the Mac's, `keyboard_layout::mac_layout`, else `us`) for the console and
+/// the sign-in screen, and what is said on the serial port when it ends.
+pub fn user_data(
+    account: &str,
+    hostname: &str,
+    time_zone: &str,
+    desktop: Desktop,
+    keyboard: Option<crate::keyboard_layout::Xkb>,
+) -> String {
+    let keyboard = keyboard.map_or_else(
+        || "    layout: us\n".to_string(),
+        |xkb| match xkb.variant {
+            "" => format!("    layout: {}\n", xkb.layout),
+            variant => format!("    layout: {}\n    variant: {variant}\n", xkb.layout),
+        },
+    );
     let desktop_lines = match desktop {
         Desktop::Weston => String::new(),
         chosen => format!(
@@ -248,8 +262,7 @@ autoinstall:
   version: 1
   locale: C.UTF-8
   keyboard:
-    layout: us
-  storage:
+{keyboard}  storage:
     layout:
       name: direct
       match:
