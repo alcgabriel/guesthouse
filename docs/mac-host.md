@@ -8,7 +8,7 @@ It is a preview, and some of it isn't here yet. Here is what the app needs that 
 
 The graphics process and the QEMU it needs are here now: `crates/pvg-host`, `crates/pvg-sys` and `qemu/mac/`, below. They aren't in the app yet. The app finds them, and QEMU and rmhost, through its Settings, an environment variable (`GUESTHOUSE_QEMU`, `GUESTHOUSE_PVG_QEMU`, `GUESTHOUSE_PVG_HOST`, `GUESTHOUSE_RMHOST`), or inside its own bundle.
 
-The graphics process uses three classes of Apple's ParavirtualizedGraphics framework that Apple doesn't declare: `PGMemoryMapDescriptor`, `PGIOSurfaceHostDeviceDescriptor` and `PGIOSurfaceHostDevice`, declared as QEMU's patch that lists them declares them. It also calls `reset` on the last, which no header or patch names. None of that is a public interface, so a macOS update can break it. Guesthouse isn't affiliated with Apple, and the app isn't distributed through the App Store.
+The graphics process uses three classes of Apple's ParavirtualizedGraphics framework that Apple doesn't declare: `PGMemoryMapDescriptor`, `PGIOSurfaceHostDeviceDescriptor` and `PGIOSurfaceHostDevice`. The two mapper classes are declared as QEMU's own `apple-gfx-mmio.m` declares them, and the memory map, `PGMemoryMapDescriptor` and the property that takes it, as the patch on QEMU's list adds it. It also calls `reset` on `PGIOSurfaceHostDevice`, which no header or patch names. None of that is a public interface, so a macOS update can break it. Guesthouse isn't affiliated with Apple, and the app isn't distributed through the App Store.
 
 ## How the pieces fit
 
@@ -29,7 +29,7 @@ sh qemu/mac/build.sh
 sh mac/build-pvg-host.sh
 ```
 
-That leaves QEMU, the libraries it needs and the graphics process in `target/mac-helpers/helpers/`, and QEMU's firmware and licences in `target/mac-helpers/qemu/`. [qemu/mac/README.md](../qemu/mac/README.md) says what the patches are and what isn't done yet.
+That leaves QEMU, the libraries it needs, its firmware and licences, and the graphics process in `target/mac-helpers/`, laid out for `mac/nightly.sh --helpers` (below). [qemu/mac/README.md](../qemu/mac/README.md) says what the patches are.
 
 The graphics process and the guard are s3k000's work.
 
@@ -57,4 +57,4 @@ A nightly is the release's major and minor with the date as the patch (`0.1.2026
 - `Resources/` goes to `Contents/Resources`: QEMU's firmware (`edk2-aarch64-code.fd`, `edk2-aarch64-vars.fd`) and the graphics device's option ROM (`pvgfb.rom`) in `Resources/qemu`, which a QEMU in the app finds beside itself;
 - `Frameworks/` goes to `Contents/Frameworks`: libraries QEMU needs.
 
-`sh mac/rmhost/build.sh --helpers FOLDER` puts `rmhost` in such a folder. QEMU needs the hypervisor entitlement and has its file; what the graphics process needs is not known yet.
+`sh mac/rmhost/build.sh --helpers FOLDER` puts `rmhost` in such a folder. QEMU needs the hypervisor entitlement and has its file; the graphics process needs no entitlement, so it has none. `sh qemu/mac/build.sh` and `sh mac/build-pvg-host.sh` put QEMU, its libraries and firmware, and the graphics process in such a folder too.
