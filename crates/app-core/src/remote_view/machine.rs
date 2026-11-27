@@ -29,7 +29,7 @@ use guesthouse_remote_view_core::encoder_for;
 use guesthouse_remote_view_core::install::{self, Check, INSTALLED, Pin};
 use guesthouse_remote_view_core::pairing::{Event, HostWide, Millis};
 use guesthouse_remote_view_core::policy::Policy;
-use guesthouse_remote_view_core::session::{Driver, Guest, Sessions, StepEvent};
+use guesthouse_remote_view_core::session::{Driver, Guest, Sessions, StepEvent, Unanswered};
 use guesthouse_remote_view_core::share::{ShareInfo, ShareState, pairing_seconds};
 use guesthouse_remote_view_core::status::{Reply, parse_reply};
 use guesthouse_remote_view_core::switch::{SWITCH_FILE, Switch};
@@ -392,8 +392,10 @@ struct AgentGuest<'a> {
 }
 
 impl Guest for AgentGuest<'_> {
-    fn ctl(&self, words: &Words) -> String {
-        run_ctl(self.context, self.machine, self.slot, words)
+    /// The agent gives nothing for a guest that did not answer, which reads as the host saying
+    /// nothing, as it always has.
+    fn ctl(&self, words: &Words) -> std::result::Result<String, Unanswered> {
+        Ok(run_ctl(self.context, self.machine, self.slot, words))
     }
 
     fn log(&self, line: &str) {
