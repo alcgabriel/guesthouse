@@ -231,6 +231,24 @@ if ($fingerprint) {
 # whether anything listens on its port, so the host sees how it starts while it does: what it wrote
 # to the guest's disk is lost when the machine is stopped at once.
 $watchSeconds = 180
+# Lines of remoteman's host that name a person's device or a file it sent are left out: they would
+# reach the machine's log and its bug reports. Each is known by its message, which tracing writes
+# before the fields that name the device.
+function Test-NamesDevice([string]$Line) {
+    $messages = @(
+        ': client name=',
+        'this computer is locked: the device is asked for the password',
+        'this computer was locked: unlocked for a paired device',
+        'a wrong password for unlocking this computer',
+        'a device came while sharing is off: turned away',
+        "a device's permission changed by the owner",
+        'a file from the device',
+        'a new device: asking on the desktop',
+        'the owner answered'
+    )
+    foreach ($message in $messages) { if ($Line.Contains($message)) { return $true } }
+    return $false
+}
 $logs = @{ (Join-Path $state 'host.log') = 0; (Join-Path $state 'service.log') = 0 }
 foreach ($log in @($logs.Keys)) {
     if (Test-Path -LiteralPath $log) { $logs[$log] = @(Get-Content -LiteralPath $log).Count }
@@ -240,7 +258,9 @@ for ($second = 0; $second -lt $watchSeconds; $second += 5) {
         if (-not (Test-Path -LiteralPath $log)) { continue }
         $lines = @(Get-Content -LiteralPath $log)
         $name = Split-Path -Leaf $log
-        foreach ($line in $lines | Select-Object -Skip $logs[$log]) { Send-Line "screen: $name $line" }
+        foreach ($line in $lines | Select-Object -Skip $logs[$log]) {
+            if (-not (Test-NamesDevice $line)) { Send-Line "screen: $name $line" }
+        }
         $logs[$log] = $lines.Count
     }
     if ($second % 30 -eq 0) {
