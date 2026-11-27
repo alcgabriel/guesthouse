@@ -7,8 +7,23 @@
 //! The list is text, one device to a line: its fingerprint, a space, its name. The installer
 //! refuses a line that is not that and a list with nothing in it, and writes fingerprints in lower
 //! case, so this does the same.
+//!
+//! The list the guest has now is read off its disk while the machine is off and its disk is on the
+//! host, as remoteman's host keeps it: it reads its file only when it starts and writes it again at
+//! each pairing, rename and revoke. So a revoked device is gone from it, and stays gone, as the list
+//! given is only ever made from that file and never from the copy given at an earlier boot.
 
 use crate::ctl::{NOT_A_FINGERPRINT, check_fingerprint};
+use std::io::Read;
+use std::path::Path;
+
+/// remoteman's host's own trust list in a Windows guest, from the root of its Windows volume.
+pub const GUEST_TRUST_FILE: &str = r"ProgramData\remoteman\host\host\trusted";
+/// The most of the guest's list that is read: some hundreds of devices, far more than anyone pairs.
+/// Past it, only the whole lines before it are kept.
+pub const MOST_LIST_BYTES: u64 = 64 * 1024;
+/// A byte order mark, which remoteman never writes but an editor might.
+const BYTE_ORDER_MARK: char = '\u{feff}';
 
 /// The name the viewer's own line has, which the other lines in a list never take.
 pub const VIEWER_NAME: &str = "Guesthouse";
@@ -56,6 +71,38 @@ pub fn merge_trust(viewer: &str, current: Option<&str>) -> Result<String, String
         list.push('\n');
     }
     Ok(list)
+}
+
+/// The guest's list in the file at `path`, `None` when it has none or it can't be read, which leaves
+/// the viewer alone on the list given, as before devices could be paired. A name that isn't UTF-8 is
+/// kept as well as it reads, rather than losing its device.
+pub fn read_list(path: &Path) -> Option<String> {
+    let mut bytes = Vec::new();
+    std::fs::File::open(path).ok()?.take(MOST_LIST_BYTES + 1).read_to_end(&mut bytes).ok()?;
+    if bytes.len() as u64 > MOST_LIST_BYTES {
+        bytes.truncate(MOST_LIST_BYTES as usize);
+        let whole = bytes.iter().rposition(|&byte| byte == b'\n').map_or(0, |last| last + 1);
+        bytes.truncate(whole);
+    }
+    let text = String::from_utf8_lossy(&bytes);
+    Some(text.strip_prefix(BYTE_ORDER_MARK).unwrap_or(&text).to_string())
+}
+
+/// What the host gives a Windows guest about whom to trust, in its screen folder.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Given {
+    /// The viewer's own line, as the whole list was before devices could be paired, which decides
+    /// whether the installer runs again. Being the same bytes, a guest installed before keeps the
+    /// note of its install.
+    pub viewer: String,
+    /// The list the installer is given when it runs: the viewer, then every device the guest has.
+    pub trusted: String,
+}
+
+/// The lists for a guest whose Windows volume is at `root`, with the guest's own list read there.
+pub fn given(viewer: &str, root: &Path) -> Result<Given, String> {
+    let current = read_list(&root.join(GUEST_TRUST_FILE));
+    Ok(Given { viewer: crate::trust_list(viewer), trusted: merge_trust(viewer, current.as_deref())? })
 }
 
 #[cfg(test)]

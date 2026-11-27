@@ -1,0 +1,123 @@
+== service.log (970 bytes)
+10:00:01 app: could not read /home/<user>/.config/guesthouse/app.json
+10:00:02 <user>-desk task: start <user>-games on <host> (<host>.local), not Marrowboxes
+10:00:03 disk /home/<user>/.local/share/guesthouse/machines/<user>-games/disk.qcow2 and /home/quillonx/y
+10:00:04 {"machine": "machine2"} and "machine3" at /store/machines/machine3/vars.fd, a tv show on windows, /machines/machine4/x and w11-old
+10:00:05 uuid <uuid> {<uuid>} fixed dcc079ae-60ba-4d07-847c-3493609c0870
+10:00:06 mac <mac> and <mac>, not 00:15:5d:aa:bb:cc:dd, time 12:30:45, pci 0000:01:00.0
+10:00:07 mail <email> and <email>., unit <email>
+10:00:08 sid <sid> and S-1-5-32-544 and S-1-5-18
+10:00:09 ~\Downloads\x.iso and ~\\y and ~/Desktop
+10:00:10 guesthouse-<user>-games-com1 and \\.\pipe\guesthouse-machine2 and guesthouse-machine2
+10:00:11 <user>'s PC, <user>, quillons and marrowboxes, al calls, HOME=/home/<user>
+10:00:12 guest GuestAccount on DESKTOP-GUEST said: Pat signed in to "machine5"
+== windows.txt (69 bytes)
+ProductName: Windows 11 Pro
+DisplayVersion: 24H2
+CurrentBuild: 26100
+== _user_-games.guesthouse.json (24 bytes)
+{"name": "<user>-games"}== snapshots/index.json (2 bytes)
+{}== etc/passwd (1 bytes)
+x== a_b.txt (1 bytes)
+1== a_b.txt-2 (1 bytes)
+2== long.log (4004 bytes)
+[15184 bytes left out at the start]
+DEBUG [      238] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      239] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      240] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      241] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      242] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      243] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      244] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      245] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      246] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      247] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      248] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      249] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      250] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      251] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      252] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      253] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      254] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      255] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      256] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      257] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      258] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      259] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      260] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      261] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      262] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      263] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      264] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      265] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      266] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      267] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      268] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      269] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      270] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      271] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      272] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      273] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      274] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      275] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      276] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      277] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      278] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      279] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      280] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      281] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      282] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      283] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      284] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      285] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      286] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      287] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      288] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      289] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      290] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      291] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      292] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      293] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      294] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      295] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      296] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      297] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      298] message Some(QueryAdapter) process=0x400012c0
+DEBUG [      299] message Some(QueryAdapter) process=0x400012c0
+== description.txt (46 bytes)
+<user>-games went black for <email> on <host>
+== summary.json (277 bytes)
+{
+  "card": "NVIDIA GeForce RTX 4080",
+  "contact": "quillon on the Discord",
+  "description": "<user>-games went black for <email> on <host>",
+  "host": "windows",
+  "kind": "crashed",
+  "machine": "windows",
+  "os": "Windows 11 Pro 24H2 build 26100",
+  "version": "0.13.0"
+}
+== manifest.txt (731 bytes)
+A Guesthouse bug report from a Windows host. It goes to the developer, is read by the developer and their automation tools, and is deleted after 30 days.
+The user name, host name and home folder were taken out of its files where they were found. That's a best effort on free-form logs, not a promise.
+
+Files:
+  service.log (970 bytes)
+  windows.txt (69 bytes)
+  _user_-games.guesthouse.json (24 bytes)
+  snapshots/index.json (2 bytes)
+  etc/passwd (1 bytes)
+  a_b.txt (1 bytes)
+  a_b.txt-2 (1 bytes)
+  long.log (4004 bytes)
+  description.txt (46 bytes)
+  summary.json (277 bytes)
+  manifest.txt
+
+Not in it:
+  summary.json: That name is the report's own, so the file is left out.
+  crashes.txt: wevtutil failed for <user> on <host>
+== missing summary.json: That name is the report's own, so the file is left out.
+== missing crashes.txt: wevtutil failed for <user> on <host>
+== header
+eyJjYXJkIjoiTlZJRElBIEdlRm9yY2UgUlRYIDQwODAiLCJjb250YWN0IjoicXVpbGxvbiBvbiB0aGUgRGlzY29yZCIsImRlc2NyaXB0aW9uIjoiPHVzZXI-LWdhbWVzIHdlbnQgYmxhY2sgZm9yIDxlbWFpbD4gb24gPGhvc3Q-IiwiaG9zdCI6IndpbmRvd3MiLCJraW5kIjoiY3Jhc2hlZCIsIm1hY2hpbmUiOiJ3aW5kb3dzIiwib3MiOiJXaW5kb3dzIDExIFBybyAyNEgyIGJ1aWxkIDI2MTAwIiwidmVyc2lvbiI6IjAuMTMuMCJ9

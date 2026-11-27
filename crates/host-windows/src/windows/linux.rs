@@ -232,11 +232,7 @@ fn size_of_folder(folder: &Path) -> u64 {
 }
 
 /// A name Ubuntu takes for a user, and that the install script reads back whole.
-fn valid_user(name: &str) -> bool {
-    let mut characters = name.chars();
-    characters.next().is_some_and(|first| first.is_ascii_lowercase())
-        && characters.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
-}
+use guesthouse_account_core::windows_host::valid_ubuntu_user as valid_user;
 
 #[cfg(test)]
 mod tests {
@@ -250,6 +246,18 @@ mod tests {
         assert!(!valid_user("2a"));
         assert!(!valid_user("a b"));
         assert!(!valid_user(""));
+    }
+
+    /// Every edge of the rule as it is: no length limit and no reserved names here, a small letter
+    /// first, then small letters, digits, dashes and underscores.
+    #[test]
+    fn a_user_name_at_each_edge() {
+        for name in ["a", "z", "a0", "a-", "a_", "root", "administrator", &"x".repeat(100)] {
+            assert!(valid_user(name), "{name:?}");
+        }
+        for name in ["_a", "-a", "0a", "A", "aB", "a.b", "é", "a\n"] {
+            assert!(!valid_user(name), "{name:?}");
+        }
     }
 
     #[test]

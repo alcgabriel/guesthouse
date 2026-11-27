@@ -1,0 +1,11 @@
+[package]
+name = "guesthouse-catalog-core"
+description = "Where a guest's images come from, as data: each image's address, name, SHA-256 and size, and the rule that picks one from a published checksum list. Nothing here calls the system or the network."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

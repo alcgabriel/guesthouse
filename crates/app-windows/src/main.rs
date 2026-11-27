@@ -7,7 +7,8 @@
 //! It's WinUI 3 through Microsoft's windows-reactor: `app.rs` is the app's state and what changes
 //! it, `window.rs` what's shown, `bridge.rs` the calls to the service, `screen.rs` remoteman's
 //! viewer, `console.rs` a machine's own screen in Windows' Remote Desktop control, `report.rs` a bug
-//! report's making and sending, and `system.rs` the rest of what's asked of Windows.
+//! report's making and sending, `log.rs` a log's lines, `pace.rs` how often the window is told
+//! things, `remote_view.rs` what the Remote View group shows and asks, and `system.rs` the rest of what's asked of Windows.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
@@ -17,6 +18,12 @@ mod app;
 mod bridge;
 #[cfg(windows)]
 mod console;
+#[cfg(any(windows, test))]
+mod log;
+#[cfg(any(windows, test))]
+mod pace;
+#[cfg(any(windows, test))]
+mod remote_view;
 #[cfg(windows)]
 mod report;
 #[cfg(windows)]
@@ -45,7 +52,11 @@ fn main() {
         let _ = std::fs::write(path, format!("{info}\n"));
     }));
     let start = app::Start::new();
-    if let Err(error) = windows_reactor::App::run_component::<app::Main>(start) {
+    let ran = windows_reactor::App::run_component::<app::Main>(start);
+    // Nobody is left to answer a device that comes to pair. Only what the service's machines had
+    // open is noted, so a preview sends nothing.
+    bridge::close_pairing_left_open();
+    if let Err(error) = ran {
         let _ = std::fs::write(system::panic_file(), format!("the window couldn't open: {error}\n"));
         std::process::exit(1);
     }

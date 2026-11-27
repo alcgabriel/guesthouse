@@ -891,6 +891,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "guesthouse-account-core"
+version = "0.11.0"
+
+[[package]]
 name = "guesthouse-app"
 version = "0.11.0"
 dependencies = [
@@ -915,14 +919,20 @@ dependencies = [
 name = "guesthouse-app-core"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-account-core",
  "guesthouse-backend-intel",
  "guesthouse-backend-nvidia",
+ "guesthouse-basics",
  "guesthouse-card-check",
+ "guesthouse-carry-core",
+ "guesthouse-catalog-core",
  "guesthouse-daemon",
  "guesthouse-jail",
  "guesthouse-relay",
  "guesthouse-remote-view-core",
+ "guesthouse-report-core",
  "guesthouse-sensors",
+ "guesthouse-settings-core",
  "guesthouse-state-core",
  "guesthouse-update-check",
  "jiff",
@@ -940,8 +950,12 @@ dependencies = [
 name = "guesthouse-app-windows"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-basics",
  "guesthouse-control",
+ "guesthouse-relay",
+ "guesthouse-remote-view-core",
  "guesthouse-state-core",
+ "serde_json",
  "windows-reactor",
  "windows-reactor-setup",
  "windows-sys 0.61.2",
@@ -1000,12 +1014,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "guesthouse-basics"
+version = "0.11.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "guesthouse-card-check"
 version = "0.11.0"
 dependencies = [
  "guesthouse-backend",
  "guesthouse-backend-nvidia",
 ]
+
+[[package]]
+name = "guesthouse-carry-core"
+version = "0.11.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "guesthouse-catalog-core"
+version = "0.11.0"
 
 [[package]]
 name = "guesthouse-clock-helper"
@@ -1018,6 +1053,11 @@ dependencies = [
 name = "guesthouse-control"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-account-core",
+ "guesthouse-basics",
+ "guesthouse-remote-view-core",
+ "guesthouse-report-core",
+ "guesthouse-settings-core",
  "guesthouse-state-core",
  "guesthouse-update-check",
  "serde",
@@ -1065,6 +1105,9 @@ dependencies = [
 [[package]]
 name = "guesthouse-guest-scripts"
 version = "0.11.0"
+dependencies = [
+ "guesthouse-remote-view-core",
+]
 
 [[package]]
 name = "guesthouse-guest-share"
@@ -1096,10 +1139,12 @@ dependencies = [
 name = "guesthouse-host-windows"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-account-core",
  "guesthouse-control",
  "guesthouse-hcs",
  "guesthouse-jail",
  "guesthouse-remote-view-core",
+ "if-addrs",
  "serde",
  "serde_json",
 ]
@@ -1145,8 +1190,11 @@ version = "0.11.0"
 name = "guesthouse-relay"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-remote-view-core",
  "libc",
- "rustix",
+ "serde",
+ "serde_json",
+ "socket2",
 ]
 
 [[package]]
@@ -1172,6 +1220,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "guesthouse-report-core"
+version = "0.11.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "guesthouse-sensors"
 version = "0.11.0"
 dependencies = [
@@ -1182,14 +1238,21 @@ dependencies = [
 name = "guesthouse-service"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-basics",
  "guesthouse-control",
  "guesthouse-hcs",
  "guesthouse-host-windows",
+ "guesthouse-relay",
+ "guesthouse-remote-view-core",
  "guesthouse-state-core",
  "serde",
  "serde_json",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "guesthouse-settings-core"
+version = "0.11.0"
 
 [[package]]
 name = "guesthouse-state-core"

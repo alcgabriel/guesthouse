@@ -6,11 +6,15 @@ members = ["crates/*", "tools/card-check", "tools/hcs-boot"]
 exclude = ["vendor/windows-reactor", "vendor/windows-rs"]
 # The app needs GTK's development files, which nothing else here does. Build it with `-p guesthouse-app`.
 default-members = [
+    "crates/account",
     "crates/app-core",
     "crates/backend",
     "crates/backend-intel",
     "crates/backend-nvidia",
     "crates/backend-standin",
+    "crates/basics",
+    "crates/carry",
+    "crates/catalog",
     "crates/clock-helper",
     "crates/control",
     "crates/core",
@@ -26,7 +30,9 @@ default-members = [
     "crates/relay",
     "crates/remote-view",
     "crates/replay",
+    "crates/report",
     "crates/sensors",
+    "crates/settings",
     "crates/share-windows",
     "crates/state",
     "crates/service-windows",
@@ -56,6 +62,7 @@ guesthouse-daemon = { path = "crates/daemon" }
 guesthouse-app-core = { path = "crates/app-core" }
 guesthouse-frame-socket = { path = "crates/frame-socket" }
 guesthouse-sensors = { path = "crates/sensors" }
+guesthouse-settings-core = { path = "crates/settings" }
 guesthouse-state-core = { path = "crates/state" }
 guesthouse-jail = { path = "crates/jail" }
 guesthouse-card-check = { path = "tools/card-check" }
@@ -65,6 +72,11 @@ guesthouse-hcs = { path = "crates/hcs" }
 guesthouse-relay = { path = "crates/relay" }
 guesthouse-host-windows = { path = "crates/host-windows" }
 guesthouse-remote-view-core = { path = "crates/remote-view" }
+guesthouse-report-core = { path = "crates/report" }
+guesthouse-basics = { path = "crates/basics" }
+guesthouse-account-core = { path = "crates/account" }
+guesthouse-carry-core = { path = "crates/carry" }
+guesthouse-catalog-core = { path = "crates/catalog" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

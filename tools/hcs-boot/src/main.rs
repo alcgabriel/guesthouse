@@ -148,6 +148,8 @@ impl Options {
             bridge: None,
             // The loopback's port for SSH is the service's, as it keeps each machine's.
             ssh_port: None,
+            // A machine booted by hand keeps its guest's rules as they are.
+            host_addresses: None,
         }
     }
 }

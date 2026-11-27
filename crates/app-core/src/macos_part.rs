@@ -12,13 +12,10 @@ use std::process::{Command, Stdio};
 use std::thread::sleep;
 use std::time::Duration;
 
-/// The part's folder among the fetched parts, and the top folder of its archive.
-pub const PART_NAME: &str = "guesthouse-macos-part-1";
-const ARCHIVE_URL: &str = "https://github.com/ruxnlabs/guesthouse/releases/download/macos-part-1/\
-                           guesthouse-macos-part-1-x86_64.tar.xz";
-const ARCHIVE_SHA256: &str = "578710e662fc755b3105cc3800de35d6eae812cdd716624ac02bad322981a8bc";
-/// The archive's size, for how far a download is and for saying it beforehand.
-const ARCHIVE_BYTES: u64 = 22_435_448;
+/// The part's folder among the fetched parts, its archive's address, SHA-256 and size, as every
+/// host's catalog has them in `guesthouse_catalog_core`.
+pub use guesthouse_catalog_core::macos_part::PART_NAME;
+use guesthouse_catalog_core::macos_part::{ARCHIVE_BYTES, ARCHIVE_SHA256, ARCHIVE_URL};
 /// A program folder that has the part in it is used as it is. A build from source can put one there.
 const IN_PROGRAM: &str = "macos";
 
@@ -147,6 +144,18 @@ pub fn ensure(paths: &Paths, step: &dyn Fn(&str)) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Where the part comes from, what it must hash to and how big it is, as they were pinned.
+    #[test]
+    fn the_part_is_what_it_was() {
+        assert_eq!(PART_NAME, "guesthouse-macos-part-1");
+        assert_eq!(
+            ARCHIVE_URL,
+            "https://github.com/ruxnlabs/guesthouse/releases/download/macos-part-1/guesthouse-macos-part-1-x86_64.tar.xz"
+        );
+        assert_eq!(ARCHIVE_SHA256, "578710e662fc755b3105cc3800de35d6eae812cdd716624ac02bad322981a8bc");
+        assert_eq!(ARCHIVE_BYTES, 22_435_448);
+    }
     use crate::testing::{Scratch, scratch_paths};
 
     /// An archive as the build packs it, and a `file://` address for it.

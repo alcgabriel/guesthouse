@@ -1,0 +1,11 @@
+{
+  "name": "Ubuntu",
+  "disk": "/srv/made-up/machines/ubuntu/disk.qcow2",
+  "vars": "/srv/made-up/machines/ubuntu/OVMF_VARS.fd",
+  "cores": 4,
+  "ram_gib": 8,
+  "kind": "linux",
+  "user": "desk",
+  "iso": "/srv/made-up/parts/ubuntu/ubuntu-26.04-live-server-amd64.iso",
+  "installing": false
+}
