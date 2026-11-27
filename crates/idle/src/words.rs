@@ -102,7 +102,7 @@ pub fn limits_text(limits: &Limits) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::idle::{PowerKind, PowerRequest, Unread};
+    use crate::{PowerKind, PowerRequest, Unread};
 
     fn quiet() -> IdleReading {
         IdleReading {

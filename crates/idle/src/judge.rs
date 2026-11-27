@@ -96,7 +96,7 @@ pub fn judge(reading: &IdleReading, limits: &Limits) -> Verdict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::idle::PowerKind;
+    use crate::PowerKind;
 
     fn quiet() -> IdleReading {
         IdleReading {

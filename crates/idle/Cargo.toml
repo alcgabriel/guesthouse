@@ -1,0 +1,15 @@
+[package]
+name = "guesthouse-idle-core"
+description = "Whether a running machine looks idle: the verdict on a reading, the reading of a guest's answer and the words for both. Nothing here calls the system, so every host can build on it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# How long ago the last input was, in words.
+guesthouse-basics.workspace = true
+
+[lints]
+workspace = true

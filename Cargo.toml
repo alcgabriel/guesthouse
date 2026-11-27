@@ -23,6 +23,7 @@ default-members = [
     "crates/frame-socket",
     "crates/guest-scripts",
     "crates/hcs",
+    "crates/idle",
     "crates/host-windows",
     "crates/installer-windows",
     "crates/jail",
@@ -81,6 +82,7 @@ guesthouse-answers-core = { path = "crates/answers" }
 guesthouse-carry-core = { path = "crates/carry" }
 guesthouse-catalog-core = { path = "crates/catalog" }
 guesthouse-serial-words-core = { path = "crates/serial-words" }
+guesthouse-idle-core = { path = "crates/idle" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

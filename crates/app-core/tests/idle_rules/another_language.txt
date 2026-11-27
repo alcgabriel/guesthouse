@@ -1,0 +1,23 @@
+sessions ok
+s|0|4|Services
+s|1|0|Console
+power ok
+p|ANZEIGE:
+p|Keine.
+p|
+p|SYSTEM:
+p|Keine.
+p|
+p|ABWESENHEITSMODUS:
+p|Keine.
+p|
+p|AUSFÜHRUNG:
+p|Keine.
+p|
+p|PERFBOOST:
+p|Keine.
+p|
+p|ACTIVELOCKSCREEN:
+p|Keine.
+p|
+input nobody
