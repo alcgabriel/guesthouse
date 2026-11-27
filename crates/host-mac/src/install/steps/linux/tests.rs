@@ -75,7 +75,7 @@ fn the_installer_starts_by_its_kernel_with_the_unattended_line_and_the_rom_gives
     assert_eq!(file["installer_initrd"], "installer-boot/casper/initrd");
     assert!(folder.join("installer-boot/casper/vmlinuz").is_file());
     let line = file["installer_command_line"].as_str().unwrap();
-    assert!(line.starts_with("autoinstall ds=nocloud ") && line.contains("console=ttyAMA0"));
+    assert!(line.starts_with("autoinstall ds=nocloud "));
     assert_eq!(file["option_rom"], OPTION_ROM);
     assert_eq!(fs::read(folder.join(OPTION_ROM)).unwrap(), b"rom");
     let _ = fs::remove_dir_all(root);

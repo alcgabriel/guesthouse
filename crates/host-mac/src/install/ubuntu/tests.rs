@@ -64,10 +64,11 @@ fn the_driver_step_says_plainly_what_is_missing() {
 }
 
 #[test]
-fn the_installer_runs_with_no_questions_and_its_console_on_the_serial_port() {
+fn the_installer_runs_with_no_questions_and_says_no_command_on_the_serial_port() {
     assert!(INSTALLER_COMMAND_LINE.starts_with("autoinstall ds=nocloud "));
     let (installer, installed) = INSTALLER_COMMAND_LINE.split_once(" --- ").unwrap();
-    assert!(installer.contains("console=ttyAMA0,115200"));
+    // The installer prints its late commands on its consoles, and one of them holds the password.
+    assert!(!installer.contains("ttyAMA0"));
     assert!(installed.contains("console=ttyAMA0,115200"));
 }
 
