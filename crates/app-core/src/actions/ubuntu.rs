@@ -31,7 +31,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-const INSTALL_HOURS: u64 = 2;
+/// How long the installer is given, the steps said and every sentence, as the Linux host has them in
+/// every host's `guesthouse_install_steps_core`.
+use guesthouse_install_steps_core::linux_host::ubuntu_guest::{self as steps, INSTALL_HOURS};
+use guesthouse_install_steps_core::linux_host::{NOT_IN_FOLDER, disc_missing};
 const REASON_FILE: &str = "gpu-off-reason";
 const NO_CARD_DETAIL: &str = "The NVIDIA driver doesn't list the card setup chose, so it has no device file to open. \
                               Run Setup Again from the menu if the card has changed.";
@@ -44,7 +47,7 @@ fn isoinfo_files(iso: &str) -> Result<String> {
 fn extract(iso: &str, name: &str, to: &Path) -> Result<()> {
     let data = Command::new("isoinfo").args(["-R", "-i", iso, "-x", name]).output()?.stdout;
     if data.is_empty() {
-        return Err(Failure(format!("{iso} has no {name}, so it is not an Ubuntu server ISO.")));
+        return Err(Failure(steps::not_a_server_disc(iso, name)));
     }
     fs::write(to, data)?;
     Ok(())
@@ -54,19 +57,17 @@ fn extract(iso: &str, name: &str, to: &Path) -> Result<()> {
 pub fn install(task: &mut Task) -> Result<()> {
     let context = task.context;
     if !task.machine.owns_files(context) {
-        return Err(Failure::new(
-            "This machine's disk is not in its folder, so nothing will install over it.",
-        ));
+        return Err(Failure::new(NOT_IN_FOLDER));
     }
     let mut found = start_problems(context, &task.machine)?;
     found.retain(|problem| !problem.contains("is missing"));
     if !Path::new(&task.machine.iso).exists() {
-        found.push(format!("{} is missing.", task.machine.iso));
+        found.push(disc_missing(&task.machine.iso));
     }
     if let Some(problem) = found.into_iter().next() {
         return Err(Failure(problem));
     }
-    task.step("Preparing the install");
+    task.step(steps::PREPARING);
     super::recipe::reset(task);
     // A new install is a new guest, with host keys of its own.
     task.machine.forget_guest_host_key(context);
@@ -74,9 +75,7 @@ pub fn install(task: &mut Task) -> Result<()> {
     let iso = task.machine.iso.clone();
     let listing = isoinfo_files(&iso)?;
     let package = listing.lines().find_map(kernel_package).map(str::to_owned);
-    let package = package.ok_or_else(|| {
-        Failure(format!("{iso} holds no generic kernel in its pool, so it is not an Ubuntu server ISO."))
-    })?;
+    let package = package.ok_or_else(|| Failure(steps::no_generic_kernel(&iso)))?;
     let seed = make_seed(context, &task.machine, &package)?;
     let boot = task.machine.folder(context).join("boot");
     fs::create_dir_all(&boot)?;
@@ -114,9 +113,7 @@ fn wait_for_poweroff(task: &Task) -> Result<()> {
     let end = task.now() + Duration::from_secs(INSTALL_HOURS * 3600);
     while task.pid().is_some() {
         if task.now() >= end {
-            return Err(Failure(format!(
-                "The install did not finish in {INSTALL_HOURS} hours. Show Screen says how far it got."
-            )));
+            return Err(Failure(steps::not_finished()));
         }
         task.sleep(KEY_POLL);
     }

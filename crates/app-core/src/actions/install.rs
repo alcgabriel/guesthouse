@@ -34,19 +34,17 @@ use std::time::Duration;
 pub(super) const INSTALL_FILES: [&str; 4] =
     ["autounattend.xml", "SetupComplete.cmd", "setup.ps1", "agent.ps1"];
 const SYSTEM_FILES_SCRIPT: &str = "nv-files.ps1";
-const INSTALL_HOURS: u64 = 2;
-/// Setup writes all the time until the desktop, so a disk that stops growing means it's waiting for
-/// someone, or stuck. The longest quiet stretch in a normal install is well under this.
-const INSTALL_QUIET_MINUTES: u64 = 10;
-const BOOT_PROMPT_SECONDS: u64 = 6;
+/// Each wait's length and how often it looks, the rule that a disk which stops growing means Setup is
+/// stuck, the steps said and every sentence, as the Linux host has them in every host's
+/// `guesthouse_install_steps_core`.
+use guesthouse_install_steps_core::linux_host::windows_guest::{
+    self as steps, ALL_THERE, BOOT_PROMPT_SECONDS, CHECK_SCRIPT_SECONDS, FINISHED, FIRMWARE_WAIT,
+    INSTALL_HOURS, INSTALL_STOP_SECONDS, QuietDisk, SETUP_POLL, SETUP_SCRIPT_SECONDS, SHORT_POLL,
+    STUCK_SCREEN,
+};
+use guesthouse_install_steps_core::linux_host::{NOT_IN_FOLDER, disc_missing};
 /// The steps of an install, read off the firmware's lines, as every host can share them.
 pub use guesthouse_serial_words_core::linux_host::{INSTALL_STEPS, install_step};
-const FIRMWARE_WAIT: Duration = Duration::from_secs(30);
-const SETUP_SCRIPT_SECONDS: u64 = 30;
-const CHECK_SCRIPT_SECONDS: u64 = 60;
-const INSTALL_STOP_SECONDS: u64 = 120;
-const SETUP_POLL: Duration = Duration::from_secs(5);
-const SHORT_POLL: Duration = Duration::from_millis(200);
 /// The agent's file and the time zone both go through these.
 const ANSWER_DISC: &str = "answer.iso";
 const ANSWER_LABEL: &str = "GPUPV_SETUP";
@@ -83,7 +81,7 @@ pub(super) fn account_script(task: &Task, name: &str) -> Result<String> {
 /// An account with the template's own text for a password is one nobody chose, so no disc gets made.
 fn password_is_filled(answers: String) -> Result<String> {
     if answers.contains(PASSWORD_MARK) {
-        return Err(Failure::new("The answer file has no password in it, so nothing was installed."));
+        return Err(Failure::new(steps::NO_PASSWORD));
     }
     Ok(answers)
 }
@@ -182,41 +180,31 @@ fn disk_written(machine: &Machine) -> u64 {
 /// Waits for the agent, and then for the user account, which Windows makes late.
 pub fn wait_for_setup(task: &mut Task) -> Result<()> {
     let finish = account_script(task, "finish.ps1")?;
-    let quiet = Duration::from_secs(INSTALL_QUIET_MINUTES * 60);
     let end = task.now() + Duration::from_secs(INSTALL_HOURS * 3600);
     let mut step = "";
-    let (mut grew_at, mut written) = (task.now(), 0);
+    let mut disk = QuietDisk::new(task.now());
     while task.now() < end {
         if task.pid().is_none() {
-            let words = last_words(task.context);
-            return Err(Failure(format!("The VM stopped during the install. {words}").trim().to_owned()));
+            return Err(Failure(steps::stopped_during(&last_words(task.context))));
         }
-        let now_written = disk_written(&task.machine);
-        if now_written > written {
-            (grew_at, written) = (task.now(), now_written);
-        }
-        if task.now().saturating_sub(grew_at) > quiet {
-            let file = task.run_file("stuck-install.ppm");
+        let written = disk_written(&task.machine);
+        if disk.stuck(task.now(), written) {
+            let file = task.run_file(STUCK_SCREEN);
             let command = Qmp::new("screendump", json!({"filename": file}));
             task.context.ask_monitor(None, &command);
-            return Err(Failure(format!(
-                "Windows Setup has not written to the disk for {INSTALL_QUIET_MINUTES} minutes, so it is \
-                 stuck or waiting for an answer. The VM is still up: Show Screen has what it says."
-            )));
+            return Err(Failure(steps::stuck()));
         }
         let current = install_step(&serial_log(task));
         if current != step {
             step = current;
             task.step(step);
         }
-        if task.ask_guest(&finish, SETUP_SCRIPT_SECONDS).contains("finished") {
+        if task.ask_guest(&finish, SETUP_SCRIPT_SECONDS).contains(FINISHED) {
             return Ok(());
         }
         task.sleep(SETUP_POLL);
     }
-    Err(Failure(format!(
-        "Windows setup did not finish in {INSTALL_HOURS} hours. Show Screen says how far it got."
-    )))
+    Err(Failure(steps::not_finished()))
 }
 
 /// The version of NVIDIA's driver setup put in the guest's driver store, from the disc's own files, so
@@ -239,17 +227,14 @@ fn count_files(folder: &Path) -> usize {
 
 /// Looks at the finished guest, so that anything missing is found here and not at first boot.
 fn check_guest(task: &Task) -> Result<()> {
-    task.step("Checking Windows");
+    task.step(steps::CHECKING);
     let driver = guest_driver(task.context, &task.machine).map_err(Failure::new)?;
     let expected = count_files(&driver.folder);
     let check = account_script(task, "check.ps1")?;
     let script = format!("$expected = {expected}\n$store_folder = '{}'\n{check}", driver.store_folder);
     let answer = task.ask_guest(&script, CHECK_SCRIPT_SECONDS);
-    if !answer.contains("all there") {
-        let said = answer.trim();
-        let tail = said.char_indices().rev().nth(299).map_or(0, |found| found.0);
-        let said = if said.is_empty() { "the agent went quiet" } else { &said[tail..] };
-        return Err(Failure(format!("Windows is missing something: {said}")));
+    if !answer.contains(ALL_THERE) {
+        return Err(Failure(steps::missing_something(&answer)));
     }
     Ok(())
 }
@@ -259,19 +244,17 @@ fn check_guest(task: &Task) -> Result<()> {
 pub fn install(task: &mut Task) -> Result<()> {
     let context = task.context;
     if !task.machine.owns_files(context) {
-        return Err(Failure::new(
-            "This machine's disk is not in its folder, so nothing will install over it.",
-        ));
+        return Err(Failure::new(NOT_IN_FOLDER));
     }
     let mut found: Vec<String> = start_problems(context, &task.machine)?;
     found.retain(|problem| !problem.contains("is missing"));
     if !Path::new(&task.machine.iso).exists() {
-        found.push(format!("{} is missing.", task.machine.iso));
+        found.push(disc_missing(&task.machine.iso));
     }
     if let Some(problem) = found.into_iter().next() {
         return Err(Failure(problem));
     }
-    task.step("Preparing the install disc");
+    task.step(steps::PREPARING);
     recipe::reset(task);
     // The answer file counts on it, and all that was here goes anyway.
     task.machine.tpm = true;
@@ -287,16 +270,16 @@ pub fn install(task: &mut Task) -> Result<()> {
     crate::display::forget_state(context, &task.machine);
     crate::auto_snapshot::record::forget(context, &task.machine);
     let _ = fs::remove_file(guest_driver_store::record_file(context, &task.machine));
-    task.step("Starting the installer");
+    task.step(steps::STARTING);
     let answer = answer_disc_path(context, &task.machine);
     let boot = Boot::Install { iso: task.machine.iso.clone(), answer: answer.clone() };
     let plan = plan_for(context, &task.machine, boot);
     task.host.start(&plan, &task.machine)?;
     pass_boot_prompt(task);
     wait_for_setup(task)?;
-    task.step("Waiting for the desktop");
+    task.step(steps::WAITING_FOR_DESKTOP);
     if !wait_for_desktop(task) {
-        return Err(Failure::new("Windows installed, but its desktop never came up."));
+        return Err(Failure::new(steps::NO_DESKTOP));
     }
     check_guest(task)?;
     note_guest_driver(task)?;
@@ -306,14 +289,14 @@ pub fn install(task: &mut Task) -> Result<()> {
     super::scan_exclusions::after_install(task);
     // Here, so the first start is already on the card maker's vendor number and needs no second VM.
     set_up_identity(task);
-    task.step("Shutting down Windows");
+    task.step(steps::SHUTTING_DOWN);
     task.ask_guest("Stop-Computer -Force", QUICK_SECONDS);
     let end = task.now() + Duration::from_secs(INSTALL_STOP_SECONDS);
     while task.pid().is_some() && task.now() < end {
         task.sleep(KEY_POLL);
     }
     if task.pid().is_some() {
-        return Err(Failure::new("Windows is installed but would not shut down. Try Force Off, then Start."));
+        return Err(Failure::new(steps::WOULD_NOT_SHUT_DOWN));
     }
     fs::remove_file(&answer)?;
     task.machine.installing = false;

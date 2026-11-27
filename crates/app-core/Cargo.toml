@@ -84,6 +84,8 @@ guesthouse-snapshot-core.workspace = true
 guesthouse-start-checks-core.workspace = true
 # The plain half of a download: its files' names, curl's words, the check and the sentences.
 guesthouse-download-core.workspace = true
+# The plain half of an install's steps: the words said, each wait, the quiet-disk rule, the sentences.
+guesthouse-install-steps-core.workspace = true
 # The host card's readings, which the daemon's sensor thread publishes and the overlay shows.
 guesthouse-sensors.workspace = true
 # Local time for the log and for snapshot dates. The standard library has no time zones.

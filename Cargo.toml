@@ -28,6 +28,7 @@ default-members = [
     "crates/hcs",
     "crates/idle",
     "crates/host-windows",
+    "crates/install-steps",
     "crates/installer-windows",
     "crates/jail",
     "crates/messages",
@@ -92,6 +93,7 @@ guesthouse-answers-core = { path = "crates/answers" }
 guesthouse-carry-core = { path = "crates/carry" }
 guesthouse-catalog-core = { path = "crates/catalog" }
 guesthouse-download-core = { path = "crates/download" }
+guesthouse-install-steps-core = { path = "crates/install-steps" }
 guesthouse-serial-words-core = { path = "crates/serial-words" }
 guesthouse-idle-core = { path = "crates/idle" }
 guesthouse-guest-names-core = { path = "crates/guest-names" }
