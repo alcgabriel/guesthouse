@@ -13,6 +13,8 @@
 //! It is installed with no trust list (`--trust`) and no pairing (`--no-pair`): a device is only let
 //! in when a person accepts it, and an installer run never replaces the devices paired since.
 
+use serde::Deserialize;
+
 /// Where the guest's notes, log and installer for this live.
 pub const GUEST_FOLDER: &str = r"C:\Guesthouse\remote-view";
 /// The installer, where the guest is sent it.
@@ -44,6 +46,50 @@ pub struct Pin {
     pub url: String,
     pub file: String,
     pub sha256: String,
+}
+
+/// The one pin of remoteman's release for every host, `remoteman.json` beside this crate: the
+/// version, where its release files are, and each file's name and SHA-256. The Linux host takes its
+/// host's installer from it with [`pinned`], and the Windows installer's build,
+/// `scripts/windows-setup.ps1`, reads the file itself for both files.
+pub const PIN_FILE: &str = include_str!("../remoteman.json");
+
+/// remoteman's release as [`PIN_FILE`] pins it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Release {
+    pub version: String,
+    /// Where the release files are, ending in a slash.
+    pub base: String,
+    /// The host's installer, which goes into a Windows guest.
+    pub host_setup: ReleaseFile,
+    /// The Windows viewer, which the Windows installer carries.
+    pub viewer_zip: ReleaseFile,
+}
+
+/// One file of a release and its SHA-256, in lower-case hex.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct ReleaseFile {
+    pub file: String,
+    pub sha256: String,
+}
+
+/// The release this repo pins. The file is part of the build and a test reads it, so it is always
+/// one.
+pub fn pinned() -> Release {
+    serde_json::from_str(PIN_FILE).expect("remoteman.json is a release")
+}
+
+impl Release {
+    /// The host's installer of this release, as the Linux host fetches and checks it: the address is
+    /// the base and the file's name.
+    pub fn host_pin(&self) -> Pin {
+        Pin {
+            version: self.version.clone(),
+            url: format!("{}{}", self.base, self.host_setup.file),
+            file: self.host_setup.file.clone(),
+            sha256: self.host_setup.sha256.clone(),
+        }
+    }
 }
 
 /// What the guest notes once installed: the version and the encoder.
@@ -209,5 +255,50 @@ mod tests {
         let said = format!("{INSTALLED}\r\n{}\r\n", "AB".repeat(32));
         assert_eq!(fingerprint_after(&said), Some("ab".repeat(32)));
         assert_eq!(fingerprint_after(INSTALLED), None);
+    }
+
+    #[test]
+    fn the_pin_is_0_1_9_for_both_files() {
+        let release = pinned();
+        assert_eq!(release.version, "0.1.9");
+        assert_eq!(release.base, "https://files.ruxn.com/p/remoteman/");
+        let host = ReleaseFile {
+            file: "remoteman-host-setup-0.1.9.exe".into(),
+            sha256: "15ed3cef0097fcddf90497997834d1511f35cbcba0279e90a4cb0dc1e1c2f37e".into(),
+        };
+        let viewer = ReleaseFile {
+            file: "remoteman-viewer-windows-0.1.9.zip".into(),
+            sha256: "e901522f81da15b8d5c818f575c0405355e7e7785cbd2d1068198c0f2e2db1fc".into(),
+        };
+        assert_eq!(release.host_setup, host);
+        assert_eq!(release.viewer_zip, viewer);
+    }
+
+    #[test]
+    fn the_host_pin_is_the_installer_at_the_base() {
+        let pin = pinned().host_pin();
+        assert_eq!(pin.version, "0.1.9");
+        assert_eq!(pin.url, "https://files.ruxn.com/p/remoteman/remoteman-host-setup-0.1.9.exe");
+        assert_eq!(pin.file, "remoteman-host-setup-0.1.9.exe");
+        assert_eq!(pin.sha256, "15ed3cef0097fcddf90497997834d1511f35cbcba0279e90a4cb0dc1e1c2f37e");
+    }
+
+    /// The Linux host joins the base and a file's name as they are, and the Windows installer's
+    /// build trims the base's slash and puts one back: the same address only while the base ends in
+    /// one. Both compare a lower-case SHA-256.
+    #[test]
+    fn both_hosts_read_the_same_addresses_and_sums() {
+        let release = pinned();
+        assert!(release.base.starts_with("https://") && release.base.ends_with('/'));
+        assert!(!release.base.ends_with("//"));
+        for entry in [&release.host_setup, &release.viewer_zip] {
+            assert!(entry.file.contains(&release.version) && !entry.file.contains('/'));
+            let windows = format!("{}/{}", release.base.trim_end_matches('/'), entry.file);
+            assert_eq!(format!("{}{}", release.base, entry.file), windows);
+            assert!(
+                entry.sha256.len() == 64
+                    && entry.sha256.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+            );
+        }
     }
 }

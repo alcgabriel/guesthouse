@@ -56,12 +56,6 @@ const UPDATES_OFF_PAUSE: Duration = Duration::from_secs(3);
 const PARTS_FOLDER: &str = "remoteman";
 /// Where a build that ships the installer has it, in the program's folder.
 const SHIPPED: &str = "remoteman/remoteman-host-setup.exe";
-/// The release of remoteman's host this host puts in a guest. 0.1.6 is the first whose `--no-pair`
-/// still lets `pair on` open pairing, which every pairing here needs. The Windows host carries its own
-/// release, pinned in `windows/remoteman.json`. 0.1.9 is the first that takes `set updates off`.
-const REMOTEMAN_VERSION: &str = "0.1.9";
-const REMOTEMAN_BASE: &str = "https://files.ruxn.com/p/remoteman/";
-const REMOTEMAN_SHA256: &str = "15ed3cef0097fcddf90497997834d1511f35cbcba0279e90a4cb0dc1e1c2f37e";
 pub const TOO_OLD: &str = "This machine's display driver is older than viewing from other devices needs: its \
                            take-over script would take remoteman's screen for its own. Update the machine's \
                            display driver, then turn this on again.";
@@ -147,15 +141,11 @@ pub fn encoder(machine: &Machine) -> &'static str {
     encoder_for(&format!("PCI\\VEN_{vendor}"))
 }
 
-/// remoteman's host installer at this host's pin.
+/// remoteman's host installer at this host's pin, the release every host pins in
+/// `crates/remote-view/remoteman.json`. 0.1.6 is the first whose `--no-pair` still lets `pair on`
+/// open pairing, which every pairing here needs. 0.1.9 is the first that takes `set updates off`.
 pub fn pin() -> Pin {
-    let file = format!("remoteman-host-setup-{REMOTEMAN_VERSION}.exe");
-    Pin {
-        version: REMOTEMAN_VERSION.to_owned(),
-        url: format!("{REMOTEMAN_BASE}{file}"),
-        file,
-        sha256: REMOTEMAN_SHA256.to_owned(),
-    }
+    install::pinned().host_pin()
 }
 
 /// The pinned installer on this PC: the copy a build shipped, or one downloaded once into the fetched
@@ -649,6 +639,19 @@ mod tests {
         assert_eq!(pin.version, "0.1.9");
         assert_eq!(pin.url, "https://files.ruxn.com/p/remoteman/remoteman-host-setup-0.1.9.exe");
         assert_eq!(pin.sha256, "15ed3cef0097fcddf90497997834d1511f35cbcba0279e90a4cb0dc1e1c2f37e");
+    }
+
+    /// Every field of the installer this host fetches and checks, whole, so where the pin is kept can
+    /// change without the installer's name, address or SHA-256 changing by a byte.
+    #[test]
+    fn the_pin_is_the_installer_it_always_was() {
+        let pin = Pin {
+            version: "0.1.9".into(),
+            url: "https://files.ruxn.com/p/remoteman/remoteman-host-setup-0.1.9.exe".into(),
+            file: "remoteman-host-setup-0.1.9.exe".into(),
+            sha256: "15ed3cef0097fcddf90497997834d1511f35cbcba0279e90a4cb0dc1e1c2f37e".into(),
+        };
+        assert_eq!(super::pin(), pin);
     }
 
     /// What a guest is asked, and answers from a table: the first answer whose key the script holds.
