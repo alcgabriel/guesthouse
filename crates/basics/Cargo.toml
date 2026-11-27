@@ -1,0 +1,16 @@
+[package]
+name = "guesthouse-basics"
+description = "Small pieces every host shares that belong to no one subject: plain values in and out, so the Linux, Windows and Mac hosts build on one copy."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# A small JSON file written in one step, as every host keeps its records.
+serde = "1"
+serde_json = "1"
+
+[lints]
+workspace = true
