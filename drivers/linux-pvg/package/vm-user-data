@@ -1,0 +1,19 @@
+#cloud-config
+# The build VM's cloud-init answers (vm.sh make puts the key in).
+hostname: pvg-build
+users:
+  - name: pvg
+    groups: [sudo, video, render, input]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: false
+    plain_text_passwd: pvg
+    ssh_authorized_keys:
+      - "@KEY@"
+ssh_pwauth: false
+package_update: true
+package_upgrade: false
+# The build's packages come by vm-packages.sh over ssh, where a wrong name
+# shows.
+runcmd:
+  - [sh, -c, 'echo "pvg-build: cloud-init done $(uname -r)" > /dev/ttyAMA0']
