@@ -28,6 +28,12 @@
 //! signing on by itself, so the tester never handles a certificate.
 //!
 //! `GUESTHOUSE_DRIVER_DIR` names a folder of the same files instead, for the lab.
+//!
+//! **A Linux guest's package** (`LINUX`) is published the same way, under
+//! `guesthouse-linux-driver-latest.json`: `install.sh`, the `.deb` files it installs, and the
+//! manifest, which goes to the guest with them so the guest knows the version it installed. Its
+//! files and their words on the serial port are the driver's own README's (`tools/pvg-ubuntu` of
+//! the contributor's repo); `ubuntu` has the guest's side of it.
 
 use super::fetch::{self, FetchError, Outcome, Request, Transport};
 use serde::Deserialize;
@@ -53,6 +59,34 @@ pub const REQUIRED: [&str; 9] = [
     "ruxnd3d11.dll",
 ];
 
+/// One guest's package: the manifest it is published under, the folder a fetched one is kept in,
+/// and the files it must hold by their names in it.
+#[derive(Debug)]
+pub struct Package {
+    pub manifest: &'static str,
+    pub folder: &'static str,
+    pub required: &'static [&'static str],
+    /// Whether the manifest goes to the guest with the files.
+    pub manifest_in_guest: bool,
+}
+
+pub const WINDOWS: Package = Package {
+    manifest: MANIFEST_NAME,
+    folder: "windows-driver",
+    required: &REQUIRED,
+    manifest_in_guest: false,
+};
+
+/// The script a Linux guest's package is installed with, run as root from its disk.
+pub const LINUX_SCRIPT: &str = "install.sh";
+
+pub const LINUX: Package = Package {
+    manifest: "guesthouse-linux-driver-latest.json",
+    folder: "linux-driver",
+    required: &[LINUX_SCRIPT],
+    manifest_in_guest: true,
+};
+
 /// Files that hold a private key. A package with one is refused, whoever made it.
 const PRIVATE_KEY_ENDINGS: [&str; 5] = [".pfx", ".p12", ".pvk", ".key", ".snk"];
 
@@ -74,6 +108,11 @@ impl Manifest {
     /// Reads a manifest and checks it names every file the package needs, once each, with
     /// names that stay in their folder, checksums that are SHA-256 and no private key.
     pub fn parse(text: &str) -> Result<Manifest, String> {
+        Manifest::parse_for(&WINDOWS, text)
+    }
+
+    /// The same for any guest's package.
+    pub fn parse_for(package: &Package, text: &str) -> Result<Manifest, String> {
         let manifest: Manifest = serde_json::from_str(text)
             .map_err(|e| format!("The driver's manifest is not readable: {e}"))?;
         for entry in &manifest.files {
@@ -91,7 +130,7 @@ impl Manifest {
                 ));
             }
         }
-        for needed in REQUIRED {
+        for &needed in package.required {
             let count = manifest
                 .files
                 .iter()
@@ -124,8 +163,8 @@ fn refuse_private_keys<'a>(names: impl Iterator<Item = &'a str>) -> Result<(), S
 }
 
 /// Where a fetched package is kept: one folder for the version, with the manifest beside it.
-fn folder_of(downloads: &Path, version: &str) -> PathBuf {
-    downloads.join("windows-driver").join(version)
+fn folder_of(package: &Package, downloads: &Path, version: &str) -> PathBuf {
+    downloads.join(package.folder).join(version)
 }
 
 /// Fetches the manifest and every file it names into `downloads`, each checked against its
@@ -134,9 +173,18 @@ pub fn fetch_package(
     transport: &mut dyn Transport,
     downloads: &Path,
 ) -> Result<PathBuf, FetchError> {
-    let text = transport.text(&format!("{BASE_URL}{MANIFEST_NAME}"))?;
-    let manifest = Manifest::parse(&text).map_err(FetchError::new)?;
-    let folder = folder_of(downloads, &manifest.version);
+    fetch_package_of(&WINDOWS, transport, downloads)
+}
+
+/// The same for any guest's package.
+pub fn fetch_package_of(
+    package: &Package,
+    transport: &mut dyn Transport,
+    downloads: &Path,
+) -> Result<PathBuf, FetchError> {
+    let text = transport.text(&format!("{BASE_URL}{}", package.manifest))?;
+    let manifest = Manifest::parse_for(package, &text).map_err(FetchError::new)?;
+    let folder = folder_of(package, downloads, &manifest.version);
     let parts = folder.join("parts");
     for entry in &manifest.files {
         let url = format!("{BASE_URL}{}", entry.name);
@@ -155,7 +203,7 @@ pub fn fetch_package(
             Outcome::Stopped => return Err(FetchError::new("The driver's download was stopped.")),
         }
     }
-    fs::write(folder.join(MANIFEST_NAME), text)
+    fs::write(folder.join(package.manifest), text)
         .map_err(|e| FetchError::new(format!("Cannot keep the driver's manifest: {e}")))?;
     Ok(folder)
 }
@@ -163,11 +211,16 @@ pub fn fetch_package(
 /// The package a fetch kept, found again and checked against its manifest, newest first. None
 /// when there is none whole.
 pub fn kept_package(downloads: &Path) -> Option<PathBuf> {
-    let versions = fs::read_dir(downloads.join("windows-driver")).ok()?;
+    kept_package_of(&WINDOWS, downloads)
+}
+
+/// The same for any guest's package.
+pub fn kept_package_of(package: &Package, downloads: &Path) -> Option<PathBuf> {
+    let versions = fs::read_dir(downloads.join(package.folder)).ok()?;
     let mut found: Vec<PathBuf> = versions
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.join(MANIFEST_NAME).is_file())
+        .filter(|p| p.join(package.manifest).is_file())
         .collect();
     // By version number (0.3.36 is newer than 0.3.9), not by the folder's text. A folder whose
     // name is not three numbers sorts before every version, so it is only used when it is all there is.
@@ -178,10 +231,10 @@ pub fn kept_package(downloads: &Path) -> Option<PathBuf> {
             .and_then(version_numbers)
     });
     found.into_iter().rev().find(|folder| {
-        let Ok(text) = fs::read_to_string(folder.join(MANIFEST_NAME)) else {
+        let Ok(text) = fs::read_to_string(folder.join(package.manifest)) else {
             return false;
         };
-        Manifest::parse(&text).is_ok_and(|m| {
+        Manifest::parse_for(package, &text).is_ok_and(|m| {
             m.files.iter().all(|e| {
                 fetch::sha256_of(&folder.join(&e.package_name))
                     .is_ok_and(|sum| sum.eq_ignore_ascii_case(&e.sha256))
@@ -207,6 +260,11 @@ fn version_numbers(version: &str) -> Option<[u64; 3]> {
 /// guest needs, and none that is a private key. A folder from `GUESTHOUSE_DRIVER_DIR` is checked
 /// the same way a fetched one is.
 pub fn package_files(folder: &Path) -> Result<Vec<PathBuf>, String> {
+    package_files_of(&WINDOWS, folder)
+}
+
+/// The same for any guest's package; the manifest is one of them when the guest is given it.
+pub fn package_files_of(package: &Package, folder: &Path) -> Result<Vec<PathBuf>, String> {
     let entries = fs::read_dir(folder).map_err(|_| {
         format!(
             "The driver's files are not at {}. Build them first.",
@@ -217,13 +275,16 @@ pub fn package_files(folder: &Path) -> Result<Vec<PathBuf>, String> {
         .flatten()
         .map(|e| e.path())
         .filter(|p| p.is_file())
-        .filter(|p| p.file_name().is_some_and(|n| n != MANIFEST_NAME))
+        .filter(|p| {
+            package.manifest_in_guest || p.file_name().is_some_and(|n| n != package.manifest)
+        })
         .collect();
     let names: Vec<String> = files
         .iter()
         .filter_map(|f| f.file_name().map(|n| n.to_string_lossy().into_owned()))
         .collect();
-    for needed in REQUIRED {
+    let manifest = package.manifest_in_guest.then_some(package.manifest);
+    for &needed in package.required.iter().chain(manifest.iter()) {
         if !names.iter().any(|n| n == needed) {
             return Err(format!(
                 "The driver's files at {} have no {needed}.",

@@ -3,8 +3,15 @@
 //! (`crates/host-windows/guest/linux/user-data` of the public repo).
 //!
 //! The installer is Ubuntu's own: the live server image for arm64 from `cdimage.ubuntu.com`, with
-//! the `SHA256SUMS` beside it. The driver step is a named placeholder (`DRIVER_PLACEHOLDER`)
-//! until the Linux guest driver is packaged; `notes/mac-app-install.md` lists what it needs.
+//! the `SHA256SUMS` beside it. The firmware starts its kernel from the image with the kernel line
+//! the installer needs to run on its own (`INSTALLER_COMMAND_LINE`), as the public repo's Windows
+//! host does with a boot menu of its own.
+//!
+//! The graphics driver comes as a package (`driver::LINUX`) on a small disk labelled `RUXN`, as
+//! the Windows driver does. The answers put a service into the installed system that installs it
+//! from that disk when it is there, once for each version (`DRIVER_SERVICE`, `DRIVER_RUNNER`).
+//! With no package, the driver step says so (`DRIVER_PLACEHOLDER`) and offers to open Ubuntu
+//! without it. `notes/mac-app-install.md` has the rest.
 
 /// Ubuntu's release folder for arm64 and its checksum list.
 pub const RELEASE_URL: &str = "https://cdimage.ubuntu.com/releases/26.04/release/";
@@ -18,8 +25,86 @@ const SUFFIX: &str = "-live-server-arm64.iso";
 pub const FINISHED: &str = "guesthouse-install-finished";
 pub const FAILED: &str = "guesthouse-install-failed";
 
-/// Said when the driver step is reached: the Linux guest driver is not something this app can put
-/// in yet.
+/// The installer's kernel and initrd, by their paths in Ubuntu's image.
+pub const INSTALLER_KERNEL: &str = "casper/vmlinuz";
+pub const INSTALLER_INITRD: &str = "casper/initrd";
+
+/// The installer's kernel line. `autoinstall`, because the installer asks before it writes the
+/// disk when it found its answers only on a seed (subiquity's install controller, read
+/// 2026-11-27); `ds=nocloud` for the seed disc; its console on the serial port as well as the
+/// screen, so `serial.log` has it. What follows `---` the installed system keeps.
+pub const INSTALLER_COMMAND_LINE: &str = "autoinstall ds=nocloud console=ttyAMA0,115200 console=tty0 --- console=ttyAMA0,115200 console=tty0";
+
+/// What the guest says about the driver and its first start: the same words as Windows'.
+pub use super::windows::marker;
+
+/// The answer disc's two files that the installed system gets, by their names on the disc.
+pub const DRIVER_SERVICE_FILE: &str = "guesthouse-driver.service";
+pub const DRIVER_RUNNER_FILE: &str = "guesthouse-driver.sh";
+
+/// The service that installs the driver from its disk when the system starts.
+pub const DRIVER_SERVICE: &str = "\
+[Unit]
+Description=Guesthouse graphics driver, from the disk labelled RUXN
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /usr/local/sbin/guesthouse-driver
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target
+";
+
+/// What the service runs: the package copied off its disk, its `install.sh` run as root (which
+/// says on the serial port how it went), then a restart into the desktop, or a power-off when it
+/// failed, so that Try Again is the next start with the disk. A version already installed is
+/// not installed again. Without the disk it does nothing.
+pub const DRIVER_RUNNER: &str = r#"#!/bin/sh
+# Guesthouse: installs the graphics driver from the disk labelled RUXN, once for each version.
+disk=/dev/disk/by-label/RUXN
+mnt=/run/guesthouse-driver
+state=/var/lib/guesthouse
+manifest=guesthouse-linux-driver-latest.json
+say() { echo "guesthouse: $*" > /dev/ttyAMA0; }
+# The disk may still be on its way while the system starts.
+tries=0
+while [ ! -e "$disk" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -gt 20 ] && exit 0
+    sleep 1
+done
+mkdir -p "$mnt" "$state"
+if ! mount -o ro "$disk" "$mnt"; then
+    say "driver failed mount"
+    systemctl --no-block poweroff
+    exit 1
+fi
+version=$(sed -n 's/.*"version" *: *"\([^"]*\)".*//p' "$mnt/$manifest")
+if [ -n "$version" ] && [ "$(cat "$state/driver-version" 2>/dev/null)" = "$version" ]; then
+    umount "$mnt"
+    exit 0
+fi
+work="$state/driver/${version:-unknown}"
+rm -rf "$work"
+mkdir -p "$work"
+cp -R "$mnt/." "$work/"
+umount "$mnt"
+(cd "$work" && sh ./install.sh)
+code=$?
+if [ "$code" -eq 0 ]; then
+    echo "$version" > "$state/driver-version"
+    systemctl --no-block reboot
+else
+    # Only read when install.sh said nothing itself: the first line said counts.
+    say "driver failed exit-$code"
+    systemctl --no-block poweroff
+fi
+"#;
+
+/// Said at the driver step when there is no package for Ubuntu: none published, none named.
 pub const DRIVER_PLACEHOLDER: &str = "The Guesthouse graphics driver for Ubuntu is not packaged yet, so it cannot be installed. Open Ubuntu without it for now.";
 
 /// The image to fetch.
@@ -57,8 +142,8 @@ fn yaml(text: &str) -> String {
 }
 
 /// The autoinstall answers: no questions, the largest disk, an account named after the Mac's user
-/// and the password it was given (set at the end, so the first console sign-in uses it), and what is said
-/// on the serial port when it ends.
+/// and the password it was given (set at the end, so the first console sign-in uses it), the
+/// driver's service from the answer disc, and what is said on the serial port when it ends.
 pub fn user_data(account: &str, password: &str, hostname: &str) -> String {
     format!(
         "#cloud-config
@@ -94,6 +179,12 @@ autoinstall:
     - echo {failed} > /dev/ttyAMA0
   late-commands:
     - 'curtin in-target --target=/target -- sh -c \"echo ''{user}:{password}'' | chpasswd\"'
+    - mkdir -p /run/guesthouse-answers
+    - mount -o ro LABEL=CIDATA /run/guesthouse-answers
+    - install -D -m 0755 /run/guesthouse-answers/{runner} /target/usr/local/sbin/guesthouse-driver
+    - install -D -m 0644 /run/guesthouse-answers/{service} /target/etc/systemd/system/{service}
+    - curtin in-target --target=/target -- systemctl enable {service}
+    - umount /run/guesthouse-answers
     - echo {finished} > /dev/ttyAMA0
 ",
         host = hostname,
@@ -101,6 +192,8 @@ autoinstall:
         password = password,
         failed = FAILED,
         finished = FINISHED,
+        runner = DRIVER_RUNNER_FILE,
+        service = DRIVER_SERVICE_FILE,
     )
 }
 

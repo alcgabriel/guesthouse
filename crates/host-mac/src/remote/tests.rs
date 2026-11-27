@@ -13,6 +13,7 @@ fn launch() -> Launch {
         stick: None,
         installer: None,
         answer_disc: None,
+        installer_boot: None,
         option_rom: None,
         modes: vec![],
         frame_name: "guesthouse.w".into(),

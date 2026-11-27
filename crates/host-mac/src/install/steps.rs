@@ -9,7 +9,7 @@
 use super::fetch::{self, FetchError, Outcome, Request, Transport};
 use super::plan::{Guest, Step, space_needed_gb};
 use super::runner::{Ended, Progress, Report, StepError, Steps};
-use super::state::{InstallInfo, Source};
+use super::state::{InstallInfo, Source, StepStatus};
 use super::{driver, password, ubuntu, windows};
 use crate::store::MACHINE_FILE;
 use std::fs::{self, File};
@@ -21,6 +21,8 @@ pub trait MachineControl {
     fn make_disc(&mut self, folder: &Path, label: &str, out: &Path) -> Result<(), String>;
     /// A small FAT disk image holding `files`, for the guest to read.
     fn make_stick(&mut self, image: &Path, files: &[PathBuf]) -> Result<(), String>;
+    /// Files of a disc image, by their paths on it, into `folder` under the same paths.
+    fn extract(&mut self, image: &Path, names: &[&str], folder: &Path) -> Result<(), String>;
     /// Starts the machine as its file says.
     fn start(&mut self, id: &str) -> Result<(), String>;
     /// Where the machine stands (`running`, `stopped`, `failed`, ...) and why, if it failed.
@@ -51,6 +53,8 @@ pub struct Setup {
     /// Folders to look for QEMU's firmware in.
     pub firmware_dirs: Vec<PathBuf>,
 }
+
+mod linux;
 
 /// How often the serial port is read while waiting for the guest, and how long each wait may last.
 const POLL_MS: u64 = 5_000;
@@ -101,6 +105,13 @@ pub fn set_keys(folder: &Path, changes: &[(&str, Option<&str>)]) -> Result<(), S
     )
     .and_then(|()| fs::rename(&temporary, &path))
     .map_err(|e| StepError::new(format!("Cannot write {MACHINE_FILE}: {e}")))
+}
+
+/// The installer the fetch named in the machine's file.
+fn installer_of(folder: &Path) -> Option<PathBuf> {
+    let text = fs::read_to_string(folder.join(MACHINE_FILE)).ok()?;
+    let settings: serde_json::Value = serde_json::from_str(&text).ok()?;
+    settings["installer"].as_str().map(PathBuf::from)
 }
 
 /// Reads a firmware file, which QEMU's own folder may keep compressed.
@@ -205,6 +216,14 @@ impl RealSteps<'_> {
         if self.setup.guest == Guest::Windows && self.setup.driver_dir.is_none() {
             driver::fetch_package(self.transport, &self.setup.downloads).map_err(from_fetch)?;
         }
+        // Ubuntu can be opened without it, so a package that is not there is said at the driver
+        // step, where that is offered.
+        let lab_linux = self.setup.driver_dir.as_ref();
+        if self.setup.guest == Guest::Ubuntu
+            && !lab_linux.is_some_and(|dir| dir.join(driver::LINUX_SCRIPT).is_file())
+        {
+            let _ = driver::fetch_package_of(&driver::LINUX, self.transport, &self.setup.downloads);
+        }
         Ok(Ended::Done)
     }
 
@@ -236,6 +255,16 @@ impl RealSteps<'_> {
             fs::write(folder.join("code.fd"), code)
                 .and_then(|()| fs::write(folder.join("vars.fd"), vars))
                 .map_err(|e| StepError::new(format!("Cannot write the firmware: {e}")))?;
+        }
+        // The graphics device's ROM gives the firmware and the installer a picture. Without one
+        // the guest is still installed, and shows nothing until its driver runs.
+        if self.setup.guest == Guest::Ubuntu
+            && !folder.join(linux::OPTION_ROM).exists()
+            && let Some(rom) = linux::find_option_rom(&self.setup.firmware_dirs)
+        {
+            fs::copy(&rom, folder.join(linux::OPTION_ROM))
+                .map_err(|e| StepError::new(format!("Cannot copy the option ROM: {e}")))?;
+            set_keys(&folder, &[("option_rom", Some(linux::OPTION_ROM))])?;
         }
         Ok(Ended::Done)
     }
@@ -284,13 +313,12 @@ impl RealSteps<'_> {
                 "GPUPV_SETUP"
             }
             Guest::Ubuntu => {
-                fs::write(
-                    answers.join("user-data"),
-                    ubuntu::user_data(&account, &secret, &self.setup.id),
-                )
-                .map_err(|e| StepError::new(e.to_string()))?;
-                fs::write(answers.join("meta-data"), ubuntu::meta_data(&self.setup.id))
-                    .map_err(|e| StepError::new(e.to_string()))?;
+                self.ubuntu_answers(&answers, &account, &secret)?;
+                // Its kernel from the installer the fetch named; a machine whose file names
+                // none starts as its file says.
+                if let Some(installer) = installer_of(&folder) {
+                    self.ubuntu_installer_boot(&installer)?;
+                }
                 "CIDATA"
             }
         };
@@ -374,7 +402,7 @@ impl RealSteps<'_> {
 
     fn install_driver(&mut self, progress: Progress) -> Result<Ended, StepError> {
         if self.setup.guest == Guest::Ubuntu {
-            return Err(StepError::coded("no_package", ubuntu::DRIVER_PLACEHOLDER));
+            return self.ubuntu_driver(progress);
         }
         let heard = self.wait_for(DRIVER_MAX_MS, 0, progress, |text| {
             if let Some(line) = text
@@ -397,7 +425,7 @@ impl RealSteps<'_> {
         })
     }
 
-    fn first_start(&mut self, progress: Progress) -> Result<Ended, StepError> {
+    fn first_start(&mut self, info: &InstallInfo, progress: Progress) -> Result<Ended, StepError> {
         let folder = self.folder();
         set_keys(
             &folder,
@@ -420,36 +448,8 @@ impl RealSteps<'_> {
                 })
             }
             Guest::Ubuntu => {
-                self.control.start(&self.setup.id).map_err(StepError::new)?;
-                let began = self.control.now_ms();
-                let mut up_since: Option<u64> = None;
-                loop {
-                    let (state, why) = self.control.machine_state(&self.setup.id);
-                    let now = self.control.now_ms();
-                    match state.as_str() {
-                        "running" => {
-                            let since = *up_since.get_or_insert(now);
-                            if now - since >= UBUNTU_UP_MS {
-                                return Ok(Ended::Done);
-                            }
-                        }
-                        "failed" | "stopped" if now - began > POLL_MS => {
-                            return Err(StepError::new(why.unwrap_or_else(|| {
-                                "The machine stopped soon after it started.".into()
-                            })));
-                        }
-                        _ => up_since = None,
-                    }
-                    if now - began >= FIRST_START_MAX_MS {
-                        return Err(StepError::coded("timeout", "The machine did not come up."));
-                    }
-                    if !progress(Report::Fraction(
-                        ((now - began) as f64 / UBUNTU_UP_MS as f64).min(GUESS_CEILING),
-                    )) {
-                        return Ok(Ended::Stopped);
-                    }
-                    self.control.sleep_ms(POLL_MS);
-                }
+                let with_driver = info.status_of(Step::InstallDriver) == StepStatus::Done;
+                self.ubuntu_first_start(with_driver, progress)
             }
         }
     }
@@ -467,7 +467,7 @@ impl Steps for RealSteps<'_> {
             Step::MakeDisk => self.make_disk(),
             Step::InstallSystem => self.install_system(progress),
             Step::InstallDriver => self.install_driver(progress),
-            Step::FirstStart => self.first_start(progress),
+            Step::FirstStart => self.first_start(info, progress),
         }
     }
 }

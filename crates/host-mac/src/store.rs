@@ -2,7 +2,7 @@
 //! `machine.json` with the machine's settings. The store lists what is there and works out what
 //! starting a machine needs from it.
 
-use crate::launch::{DEFAULT_MODES, DEFAULT_SCALE, Graphics, Launch};
+use crate::launch::{DEFAULT_MODES, DEFAULT_SCALE, Graphics, InstallerBoot, Launch};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
@@ -62,6 +62,14 @@ struct Settings {
     installer: Option<String>,
     #[serde(default)]
     answer_disc: Option<String>,
+    /// The installer's kernel and initrd, taken from its disc, and its kernel line: set only
+    /// while an installer that needs them runs.
+    #[serde(default)]
+    installer_kernel: Option<String>,
+    #[serde(default)]
+    installer_initrd: Option<String>,
+    #[serde(default)]
+    installer_command_line: Option<String>,
     #[serde(default)]
     option_rom: Option<String>,
     #[serde(default)]
@@ -203,6 +211,15 @@ fn resolve(folder: &Path, path: &str) -> PathBuf {
     folder.join(path)
 }
 
+/// The installer's kernel for the firmware, when the machine names both its files.
+fn installer_boot(folder: &Path, settings: &Settings) -> Option<InstallerBoot> {
+    Some(InstallerBoot {
+        kernel: resolve(folder, settings.installer_kernel.as_deref()?),
+        initrd: resolve(folder, settings.installer_initrd.as_deref()?),
+        command_line: settings.installer_command_line.clone().unwrap_or_default(),
+    })
+}
+
 /// What starting needs, when the machine names its firmware files.
 fn launch_for(folder: &Path, id: &str, settings: &Settings) -> Option<Launch> {
     let code = settings.firmware_code.as_deref()?;
@@ -233,6 +250,7 @@ fn launch_for(folder: &Path, id: &str, settings: &Settings) -> Option<Launch> {
             .answer_disc
             .as_deref()
             .map(|path| resolve(folder, path)),
+        installer_boot: installer_boot(folder, settings),
         option_rom: settings
             .option_rom
             .as_deref()
@@ -408,6 +426,42 @@ mod tests {
         let json = serde_json::to_value(list(&store).unwrap()).unwrap();
         assert_eq!(json["machines"][0]["state"], "stopped");
         assert_eq!(json["skipped"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn an_installer_kernel_is_read_only_with_both_its_files() {
+        let store = scratch();
+        let machines = store.join("Machines");
+        let file = |extra: &str| {
+            format!(
+                r#"{{"name": "U", "kind": "linux", "cores": 4, "memory_mb": 3072, "disk": "disk.img",
+                    "firmware_code": "code.fd", "firmware_vars": "vars.fd"{extra}}}"#
+            )
+        };
+        add_machine(
+            &machines,
+            "u",
+            &file(
+                r#", "installer_kernel": "boot/vmlinuz", "installer_initrd": "boot/initrd",
+                    "installer_command_line": "autoinstall ---""#,
+            ),
+        );
+        add_machine(
+            &machines,
+            "v",
+            &file(r#", "installer_kernel": "boot/vmlinuz""#),
+        );
+        let listing = list(&machines).unwrap().machines;
+        let boot = listing[0].launch.as_ref().unwrap().installer_boot.clone();
+        assert_eq!(
+            boot,
+            Some(InstallerBoot {
+                kernel: machines.join("u/boot/vmlinuz"),
+                initrd: machines.join("u/boot/initrd"),
+                command_line: "autoinstall ---".into(),
+            })
+        );
+        assert_eq!(listing[1].launch.as_ref().unwrap().installer_boot, None);
     }
 
     #[test]

@@ -122,6 +122,32 @@ pub struct FakeGuest {
     pub start_error: Option<String>,
     /// Real milliseconds to sleep for each wait, so a person watching can see it move.
     pub real_pause_ms: u64,
+    /// What each disc image holds, by path, for `extract`; a path not named is a stand-in's.
+    pub extracted: Vec<String>,
+    /// The line a Linux driver package's `install.sh` says, when one is on the stick: the
+    /// stand-in guest says it at its next start, as the driver's service would run it.
+    pub stick_line: Option<String>,
+    /// When the stand-in guest turns itself off after a driver that failed.
+    pub off_at: Option<u64>,
+}
+
+/// After a start with the driver's disk, when the stand-in guest says what `install.sh` says,
+/// and then that it came up again.
+const DRIVER_SAYS_AFTER_MS: u64 = 15_000;
+const FIRST_START_AFTER_MS: u64 = 30_000;
+/// How long the stand-in guest takes to turn itself off after a driver that failed.
+const POWER_OFF_AFTER_MS: u64 = 5_000;
+
+/// The first line of the serial port's words in a stand-in `install.sh`, if it has one.
+fn said_by_script(text: &str) -> Option<String> {
+    use super::windows::marker;
+    let start = [marker::DRIVER_FAILED, marker::DRIVER_INSTALLED]
+        .iter()
+        .filter_map(|m| text.find(m))
+        .min()?;
+    let line = &text[start..];
+    let end = line.find(['"', '\'', '\n']).unwrap_or(line.len());
+    Some(line[..end].trim().to_string())
 }
 
 impl FakeGuest {
@@ -156,6 +182,11 @@ impl MachineControl for FakeGuest {
     }
 
     fn make_stick(&mut self, image: &Path, files: &[PathBuf]) -> Result<(), String> {
+        self.stick_line = files
+            .iter()
+            .find(|f| f.file_name().is_some_and(|n| n == driver::LINUX_SCRIPT))
+            .and_then(|f| fs::read_to_string(f).ok())
+            .and_then(|text| said_by_script(&text));
         self.stick_files = files
             .iter()
             .filter_map(|f| f.file_name())
@@ -164,17 +195,45 @@ impl MachineControl for FakeGuest {
         fs::write(image, b"stick").map_err(|e| e.to_string())
     }
 
+    fn extract(&mut self, image: &Path, names: &[&str], folder: &Path) -> Result<(), String> {
+        if !image.is_file() {
+            return Err(format!("{} is not there.", image.display()));
+        }
+        for name in names {
+            let path = folder.join(name);
+            fs::create_dir_all(path.parent().unwrap_or(folder)).map_err(|e| e.to_string())?;
+            fs::write(&path, format!("pretend this is {name}")).map_err(|e| e.to_string())?;
+            self.extracted.push(name.to_string());
+        }
+        Ok(())
+    }
+
     fn start(&mut self, id: &str) -> Result<(), String> {
         if let Some(error) = &self.start_error {
             return Err(error.clone());
         }
         self.started.push(id.to_string());
+        self.off_at = None;
+        // A start with a Linux driver's disk: the service runs its install.sh.
+        if let Some(line) = self.stick_line.clone() {
+            self.says
+                .push((self.now + DRIVER_SAYS_AFTER_MS, line.clone()));
+            if line.contains(super::windows::marker::DRIVER_INSTALLED) {
+                let first = super::windows::marker::FIRST_START.to_string();
+                self.says.push((self.now + FIRST_START_AFTER_MS, first));
+            } else {
+                self.off_at = Some(self.now + DRIVER_SAYS_AFTER_MS + POWER_OFF_AFTER_MS);
+            }
+        }
         Ok(())
     }
 
     fn machine_state(&mut self, _: &str) -> (String, Option<String>) {
         if let Some(why) = &self.fails {
             return ("failed".into(), Some(why.clone()));
+        }
+        if self.off_at.is_some_and(|at| self.now >= at) {
+            return ("stopped".into(), None);
         }
         match self.stops_at {
             Some(at) if self.now >= at && self.started.len() == 1 => ("stopped".into(), None),

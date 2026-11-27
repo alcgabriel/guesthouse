@@ -67,6 +67,16 @@ impl Graphics {
     }
 }
 
+/// An installer started by the firmware from a kernel QEMU hands it (`-kernel`), with the kernel
+/// line the installer needs to run on its own. Ubuntu's installer asks before it writes the disk
+/// unless its kernel line says `autoinstall`, and its own boot menu does not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstallerBoot {
+    pub kernel: PathBuf,
+    pub initrd: PathBuf,
+    pub command_line: String,
+}
+
 /// Everything the command line is made of.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Launch {
@@ -86,6 +96,8 @@ pub struct Launch {
     pub installer: Option<PathBuf>,
     /// The answers the installer reads, on a disc of their own.
     pub answer_disc: Option<PathBuf>,
+    /// The installer's kernel, when the installer disc is not to be booted by its own menu.
+    pub installer_boot: Option<InstallerBoot>,
     pub option_rom: Option<PathBuf>,
     pub modes: Vec<String>,
     /// The bootstrap name the device publishes its frames under.
@@ -228,6 +240,16 @@ pub fn qemu_args(launch: &Launch) -> Vec<String> {
         ]);
         add(&["-device", "usb-storage,drive=cd,bootindex=0"]);
     }
+    // The firmware starts a kernel it is handed before it looks at any disk.
+    if let Some(boot) = &launch.installer_boot {
+        add(&[
+            "-kernel",
+            &path(&boot.kernel),
+            "-initrd",
+            &path(&boot.initrd),
+        ]);
+        add(&["-append", &boot.command_line]);
+    }
     if let Some(answers) = &launch.answer_disc {
         add(&[
             "-drive",
@@ -318,6 +340,7 @@ mod tests {
             stick: None,
             installer: None,
             answer_disc: None,
+            installer_boot: None,
             option_rom: Some("/m/win/pvgfb.rom".into()),
             modes: vec!["1024x768@60".into()],
             frame_name: "guesthouse.win".into(),
@@ -593,6 +616,41 @@ mod tests {
         ];
         want.splice(at..at, extra.iter().map(|a| a.to_string()));
         assert_eq!(got, want);
+    }
+
+    /// Ubuntu's installer: its disc and answers as Windows', then its kernel, initrd and kernel
+    /// line for the firmware, and nothing else changed.
+    #[test]
+    fn an_installer_kernel_comes_right_after_the_installer_disc() {
+        let mut installing = launch();
+        installing.kind = LINUX.into();
+        installing.installer = Some("/m/u/ubuntu.iso".into());
+        installing.answer_disc = Some("/m/u/answers.iso".into());
+        installing.installer_boot = Some(InstallerBoot {
+            kernel: "/m/u/installer-boot/casper/vmlinuz".into(),
+            initrd: "/m/u/installer-boot/casper/initrd".into(),
+            command_line: "autoinstall ds=nocloud ---".into(),
+        });
+        let got = qemu_args(&installing);
+        let mut without = installing.clone();
+        without.installer_boot = None;
+        let mut want = qemu_args(&without);
+        let at = want
+            .iter()
+            .position(|arg| arg == "usb-storage,drive=cd,bootindex=0")
+            .unwrap()
+            + 1;
+        let extra = [
+            "-kernel",
+            "/m/u/installer-boot/casper/vmlinuz",
+            "-initrd",
+            "/m/u/installer-boot/casper/initrd",
+            "-append",
+            "autoinstall ds=nocloud ---",
+        ];
+        want.splice(at..at, extra.iter().map(|a| a.to_string()));
+        assert_eq!(got, want);
+        assert!(!qemu_args(&launch()).contains(&"-kernel".to_string()));
     }
 
     #[test]

@@ -59,7 +59,23 @@ const LAB_FIRMWARE: &str =
 /// Where the lab's `stick.sh` is, as a development convenience.
 const LAB_STICK_SCRIPT: &str = "Developer/lab/win/stick.sh";
 const FAKE_DISK_GB: u64 = 1;
-const STICK_MEGABYTES: &str = "64";
+/// The driver's disk, at least, and the room it keeps beside its files.
+const STICK_MEGABYTES: u64 = 64;
+const STICK_SPARE_MEGABYTES: u64 = 16;
+/// The system's tar, which reads ISO 9660 images.
+const TAR: &str = "/usr/bin/tar";
+
+/// A stick that holds `files`: 64 MB, or more when they need it (a Linux package's `.deb`s).
+fn stick_megabytes(files: &[PathBuf]) -> u64 {
+    let bytes: u64 = files
+        .iter()
+        .filter_map(|f| fs::metadata(f).ok())
+        .map(|m| m.len())
+        .sum();
+    // FAT's own tables and the clusters' rounding take about a tenth more.
+    let needed = bytes / 1_000_000 * 11 / 10 + STICK_SPARE_MEGABYTES;
+    needed.max(STICK_MEGABYTES)
+}
 
 /// The Mac's side of the steps, with the agent's machines behind it.
 struct AgentControl {
@@ -123,10 +139,34 @@ impl MachineControl for AgentControl {
                 String::from_utf8_lossy(&output.stderr).trim()
             ))
         };
-        run(vec!["new".into(), image.into(), STICK_MEGABYTES.into()])?;
+        run(vec![
+            "new".into(),
+            image.into(),
+            stick_megabytes(files).to_string().into(),
+        ])?;
         let mut put: Vec<std::ffi::OsString> = vec!["put".into(), image.into()];
         put.extend(files.iter().map(|f| f.into()));
         run(put)
+    }
+
+    fn extract(&mut self, image: &Path, names: &[&str], folder: &Path) -> Result<(), String> {
+        fs::create_dir_all(folder).map_err(|e| format!("Cannot make {}: {e}", folder.display()))?;
+        let output = Command::new(TAR)
+            .arg("-xf")
+            .arg(image)
+            .arg("-C")
+            .arg(folder)
+            .args(names)
+            .output()
+            .map_err(|e| format!("tar could not be started: {e}"))?;
+        if let Some(missing) = names.iter().find(|name| !folder.join(name).is_file()) {
+            return Err(format!(
+                "{missing} could not be taken from {}: {}",
+                image.display(),
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+        Ok(())
     }
 
     fn start(&mut self, id: &str) -> Result<(), String> {
@@ -433,6 +473,22 @@ mod tests {
         let mut info = InstallInfo::new("m", &Plan::for_guest(guest), Source::Download);
         info.disk_gb = kept;
         info
+    }
+
+    #[test]
+    fn the_drivers_stick_is_64_mb_unless_its_files_need_more() {
+        let folder = std::env::temp_dir().join(format!("gh-stick-{}", std::process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        let small = folder.join("small");
+        fs::write(&small, vec![0u8; 1000]).unwrap();
+        assert_eq!(stick_megabytes(std::slice::from_ref(&small)), 64);
+        let big = folder.join("big");
+        fs::File::create(&big)
+            .unwrap()
+            .set_len(100_000_000)
+            .unwrap();
+        assert_eq!(stick_megabytes(&[small, big]), 126);
+        let _ = fs::remove_dir_all(folder);
     }
 
     #[test]

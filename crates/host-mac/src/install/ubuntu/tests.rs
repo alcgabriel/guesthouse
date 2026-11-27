@@ -62,3 +62,36 @@ fn the_seed_names_the_instance() {
 fn the_driver_step_says_plainly_what_is_missing() {
     assert!(DRIVER_PLACEHOLDER.contains("not packaged yet"));
 }
+
+#[test]
+fn the_installer_runs_with_no_questions_and_its_console_on_the_serial_port() {
+    assert!(INSTALLER_COMMAND_LINE.starts_with("autoinstall ds=nocloud "));
+    let (installer, installed) = INSTALLER_COMMAND_LINE.split_once(" --- ").unwrap();
+    assert!(installer.contains("console=ttyAMA0,115200"));
+    assert!(installed.contains("console=ttyAMA0,115200"));
+}
+
+#[test]
+fn the_answers_put_the_drivers_service_into_the_installed_system_before_saying_finished() {
+    let text = user_data("nick", "k7mn-p3xq-ab9d-w4ht", "guesthouse");
+    let enable = text
+        .find(&format!("systemctl enable {DRIVER_SERVICE_FILE}"))
+        .unwrap();
+    assert!(text.contains("mount -o ro LABEL=CIDATA"));
+    assert!(text.contains("/target/usr/local/sbin/guesthouse-driver"));
+    assert!(enable < text.find(&format!("echo {FINISHED}")).unwrap());
+}
+
+#[test]
+fn the_drivers_service_runs_install_sh_from_the_ruxn_disk_once_a_version() {
+    assert!(DRIVER_SERVICE.contains("ExecStart=/bin/sh /usr/local/sbin/guesthouse-driver"));
+    assert!(DRIVER_SERVICE.contains("WantedBy=multi-user.target"));
+    assert!(DRIVER_RUNNER.contains("/dev/disk/by-label/RUXN"));
+    assert!(DRIVER_RUNNER.contains("sh ./install.sh"));
+    assert!(DRIVER_RUNNER.contains(crate::install::driver::LINUX.manifest));
+    assert!(DRIVER_RUNNER.contains("driver-version"));
+    // Worked: into the desktop; failed: off, so Try Again is a start of its own.
+    assert!(DRIVER_RUNNER.contains("systemctl --no-block reboot"));
+    assert!(DRIVER_RUNNER.contains("systemctl --no-block poweroff"));
+    assert!(DRIVER_RUNNER.contains(&format!("{} exit-", "driver failed")));
+}
