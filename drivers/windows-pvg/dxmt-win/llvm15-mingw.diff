@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+# llvm15-mingw.diff: LLVM 15.0.7 against llvm-mingw's libc++ (LLVM 23).
+# libc++ no longer pulls <type_traits> in through <utility>/<limits>, so
+# std::is_pod is undeclared in ItaniumDemangle.h (LLVMDemangle fails to
+# build for aarch64-w64-mingw32). Include it explicitly, as later LLVM
+# releases do. Apply with: patch -d llvm15-src -p1 < llvm15-mingw.diff
+
+--- a/llvm/include/llvm/Demangle/ItaniumDemangle.h
++++ b/llvm/include/llvm/Demangle/ItaniumDemangle.h
+@@ -26,6 +26,7 @@
+ #include <cstdlib>
+ #include <cstring>
+ #include <limits>
++#include <type_traits>
+ #include <utility>
+ 
+ DEMANGLE_NAMESPACE_BEGIN
