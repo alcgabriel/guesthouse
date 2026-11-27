@@ -1,6 +1,7 @@
 //! What a machine's network needs of the host beyond HCN's network itself: port forwards, which are
-//! `netsh interface portproxy` entries with a Windows Firewall rule beside each, and the adapters a
-//! machine can be bridged onto.
+//! `netsh interface portproxy` entries with a Windows Firewall rule beside each, the firewall rule
+//! that lets other devices reach a machine's remote view, and the adapters a machine can be bridged
+//! onto.
 //!
 //! The service does it all as the system, through [`Network`]. This module is every part of it that
 //! isn't a call into Windows, so it's tested anywhere: the arguments `netsh` is run with, which are
@@ -16,6 +17,31 @@ use std::net::Ipv4Addr;
 /// behind is known for Guesthouse's own.
 pub const RULE_PREFIX: &str = "Guesthouse ";
 
+/// What the firewall rule for a machine's remote view starts with. It begins as a forward's does,
+/// so one listing of Guesthouse's rules finds both, but its extra words are never a forward's name,
+/// whose machine is one word: neither cleanup takes the other's rules, and a forward's, which takes
+/// the portproxy entry on its port too, never touches a remote view's.
+pub const VIEW_RULE_PREFIX: &str = "Guesthouse remote view ";
+
+/// The protocol a firewall rule lets in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Protocol {
+    /// A port forward's, as portproxy carries TCP only.
+    Tcp,
+    /// A remote view's, as remoteman's screen is QUIC over UDP.
+    Udp,
+}
+
+impl Protocol {
+    /// How `netsh` names it.
+    pub fn word(self) -> &'static str {
+        match self {
+            Protocol::Tcp => "TCP",
+            Protocol::Udp => "UDP",
+        }
+    }
+}
+
 /// The service that is Hyper-V's virtual machine management, which is installed with the Hyper-V
 /// feature of Windows Pro, Education and Enterprise.
 pub const HYPER_V_SERVICE: &str = "vmms";
@@ -29,6 +55,19 @@ pub fn rule_name(machine: &str, port: u16) -> String {
 /// so the port is whatever follows the last one.
 pub fn parse_rule_name(name: &str) -> Option<(&str, u16)> {
     let (machine, port) = name.strip_prefix(RULE_PREFIX)?.rsplit_once(' ')?;
+    let port = port.parse::<u16>().ok().filter(|port| *port != 0)?;
+    (!machine.is_empty() && !machine.contains(' ')).then_some((machine, port))
+}
+
+/// The name of the firewall rule that lets other devices reach `machine`'s remote view on this PC's
+/// UDP `port`.
+pub fn view_rule_name(machine: &str, port: u16) -> String {
+    format!("{VIEW_RULE_PREFIX}{machine} {port}")
+}
+
+/// The machine and port in a rule's name as [`view_rule_name`] makes it.
+pub fn parse_view_rule_name(name: &str) -> Option<(&str, u16)> {
+    let (machine, port) = name.strip_prefix(VIEW_RULE_PREFIX)?.rsplit_once(' ')?;
     let port = port.parse::<u16>().ok().filter(|port| *port != 0)?;
     (!machine.is_empty() && !machine.contains(' ')).then_some((machine, port))
 }
@@ -122,16 +161,16 @@ pub fn show_rules_args() -> Vec<String> {
     words(&["advfirewall", "firewall", "show", "rule", "name=all", "dir=in"])
 }
 
-/// Lets TCP `port` in from this PC's own network, on any profile, as a connection from the other
-/// devices on the network is what a forward is for. The internet's own addresses are left out: a
-/// forward is never for them.
-pub fn add_rule_args(name: &str, port: u16) -> Vec<String> {
+/// Lets `protocol` on `port` in from this PC's own network, on any profile, as a connection from the
+/// other devices on the network is what a forward or a remote view is for. The internet's own
+/// addresses are left out: neither is ever for them.
+pub fn add_rule_args(name: &str, port: u16, protocol: Protocol) -> Vec<String> {
     let mut args = words(&["advfirewall", "firewall", "add", "rule"]);
     args.extend([
         format!("name={name}"),
         "dir=in".to_owned(),
         "action=allow".to_owned(),
-        "protocol=TCP".to_owned(),
+        format!("protocol={}", protocol.word()),
         format!("localport={port}"),
         "remoteip=localsubnet".to_owned(),
         "profile=any".to_owned(),
@@ -172,9 +211,9 @@ impl<R: Run> Netsh<R> {
         self.0.run(&show_rules_args()).map(|text| parse_rule_names(&text))
     }
 
-    pub fn add_rule(&self, name: &str, port: u16) -> Result<(), String> {
+    pub fn add_rule(&self, name: &str, port: u16, protocol: Protocol) -> Result<(), String> {
         guard_rule_name(name)?;
-        self.0.run(&add_rule_args(name, port)).map(drop)
+        self.0.run(&add_rule_args(name, port, protocol)).map(drop)
     }
 
     pub fn delete_rule(&self, name: &str) -> Result<(), String> {
@@ -183,9 +222,10 @@ impl<R: Run> Netsh<R> {
     }
 }
 
-/// Only Guesthouse's own rules are made and deleted: one of its name's shape, which needs no quoting.
+/// Only Guesthouse's own rules are made and deleted: one of its names' shapes, which needs no
+/// quoting.
 fn guard_rule_name(name: &str) -> Result<(), String> {
-    match parse_rule_name(name) {
+    match parse_view_rule_name(name).or_else(|| parse_rule_name(name)) {
         Some(_) if name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '-' | '_')) => Ok(()),
         _ => Err(format!("{name:?} isn't the name of one of Guesthouse's firewall rules.")),
     }
@@ -198,9 +238,9 @@ pub trait Network: Send + Sync {
     fn add_proxy(&self, listen: u16, address: Ipv4Addr, connect: u16) -> Result<(), String>;
     /// Deletes the entry listening on every address at `listen`.
     fn delete_proxy(&self, listen: u16) -> Result<(), String>;
-    /// The names of Guesthouse's inbound rules.
+    /// The names of Guesthouse's inbound rules, forwards' and remote views' alike.
     fn rules(&self) -> Result<Vec<String>, String>;
-    fn add_rule(&self, name: &str, port: u16) -> Result<(), String>;
+    fn add_rule(&self, name: &str, port: u16, protocol: Protocol) -> Result<(), String>;
     fn delete_rule(&self, name: &str) -> Result<(), String>;
     /// Whether nothing listens on TCP `port` of this PC, by trying to.
     fn port_free(&self, port: u16) -> bool;
@@ -292,7 +332,7 @@ mod tests {
     #[test]
     fn a_forward_is_made_with_these_exact_arguments() {
         let netsh = netsh(Ok(""));
-        netsh.add_rule("Guesthouse win 8080", 8080).unwrap();
+        netsh.add_rule("Guesthouse win 8080", 8080, Protocol::Tcp).unwrap();
         netsh.add_proxy(8080, Ipv4Addr::new(172, 29, 1, 2), 80).unwrap();
         assert_eq!(
             asked(&netsh),
@@ -327,6 +367,63 @@ mod tests {
     }
 
     #[test]
+    fn a_remote_views_rule_has_its_own_name_that_no_forward_takes_for_its_own() {
+        assert_eq!(view_rule_name("win11", 7792), "Guesthouse remote view win11 7792");
+        assert_eq!(parse_view_rule_name("Guesthouse remote view win11 7792"), Some(("win11", 7792)));
+        assert_eq!(parse_rule_name("Guesthouse remote view win11 7792"), None, "never a forward's");
+        // A forward of a machine called `remote` isn't a remote view's.
+        assert_eq!(parse_view_rule_name("Guesthouse remote 7792"), None);
+        assert_eq!(parse_view_rule_name(&rule_name("remote", 7792)), None);
+        for other in
+            ["Guesthouse remote view", "Guesthouse remote view win 0", "Guesthouse remote view a b 1"]
+        {
+            assert_eq!(parse_view_rule_name(other), None, "{other}");
+        }
+        let listed = "Rule Name:   Guesthouse remote view win 7792\r\n------------------------------\r\n";
+        assert_eq!(
+            parse_rule_names(listed),
+            ["Guesthouse remote view win 7792"],
+            "listed with the forwards'"
+        );
+    }
+
+    #[test]
+    fn a_remote_views_rule_lets_udp_in_from_this_network_only() {
+        let netsh = netsh(Ok(""));
+        netsh.add_rule("Guesthouse remote view win 7792", 7792, Protocol::Udp).unwrap();
+        netsh.delete_rule("Guesthouse remote view win 7792").unwrap();
+        assert_eq!(
+            asked(&netsh),
+            [
+                [
+                    "advfirewall",
+                    "firewall",
+                    "add",
+                    "rule",
+                    "name=Guesthouse remote view win 7792",
+                    "dir=in",
+                    "action=allow",
+                    "protocol=UDP",
+                    "localport=7792",
+                    "remoteip=localsubnet",
+                    "profile=any"
+                ]
+                .to_vec(),
+                [
+                    "advfirewall",
+                    "firewall",
+                    "delete",
+                    "rule",
+                    "name=Guesthouse remote view win 7792",
+                    "dir=in"
+                ]
+                .to_vec()
+            ]
+        );
+        assert!(netsh.add_rule("Guesthouse remote view a.b 7792", 7792, Protocol::Udp).is_err());
+    }
+
+    #[test]
     fn a_forward_is_removed_with_these_exact_arguments() {
         let netsh = netsh(Ok(""));
         netsh.delete_proxy(8080).unwrap();
@@ -347,7 +444,7 @@ mod tests {
         for name in
             ["Remote Desktop", "Guesthouse win 80\" & calc", "Guesthouse win 99999", "Guesthouse a.b 80"]
         {
-            assert!(netsh.add_rule(name, 80).is_err(), "{name}");
+            assert!(netsh.add_rule(name, 80, Protocol::Tcp).is_err(), "{name}");
             assert!(netsh.delete_rule(name).is_err(), "{name}");
         }
         assert!(asked(&netsh).is_empty(), "nothing was run");

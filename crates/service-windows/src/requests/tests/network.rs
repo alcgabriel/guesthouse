@@ -2,7 +2,7 @@
 
 use super::*;
 use guesthouse_control::{AdapterInfo, Forward};
-use guesthouse_host_windows::network::{Proxy, RULE_PREFIX};
+use guesthouse_host_windows::network::{Protocol, Proxy, RULE_PREFIX};
 use std::net::Ipv4Addr;
 
 /// What the double's Windows holds, and what was asked of it, in order.
@@ -67,9 +67,12 @@ impl Network for FakeNet {
         Ok(shown.cloned().collect())
     }
 
-    fn add_rule(&self, name: &str, port: u16) -> Result<(), String> {
+    fn add_rule(&self, name: &str, port: u16, protocol: Protocol) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
-        state.calls.push(format!("add_rule {name} {port}"));
+        state.calls.push(match protocol {
+            Protocol::Tcp => format!("add_rule {name} {port}"),
+            Protocol::Udp => format!("add_rule {name} {port} udp"),
+        });
         state.rules.push(name.to_owned());
         Ok(())
     }

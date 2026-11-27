@@ -427,7 +427,12 @@ mod tests {
         fn rules(&self) -> Result<Vec<String>, String> {
             Ok(Vec::new())
         }
-        fn add_rule(&self, _: &str, _: u16) -> Result<(), String> {
+        fn add_rule(
+            &self,
+            _: &str,
+            _: u16,
+            _: guesthouse_host_windows::network::Protocol,
+        ) -> Result<(), String> {
             Err("not here".into())
         }
         fn delete_rule(&self, _: &str) -> Result<(), String> {
