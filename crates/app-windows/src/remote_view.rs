@@ -186,6 +186,9 @@ pub struct Shown {
     pub switch_enabled: bool,
     pub headline: String,
     pub refused: Option<String>,
+    /// What the service says beside a state that works, as when the machine's name is announced by
+    /// something else and only its address reaches it. A failure's reason is in the headline.
+    pub note: Option<String>,
     /// "192.168.1.20:7792", or only the port when this PC's address isn't known.
     pub address: Option<String>,
     pub port: Option<u16>,
@@ -308,6 +311,7 @@ impl Viewing {
             switch_enabled: self.asked_switch.is_none(),
             headline: wording::headline(on, facts.running, info),
             refused: self.refused.clone(),
+            note: info.reason.clone().filter(|_| on && !failed),
             address,
             port,
             fingerprint: info.fingerprint.clone().filter(|_| on),

@@ -652,6 +652,9 @@ fn console_row(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> V
 fn remote_view_rows(shown: &Shown, context: &ViewContext<Main>) -> Vec<View> {
     let mut under: Vec<View> =
         vec![caption(&shown.headline).into(), caption(wording::NETWORK_WARNING).into()];
+    if let Some(note) = &shown.note {
+        under.push(caption(note).into());
+    }
     if let Some(refused) = &shown.refused {
         under.push(caption(refused).foreground(ThemeBrush::SystemCritical).into());
     }

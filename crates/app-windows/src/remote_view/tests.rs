@@ -280,3 +280,14 @@ fn a_code_is_read_digit_by_digit() {
     assert_eq!(spoken_code("482 917"), "Code 4 8 2 9 1 7");
     assert_eq!(proposed::clock(9), "0:09");
 }
+
+#[test]
+fn a_reason_beside_a_working_state_is_a_note_and_not_a_failure() {
+    let reason = "It isn't listed by name on the network, as another device has that name. Its address and port still work.";
+    let shown = viewing(ShareInfo { reason: Some(reason.into()), ..listening() }).shown(&running());
+    assert_eq!(shown.headline, "Ready. A paired device can connect.");
+    assert_eq!(shown.note.as_deref(), Some(reason));
+    assert!(shown.pairing.is_some());
+    let failed = viewing(ShareInfo { state: ShareState::Failed, reason: Some(reason.into()), ..listening() });
+    assert_eq!(failed.shown(&running()).note, None);
+}

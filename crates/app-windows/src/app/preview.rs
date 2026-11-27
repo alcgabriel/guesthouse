@@ -227,6 +227,14 @@ fn remote_view(main: &mut Main, state: &str) {
             devices: vec![device("Phone", "7c8d41ab", false, false)],
             ..listening
         },
+        "rv-unlisted" => ShareInfo {
+            reason: Some(
+                "It isn't listed by name on the network, as something else has that name. Its address and port \
+                 still work."
+                    .to_owned(),
+            ),
+            ..listening
+        },
         // rv-ready, rv-bridged
         _ => listening,
     };
