@@ -252,6 +252,18 @@ mod tests {
         assert!(!valid_user(""));
     }
 
+    /// Every edge of the rule as it is: no length limit and no reserved names here, a small letter
+    /// first, then small letters, digits, dashes and underscores.
+    #[test]
+    fn a_user_name_at_each_edge() {
+        for name in ["a", "z", "a0", "a-", "a_", "root", "administrator", &"x".repeat(100)] {
+            assert!(valid_user(name), "{name:?}");
+        }
+        for name in ["_a", "-a", "0a", "A", "aB", "a.b", "é", "a\n"] {
+            assert!(!valid_user(name), "{name:?}");
+        }
+    }
+
     #[test]
     fn the_files_disk_is_never_smaller_or_larger_than_fat32_allows() {
         let size = files_disk_bytes(None);
