@@ -1,6 +1,6 @@
 //! What sort of problem the tester says it is. It never takes anything out of a report. It only adds
-//! what fits that sort of problem, and it goes into the summary so reports can be sorted. The words
-//! are the Linux host's, so one server sorts both.
+//! what fits that sort of problem, and it goes into the summary so reports can be sorted. Every host
+//! uses these words, so one server sorts them all.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ProblemKind {
@@ -23,7 +23,7 @@ impl ProblemKind {
         Self::SomethingElse,
     ];
 
-    /// The word for it in the summary.
+    /// The word for it in the summary, and on the Linux host's command line.
     pub fn word(self) -> &'static str {
         match self {
             Self::WontStart => "wont-start",
@@ -50,6 +50,18 @@ impl ProblemKind {
     pub fn from_word(word: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| kind.word() == word)
     }
+
+    /// The guest's install log, which is only worth its room when the install is what failed. The
+    /// Linux host's gathering asks this.
+    pub fn wants_install_log(self) -> bool {
+        self == Self::InstallFailed
+    }
+
+    /// Crash records of the programs that run a machine too, and from further back, beyond the
+    /// app's own. The Linux host's gathering asks this.
+    pub fn wants_every_crash(self) -> bool {
+        self == Self::Crashed
+    }
 }
 
 #[cfg(test)]
@@ -66,10 +78,21 @@ mod tests {
 
     #[test]
     fn the_words_and_labels_are_the_linux_hosts() {
-        let linux = include_str!("../../../app-core/src/report/kind.rs");
+        // Pinned, as the hosts' reports are sorted by these on one server.
+        let words: Vec<&str> = ProblemKind::ALL.iter().map(|kind| kind.word()).collect();
+        assert_eq!(words, ["wont-start", "crashed", "picture", "slow", "install-failed", "other"]);
+        let labels: Vec<&str> = ProblemKind::ALL.iter().map(|kind| kind.label()).collect();
+        assert_eq!(
+            labels,
+            ["Won't start", "Crashed", "Picture is wrong", "Slow", "Install failed", "Something else"]
+        );
+    }
+
+    #[test]
+    fn only_a_failed_install_wants_the_install_log_and_only_a_crash_every_crash() {
         for kind in ProblemKind::ALL {
-            assert!(linux.contains(&format!("=> \"{}\",", kind.word())), "{}", kind.word());
-            assert!(linux.contains(&format!("=> \"{}\",", kind.label())), "{}", kind.label());
+            assert_eq!(kind.wants_install_log(), kind == ProblemKind::InstallFailed);
+            assert_eq!(kind.wants_every_crash(), kind == ProblemKind::Crashed);
         }
     }
 

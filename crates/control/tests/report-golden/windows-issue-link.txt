@@ -1,0 +1,1 @@
+https://github.com/ruxnlabs/guesthouse/issues/new?title=Report%200a1b2c3d4e&body=Report%20ID%3A%200a1b2c3d4e%0A%0A-%20kind%3A%20crashed%0A-%20version%3A%200.13.0%0A-%20host%3A%20windows%0A-%20os%3A%20Windows%2011%20Pro%2024H2%20build%2026100%0A-%20card%3A%20NVIDIA%20GeForce%20RTX%204080%0A-%20machine%3A%20windows%0A

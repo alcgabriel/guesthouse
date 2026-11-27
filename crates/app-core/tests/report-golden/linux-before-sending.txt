@@ -1,0 +1,48 @@
+false logs=false running=false wont-start: None
+false logs=false running=false crashed: None
+false logs=false running=false picture: None
+false logs=false running=false slow: None
+false logs=false running=false install-failed: None
+false logs=false running=false other: None
+false logs=false running=true wont-start: None
+false logs=false running=true crashed: None
+false logs=false running=true picture: None
+false logs=false running=true slow: None
+false logs=false running=true install-failed: None
+false logs=false running=true other: None
+false logs=true running=false wont-start: None
+false logs=true running=false crashed: None
+false logs=true running=false picture: None
+false logs=true running=false slow: None
+false logs=true running=false install-failed: None
+false logs=true running=false other: None
+false logs=true running=true wont-start: None
+false logs=true running=true crashed: None
+false logs=true running=true picture: None
+false logs=true running=true slow: None
+false logs=true running=true install-failed: None
+false logs=true running=true other: None
+true logs=false running=false wont-start: Some("This report has no logs of the machine running. Start it, make the problem happen again, then send. If it won't start at all, send anyway.")
+true logs=false running=false crashed: Some("This report has no logs of the machine running, and logs from inside the guest need it running. The fullest report comes with the machine running: start it, make the problem happen again if you can, then send.")
+true logs=false running=false picture: Some("This report has no logs of the machine running, and logs from inside the guest need it running. The fullest report comes with the machine running: start it, make the problem happen again if you can, then send.")
+true logs=false running=false slow: Some("This report has no logs of the machine running, and logs from inside the guest need it running. The fullest report comes with the machine running: start it, make the problem happen again if you can, then send.")
+true logs=false running=false install-failed: Some("This report has no logs of the machine running. Start it, make the problem happen again, then send. If it won't start at all, send anyway.")
+true logs=false running=false other: Some("This report has no logs of the machine running, and logs from inside the guest need it running. The fullest report comes with the machine running: start it, make the problem happen again if you can, then send.")
+true logs=false running=true wont-start: Some("This report has no logs of the machine running. Start it, make the problem happen again, then send. If it won't start at all, send anyway.")
+true logs=false running=true crashed: Some("This report has no logs of the machine running. Start it, make the problem happen again, then send. If it won't start at all, send anyway.")
+true logs=false running=true picture: Some("This report has no logs of the machine running. Start it, make the problem happen again, then send. If it won't start at all, send anyway.")
+true logs=false running=true slow: Some("This report has no logs of the machine running. Start it, make the problem happen again, then send. If it won't start at all, send anyway.")
+true logs=false running=true install-failed: Some("This report has no logs of the machine running. Start it, make the problem happen again, then send. If it won't start at all, send anyway.")
+true logs=false running=true other: Some("This report has no logs of the machine running. Start it, make the problem happen again, then send. If it won't start at all, send anyway.")
+true logs=true running=false wont-start: None
+true logs=true running=false crashed: Some("The machine isn't running, so the report has nothing from inside the guest. The fullest report comes with it running: start it, make the problem happen if you can, then send.")
+true logs=true running=false picture: Some("The machine isn't running, so the report has nothing from inside the guest. The fullest report comes with it running: start it, make the problem happen if you can, then send.")
+true logs=true running=false slow: Some("The machine isn't running, so the report has nothing from inside the guest. The fullest report comes with it running: start it, make the problem happen if you can, then send.")
+true logs=true running=false install-failed: None
+true logs=true running=false other: Some("The machine isn't running, so the report has nothing from inside the guest. The fullest report comes with it running: start it, make the problem happen if you can, then send.")
+true logs=true running=true wont-start: None
+true logs=true running=true crashed: None
+true logs=true running=true picture: None
+true logs=true running=true slow: None
+true logs=true running=true install-failed: None
+true logs=true running=true other: None
