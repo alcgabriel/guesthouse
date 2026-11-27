@@ -924,6 +924,7 @@ dependencies = [
  "guesthouse-backend-nvidia",
  "guesthouse-basics",
  "guesthouse-card-check",
+ "guesthouse-carry-core",
  "guesthouse-daemon",
  "guesthouse-jail",
  "guesthouse-relay",
@@ -1022,6 +1023,15 @@ version = "0.11.0"
 dependencies = [
  "guesthouse-backend",
  "guesthouse-backend-nvidia",
+]
+
+[[package]]
+name = "guesthouse-carry-core"
+version = "0.11.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
