@@ -98,6 +98,7 @@ pub fn view(main: &Main, context: &mut ViewContext<Main>) -> View {
         (Some(name), _) => content.content_dialog(delete_dialog(name, context)),
         (None, Some(ask)) => content.content_dialog(snapshot_dialog(ask, context)),
         (None, None) if main.bridge_ask => content.content_dialog(bridge_dialog(main, context)),
+        (None, None) if main.install_ask => content.content_dialog(install_dialog(main, context)),
         (None, None) if removing.is_some() => {
             let name = removing.map(|(_, name)| name.as_str()).unwrap_or_default();
             content.content_dialog(remove_dialog(name, context))
@@ -111,6 +112,7 @@ fn can_go_back(main: &Main) -> bool {
     let asking = main.deleting.is_some()
         || main.snapshot_ask.is_some()
         || main.bridge_ask
+        || main.install_ask
         || main.viewing.as_ref().is_some_and(|viewing| viewing.removing.is_some());
     let page = match main.seen {
         Ok(_) => main.page != Page::Home,
@@ -345,6 +347,55 @@ fn bridge_dialog(main: &Main, context: &ViewContext<Main>) -> ContentDialog {
         .default_button(ContentDialogButton::Close)
         .is_open(true)
         .on_closed(context.callback(Message::BridgeAnswered))
+}
+
+/// Asks before an install that stops running machines, naming them, as the installer stops the
+/// service, which shuts them down. Later is what Enter presses.
+fn install_dialog(main: &Main, context: &ViewContext<Main>) -> ContentDialog {
+    let version = main.updates.newer().map(|latest| latest.version.as_str()).unwrap_or_default();
+    if main.status().is_none() {
+        return ContentDialog::new()
+            .title(format!("Install Guesthouse {version} now?"))
+            .content(
+                TextBlock::new()
+                    .text(format!(
+                        "{} A running machine is asked to shut down, and turned off if it's still running after a \
+                         minute; anything unsaved in it is lost. A machine being made would be left half made.",
+                        app_settings::UNKNOWN_MACHINES
+                    ))
+                    .text_wrapping(TextWrapping::Wrap),
+            )
+            .primary_button_text("Stop the service and install")
+            .close_button_text("Later")
+            .default_button(ContentDialogButton::Close)
+            .is_open(true)
+            .on_closed(context.callback(Message::InstallAnswered));
+    }
+    let mut parts: Vec<View> = vec![
+        TextBlock::new()
+            .text(
+                "Installing stops the service, which asks each running machine to shut down, and turns off any \
+                 still running after a minute. Anything unsaved in them is lost.",
+            )
+            .text_wrapping(TextWrapping::Wrap)
+            .into(),
+    ];
+    for machine in crate::update::stopped_by_install(main.machines()) {
+        parts.push(
+            TextBlock::new()
+                .text(format!("\u{2022}  {}, {}", machine.name, machine.state.name().to_lowercase()))
+                .margin(Thickness::new(8.0, 0.0, 0.0, 0.0))
+                .into(),
+        );
+    }
+    ContentDialog::new()
+        .title(format!("Install Guesthouse {version} now?"))
+        .content(StackPanel::new().spacing(6.0).children(parts))
+        .primary_button_text("Shut them down and install")
+        .close_button_text("Later")
+        .default_button(ContentDialogButton::Close)
+        .is_open(true)
+        .on_closed(context.callback(Message::InstallAnswered))
 }
 
 fn delete_dialog(name: &str, context: &ViewContext<Main>) -> ContentDialog {

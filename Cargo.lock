@@ -964,6 +964,7 @@ dependencies = [
  "guesthouse-remote-view-core",
  "serde",
  "serde_json",
+ "sha2",
  "windows-reactor",
  "windows-reactor-setup",
  "windows-sys 0.61.2",
