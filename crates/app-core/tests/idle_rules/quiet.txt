@@ -1,0 +1,24 @@
+sessions ok
+s|0|4|Services
+s|1|0|Console
+s|65536|6|RDP-Tcp
+power ok
+p|DISPLAY:
+p|None.
+p|
+p|SYSTEM:
+p|None.
+p|
+p|AWAYMODE:
+p|None.
+p|
+p|EXECUTION:
+p|None.
+p|
+p|PERFBOOST:
+p|None.
+p|
+p|ACTIVELOCKSCREEN:
+p|None.
+p|
+input 7200

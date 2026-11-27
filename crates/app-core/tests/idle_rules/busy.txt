@@ -1,0 +1,30 @@
+sessions ok
+s|0|4|Services
+s|1|0|Console
+s|2|0|RDP-Tcp#0
+s|3|1|rdp-tcp#1
+s|4|4|
+s|65536|6|RDP-Tcp
+power ok
+p|DISPLAY:
+p|[PROCESS] \Device\HarddiskVolume3\Program Files\VideoLAN\VLC\vlc.exe
+p|Playing video
+p|
+p|SYSTEM:
+p|[DRIVER] Realtek High Definition Audio (HDAUDIO\FUNC_01&VEN_10EC&DEV_0256&SUBSYS_00000000&REV_1000\4&0&0001)
+p|An audio stream is currently in use.
+p|[PROCESS] \Device\HarddiskVolume3\Program Files (x86)\Steam\steamapps\common\A Very Long Game Name That Goes On And On\bin\game.exe
+p|
+p|AWAYMODE:
+p|None.
+p|
+p|EXECUTION:
+p|[SERVICE] BITS
+p|
+p|PERFBOOST:
+p|None.
+p|
+p|ACTIVELOCKSCREEN:
+p|None.
+p|
+input 12
