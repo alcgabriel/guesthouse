@@ -291,9 +291,16 @@ pub fn shares_refusal(shares: &[Share]) -> Option<String> {
     None
 }
 
-/// Whether `name` can be a guest's administrator in both systems: Ubuntu's rule for a user, which
-/// Windows takes too, and not one of Windows' own accounts, which are disabled.
-pub use guesthouse_account_core::windows_host::valid_user;
+/// Why `name` won't do as a new machine's user, before its image says which system it is: the
+/// common rules' reason, if neither a Windows nor an Ubuntu guest takes it. Empty is `DEFAULT_USER`,
+/// which both take. The guest's own rule is asked once the image is opened. A machine that has its
+/// account already is never checked again.
+pub fn user_problem(name: &str) -> Option<String> {
+    if name.is_empty() {
+        return None;
+    }
+    guesthouse_account_core::common::either_name_problem(name)
+}
 
 /// The `ssh` line that reaches an Ubuntu guest through the port the service listens on, on this PC's
 /// loopback, which needs no network in the guest.
@@ -828,11 +835,19 @@ mod tests {
     }
 
     #[test]
-    fn a_user_is_one_both_systems_take() {
-        assert!(valid_user("guesthouse"));
-        assert!(valid_user("a-b_2"));
-        for name in ["", "Admin", "2a", "a b", "administrator", "guest", "averyveryverylongusername"] {
-            assert!(!valid_user(name), "{name}");
+    fn the_default_user_is_one_both_systems_take() {
+        use guesthouse_account_core::common::{linux_name_problem, windows_name_problem};
+        assert_eq!(windows_name_problem(DEFAULT_USER), None);
+        assert_eq!(linux_name_problem(DEFAULT_USER), None);
+    }
+
+    #[test]
+    fn a_user_is_one_either_system_takes() {
+        for name in ["", "guesthouse", "a-b_2", "Ann B.Lee", "_a", "administrator", "root"] {
+            assert_eq!(user_problem(name), None, "{name}");
+        }
+        for name in ["Admin istrator ", "a@b", "Guest", &"x".repeat(33)] {
+            assert!(user_problem(name).is_some(), "{name}");
         }
         assert!(valid_edition("Windows 11 Pro for Workstations"));
         assert!(!valid_edition("Windows\\11"));

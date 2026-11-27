@@ -776,6 +776,25 @@ fn with_no_user_named_the_guest_has_the_default_one() {
 }
 
 #[test]
+fn a_user_either_system_takes_is_passed_on_and_one_neither_takes_is_refused_with_its_reason() {
+    let setup = setup("user-rules", Pretend::default());
+    // Windows takes this one and Ubuntu doesn't: the image says which it is, once prepare opens it.
+    ask(
+        &setup.service,
+        Request::Create { machine: NewMachine { user: "Ann B.Lee".into(), ..new_machine(&setup, "win") } },
+    );
+    let prepared = setup.service.work.prepared.lock().unwrap()[0].clone();
+    assert_eq!(prepared.user, "Ann B.Lee");
+    let answer = ask(
+        &setup.service,
+        Request::Create { machine: NewMachine { user: "a@b".into(), ..new_machine(&setup, "x") } },
+    );
+    let reason =
+        "A Windows user name can hold letters, digits, dots, dashes, underscores and spaces between words.";
+    assert_eq!(answer, [Answer::Refused { reason: reason.into() }]);
+}
+
+#[test]
 fn a_user_edition_or_share_the_rules_refuse_makes_no_machine() {
     let setup = setup("create-refused", Pretend::default());
     let refused = |machine: NewMachine| {

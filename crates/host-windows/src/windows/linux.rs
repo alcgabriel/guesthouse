@@ -14,6 +14,7 @@ use crate::guest::linux::{
 use crate::machine::Guest;
 use crate::record::{Record, files_disk};
 use crate::settings::{PrepareSettings, Share};
+use guesthouse_account_core::common::linux_name_problem;
 use guesthouse_hcs::disk::{self, Kind, VirtualDisk};
 use guesthouse_hcs::drivers::copy_folder;
 use guesthouse_hcs::gpu::Card;
@@ -52,10 +53,8 @@ pub fn prepare(
     card: Option<&Card>,
     sink: &dyn Sink,
 ) -> Result<(), String> {
-    if !valid_user(&settings.user) {
-        return Err(
-            "A Linux guest's administrator takes lower-case letters, digits, - and _, from a letter.".into(),
-        );
+    if let Some(problem) = linux_name_problem(&settings.user) {
+        return Err(problem);
     }
     for needed in [INSTALLER_INITRD, BOOT_FILES[0].0, BOOT_FILES[1].0] {
         if !iso_root.join(needed).is_file() {
@@ -231,34 +230,9 @@ fn size_of_folder(folder: &Path) -> u64 {
         .sum()
 }
 
-/// A name Ubuntu takes for a user, and that the install script reads back whole.
-use guesthouse_account_core::windows_host::valid_ubuntu_user as valid_user;
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_user_name_is_one_ubuntu_takes() {
-        assert!(valid_user("guest"));
-        assert!(valid_user("a-b_2"));
-        assert!(!valid_user("Guest"));
-        assert!(!valid_user("2a"));
-        assert!(!valid_user("a b"));
-        assert!(!valid_user(""));
-    }
-
-    /// Every edge of the rule as it is: no length limit and no reserved names here, a small letter
-    /// first, then small letters, digits, dashes and underscores.
-    #[test]
-    fn a_user_name_at_each_edge() {
-        for name in ["a", "z", "a0", "a-", "a_", "root", "administrator", &"x".repeat(100)] {
-            assert!(valid_user(name), "{name:?}");
-        }
-        for name in ["_a", "-a", "0a", "A", "aB", "a.b", "é", "a\n"] {
-            assert!(!valid_user(name), "{name:?}");
-        }
-    }
 
     #[test]
     fn the_files_disk_is_never_smaller_or_larger_than_fat32_allows() {

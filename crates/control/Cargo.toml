@@ -10,7 +10,7 @@ license.workspace = true
 [dependencies]
 # The ssh line, and reading and writing a JSON line, as every host may.
 guesthouse-basics.workspace = true
-# Which names a guest's administrator takes, as each host has them.
+# Which names a guest's administrator takes, the rules every host shares.
 guesthouse-account-core.workspace = true
 # The checks of a machine's settings that take plain values, as each host has them.
 guesthouse-settings-core.workspace = true
