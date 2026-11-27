@@ -943,6 +943,7 @@ dependencies = [
  "guesthouse-serial-words-core",
  "guesthouse-settings-core",
  "guesthouse-snapshot-core",
+ "guesthouse-start-checks-core",
  "guesthouse-state-core",
  "guesthouse-update-check",
  "guesthouse-window-cells-core",
@@ -1346,6 +1347,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "guesthouse-start-checks-core"
+version = "0.11.0"
 
 [[package]]
 name = "guesthouse-state-core"
