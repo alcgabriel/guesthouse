@@ -1,0 +1,10 @@
+{
+  "name": "Net",
+  "disk": "/srv/made-up/machines/net/disk.qcow2",
+  "vars": "/srv/made-up/machines/net/OVMF_VARS.fd",
+  "kind": "linux",
+  "user": "1bad",
+  "network_mode": "bridged",
+  "mac": "53:54:00:ab:cd:ef",
+  "drives": [{"id": "ata-made-up"}]
+}
