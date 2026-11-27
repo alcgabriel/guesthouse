@@ -39,14 +39,8 @@ const INSTALL_HOURS: u64 = 2;
 /// someone, or stuck. The longest quiet stretch in a normal install is well under this.
 const INSTALL_QUIET_MINUTES: u64 = 10;
 const BOOT_PROMPT_SECONDS: u64 = 6;
-pub const INSTALL_STEPS: [&str; 4] = [
-    "Copying Windows to the disk",
-    "Windows is setting up its devices",
-    "Windows is getting ready",
-    "Windows is finishing its setup",
-];
-/// The firmware names it twice a boot.
-const WINDOWS_BOOT_LINE: &[u8] = b"\"Windows Boot Manager\"";
+/// The steps of an install, read off the firmware's lines, as every host can share them.
+pub use guesthouse_serial_words_core::linux_host::{INSTALL_STEPS, install_step};
 const FIRMWARE_WAIT: Duration = Duration::from_secs(30);
 const SETUP_SCRIPT_SECONDS: u64 = 30;
 const CHECK_SCRIPT_SECONDS: u64 = 60;
@@ -179,12 +173,6 @@ fn pass_boot_prompt(task: &Task) {
         send_key(task.context, "spc");
         task.sleep(KEY_POLL);
     }
-}
-
-/// What Windows setup is doing, from how often it has started from the disk.
-pub fn install_step(serial: &[u8]) -> &'static str {
-    let started = count(serial, WINDOWS_BOOT_LINE);
-    INSTALL_STEPS[(started / 2).min(INSTALL_STEPS.len() - 1)]
 }
 
 fn disk_written(machine: &Machine) -> u64 {

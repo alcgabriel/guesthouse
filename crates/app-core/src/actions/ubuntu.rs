@@ -23,13 +23,14 @@ use crate::linux::{guest_sources, sensor_daemon};
 use crate::network::{Protocol, port_taken};
 use crate::start_checks::start_problems;
 use crate::vm_args::{AmdBoot, Boot, INSTALL_LOG, UbuntuBoot, UbuntuInstall, VmPlan, ssh_port};
+#[cfg(test)]
+use guesthouse_serial_words_core::linux_host::INSTALL_FINISHED;
+use guesthouse_serial_words_core::linux_host::installed;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-/// Only a finished install writes this line. The VM powers off either way.
-const INSTALL_FINISHED: &[u8] = b"nvfwd-install-finished";
 const INSTALL_HOURS: u64 = 2;
 const REASON_FILE: &str = "gpu-off-reason";
 const NO_CARD_DETAIL: &str = "The NVIDIA driver doesn't list the card setup chose, so it has no device file to open. \
@@ -47,10 +48,6 @@ fn extract(iso: &str, name: &str, to: &Path) -> Result<()> {
     }
     fs::write(to, data)?;
     Ok(())
-}
-
-fn installed(serial: &[u8]) -> bool {
-    serial.split(|byte| *byte == b'\n').any(|line| line.starts_with(INSTALL_FINISHED))
 }
 
 /// Takes a new machine from its ISO to its first boot. Each run starts again from nothing.

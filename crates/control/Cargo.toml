@@ -12,6 +12,8 @@ license.workspace = true
 guesthouse-basics.workspace = true
 # Which names a guest's administrator takes, the rules every host shares.
 guesthouse-account-core.workspace = true
+# What a guest says on its serial port and how it is read, as each host has them.
+guesthouse-serial-words-core.workspace = true
 # The checks of a machine's settings that take plain values, as each host has them.
 guesthouse-settings-core.workspace = true
 # A machine's states, which every host shares, with the names the pipe sends.
