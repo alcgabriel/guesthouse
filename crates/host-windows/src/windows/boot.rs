@@ -6,11 +6,11 @@
 use super::{
     absolute, chosen_card, linux, machine, need_elevation, print_guest_report, refresh_windows_disk,
 };
-use crate::events::{Event, Sink, State};
+use crate::events::{Sink, State};
 use crate::guest::linux::install_finished;
 use crate::guest::{SHUTDOWN_LINE, report_done};
+use crate::guest_ctl::{GuestCtl, LineWriter, read_lines};
 use crate::machine::Guest;
-use crate::printable::printable;
 use crate::record::{Record, files_disk};
 use crate::settings::BootSettings;
 use guesthouse_hcs::host;
@@ -20,12 +20,12 @@ use guesthouse_hcs::schema::{Gpu, ModifySettingRequest, NetworkAdapter};
 use guesthouse_hcs::serial::SerialPort;
 use guesthouse_hcs::system::{self, ComputeSystem};
 use guesthouse_jail::windows::{Handles, Jail, Jailed};
-use std::io::{BufRead, BufReader, PipeReader, Read, Write};
+use std::io::{PipeReader, Read, Write};
 use std::os::windows::io::OwnedHandle;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -50,19 +50,39 @@ const SHUTDOWN_GRACE: Duration = Duration::from_secs(180);
 /// Ubuntu's installer speaks on the serial port soon after it starts, but only when the files
 /// disk's own menu started it. An install boot this quiet for this long started something else.
 const INSTALL_SILENCE: Duration = Duration::from_secs(300);
+/// How long the line asking the guest to shut down may wait for the port, behind a line being
+/// written, before the guest is asked through HCS instead.
+const SHUTDOWN_WRITE: Duration = Duration::from_secs(2);
 
 /// Boots the machine `settings` names and runs it until it stops, its time is up, or `stop` is set:
 /// once to ask the guest to shut down, and again to stop it at once. Everything it has to say goes
 /// to `sink`, ending with the machine's state as stopped. An error that ends it is returned, for the
 /// caller to report, and not sent too.
 pub fn boot(settings: &BootSettings, sink: Arc<dyn Sink>, stop: Arc<AtomicBool>) -> Result<(), String> {
+    boot_with(settings, sink, stop, GuestCtl::new())
+}
+
+/// [`boot`], with `ctl` as the way to ask remoteman's host in a Windows guest while it runs. It
+/// refuses every request once this returns.
+pub fn boot_with(
+    settings: &BootSettings,
+    sink: Arc<dyn Sink>,
+    stop: Arc<AtomicBool>,
+    ctl: GuestCtl,
+) -> Result<(), String> {
     sink.state(State::Starting);
-    let ran = run(settings, &sink, stop);
+    let ran = run(settings, &sink, stop, &ctl);
+    ctl.end();
     sink.state(State::Stopped);
     ran
 }
 
-fn run(settings: &BootSettings, sink: &Arc<dyn Sink>, stop: Arc<AtomicBool>) -> Result<(), String> {
+fn run(
+    settings: &BootSettings,
+    sink: &Arc<dyn Sink>,
+    stop: Arc<AtomicBool>,
+    ctl: &GuestCtl,
+) -> Result<(), String> {
     need_elevation()?;
     let disk = absolute(&settings.disk)?;
     // A snapshot cut short by a crash is finished or undone first, so the disk is there to boot.
@@ -223,15 +243,19 @@ fn run(settings: &BootSettings, sink: &Arc<dyn Sink>, stop: Arc<AtomicBool>) -> 
     let serial_sink = Arc::clone(sink);
     let ended = Arc::new(AtomicBool::new(false));
     let serial_ended = Arc::clone(&ended);
-    // The port's writing end, while the guest has it open, for asking the guest to shut down.
-    let port: Port = Arc::new(Mutex::new(None));
-    let serial_port = Arc::clone(&port);
-    thread::spawn(move || print_serial(&pipe, unjailed, on_line, serial_sink, &serial_ended, &serial_port));
+    // The port's writing end goes to `ctl` while the guest has it open, for asking the guest to shut
+    // down and, a Windows guest, for remoteman's commands.
+    let serial_ctl = ctl.clone();
+    let answers = guest == Guest::Windows;
+    thread::spawn(move || {
+        print_serial(&pipe, unjailed, on_line, serial_sink, &serial_ended, &serial_ctl, answers)
+    });
     sink.note("Waiting for the guest.");
     let limit = settings.for_minutes.map(|minutes| Duration::from_secs(minutes * 60));
     let silence = installing.then_some((INSTALL_SILENCE, heard));
-    let waited = wait(&running, &stop, limit, silence, &port, sink);
+    let waited = wait(&running, &stop, limit, silence, ctl, sink);
     ended.store(true, Ordering::SeqCst);
+    ctl.end();
     // The report a Windows guest writes on its own disk can be read once the machine has let go.
     drop(running);
     if guest == Guest::Windows {
@@ -289,14 +313,18 @@ fn bridged_network(adapter: &str, sink: &dyn Sink) -> Result<GUID, String> {
     Ok(id)
 }
 
-/// The serial port, while the guest has it open.
-type Port = Arc<Mutex<Option<Arc<SerialPort>>>>;
+/// The serial port's writing end, as `ctl` writes to it.
+struct Writing(Arc<SerialPort>);
+
+impl LineWriter for Writing {
+    fn write_line(&self, line: &[u8]) -> std::io::Result<()> {
+        self.0.write_all(line)
+    }
+}
 
 /// Asks the guest to shut down on its serial port. Gives whether the line was written.
-fn ask_on_port(port: &Port) -> bool {
-    // Taken out of the lock, so a write that waits doesn't hold up the reader putting a new one in.
-    let Some(open) = port.lock().ok().and_then(|held| held.clone()) else { return false };
-    open.write_all(format!("{SHUTDOWN_LINE}\n").as_bytes()).is_ok()
+fn ask_on_port(ctl: &GuestCtl) -> bool {
+    ctl.send_line(SHUTDOWN_LINE, SHUTDOWN_WRITE)
 }
 
 /// The serial port read as a stream.
@@ -316,7 +344,7 @@ fn wait(
     stop: &AtomicBool,
     limit: Option<Duration>,
     silence: Option<(Duration, Arc<AtomicBool>)>,
-    port: &Port,
+    ctl: &GuestCtl,
     sink: &Arc<dyn Sink>,
 ) -> Result<(), String> {
     let started = Instant::now();
@@ -357,7 +385,7 @@ fn wait(
             } else {
                 asked = true;
                 sink.state(State::Stopping);
-                if ask_on_port(port) {
+                if ask_on_port(ctl) {
                     sink.note(
                         "Asked the guest to shut down, on its serial port. Asking again stops it at once.",
                     );
@@ -403,36 +431,40 @@ fn wait(
 /// only copies the bytes, as they come, to the relay's input, as the host keeps the port to write
 /// to it too.
 /// The port closes whenever the guest restarts, as Windows does while it sets itself up, so it's
-/// opened again each time until the machine has stopped.
+/// opened again each time until the machine has stopped. Its writing end goes to `ctl` while it's
+/// open, and the lines of `ctl`'s channel go to it and nowhere else; `answers` says whether the
+/// guest is one that answers on it.
 fn print_serial(
     pipe: &str,
     unjailed: bool,
     mut on_line: impl FnMut(&str),
     sink: Arc<dyn Sink>,
     ended: &AtomicBool,
-    writer: &Port,
+    ctl: &GuestCtl,
+    answers: bool,
 ) {
     let mut opened_before = false;
     while !ended.load(Ordering::SeqCst) {
         let Some(port) = open_port(pipe, opened_before, ended, sink.as_ref()) else { return };
-        if let Ok(mut held) = writer.lock() {
-            *held = Some(Arc::clone(&port));
-        }
+        ctl.attach(Arc::new(Writing(Arc::clone(&port))), answers);
         if opened_before {
             sink.note("The guest restarted, so its serial port is read again.");
         }
         opened_before = true;
         if unjailed {
             sink.note("Reading the guest's serial port with no jail, as asked.");
-            print_lines(Reading(port), &mut on_line, sink.as_ref());
+            read_lines(Reading(port), &mut on_line, sink.as_ref(), ctl);
+            ctl.detach();
             continue;
         }
         match relay(Reading(port)) {
             Ok((jailed, lines)) => {
-                print_lines(lines, &mut on_line, sink.as_ref());
+                read_lines(lines, &mut on_line, sink.as_ref(), ctl);
+                ctl.detach();
                 let _ = jailed.wait();
             }
             Err(error) => {
+                ctl.detach();
                 sink.problem(format!(
                     "The guest's serial port is left unread, as its reader couldn't be jailed: {error}. \
                      Booting with no jail reads it anyway."
@@ -485,16 +517,4 @@ fn relay(mut port: Reading) -> std::io::Result<(Jailed, PipeReader)> {
     };
     let jailed = Jail::new(RELAY_PROFILE).spawn(&program, &[], handles)?;
     Ok((jailed, lines))
-}
-
-/// Sends each line, made printable, as the guest's, and hands it to `on_line`.
-fn print_lines(source: impl std::io::Read, on_line: &mut impl FnMut(&str), sink: &dyn Sink) {
-    let mut source = BufReader::new(source);
-    let mut line = Vec::new();
-    while source.read_until(b'\n', &mut line).is_ok_and(|read| read > 0) {
-        let text = printable(&line);
-        sink.event(Event::Guest(text.clone()));
-        on_line(&text);
-        line.clear();
-    }
 }

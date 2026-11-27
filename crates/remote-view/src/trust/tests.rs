@@ -90,3 +90,102 @@ fn merging_again_changes_nothing() {
     let once = merged(Some(&current));
     assert_eq!(merged(Some(&once)), once);
 }
+
+/// A guest's Windows volume in a folder of its own, with its list holding `list`, if any, and the
+/// copy given at an earlier boot holding `given_before`, if any.
+struct Volume(std::path::PathBuf);
+
+impl Volume {
+    fn new(list: Option<&[u8]>, given_before: Option<&str>) -> Self {
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let number = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!("gh-trust-{}-{number}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        if let Some(list) = list {
+            write(&root.join(GUEST_TRUST_FILE), list);
+        }
+        if let Some(before) = given_before {
+            write(&root.join(format!(r"{}\trusted", crate::GUEST_FOLDER)), before.as_bytes());
+        }
+        Self(root)
+    }
+
+    fn given(&self) -> Given {
+        given(VIEWER, &self.0).unwrap()
+    }
+}
+
+/// Writes a file, with its folders on Windows, where the guest's paths are folders and not one name.
+fn write(path: &std::path::Path, bytes: &[u8]) {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, bytes).unwrap();
+}
+
+impl Drop for Volume {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn a_guest_with_no_list_is_given_the_viewer_alone_as_before() {
+    let volume = Volume::new(None, None);
+    assert_eq!(volume.given(), Given { viewer: trust_list(VIEWER), trusted: trust_list(VIEWER) });
+}
+
+#[test]
+fn a_guest_with_only_the_viewer_is_given_what_it_always_was() {
+    let volume = Volume::new(Some(trust_list(VIEWER).as_bytes()), None);
+    assert_eq!(volume.given(), Given { viewer: trust_list(VIEWER), trusted: trust_list(VIEWER) });
+}
+
+#[test]
+fn a_device_paired_in_the_guest_is_given_back_and_the_viewers_line_stays_alone() {
+    let volume = Volume::new(Some(format!("{VIEWER} Renamed\r\n{ONE} Kitchen tablet\r\n").as_bytes()), None);
+    let given = volume.given();
+    assert_eq!(given.trusted, format!("{VIEWER} Guesthouse\n{ONE} Kitchen tablet\n"));
+    assert_eq!(given.viewer, trust_list(VIEWER));
+}
+
+#[test]
+fn a_revoked_device_is_not_brought_back_from_a_copy_given_before() {
+    let before = format!("{VIEWER} Guesthouse\n{ONE} Revoked since\n{TWO} Kept\n");
+    let volume = Volume::new(Some(format!("{VIEWER} Guesthouse\n{TWO} Kept\n").as_bytes()), Some(&before));
+    assert_eq!(volume.given().trusted, format!("{VIEWER} Guesthouse\n{TWO} Kept\n"));
+    let volume = Volume::new(None, Some(&before));
+    assert_eq!(volume.given().trusted, trust_list(VIEWER));
+}
+
+#[test]
+fn a_list_that_is_a_folder_reads_as_none() {
+    let volume = Volume::new(None, None);
+    std::fs::create_dir_all(volume.0.join(GUEST_TRUST_FILE)).unwrap();
+    assert!(volume.0.join(GUEST_TRUST_FILE).is_dir());
+    assert_eq!(read_list(&volume.0.join(GUEST_TRUST_FILE)), None);
+    assert_eq!(volume.given().trusted, trust_list(VIEWER));
+}
+
+#[test]
+fn a_byte_order_mark_and_a_name_that_is_not_utf8_lose_no_device() {
+    let mut list = "\u{feff}".as_bytes().to_vec();
+    list.extend_from_slice(format!("{ONE} Pat").as_bytes());
+    list.extend_from_slice(&[0xff, b'\n']);
+    list.extend_from_slice(format!("{TWO} B\n").as_bytes());
+    let volume = Volume::new(Some(&list), None);
+    assert_eq!(volume.given().trusted, format!("{VIEWER} Guesthouse\n{ONE} Pat\u{fffd}\n{TWO} B\n"));
+}
+
+#[test]
+fn a_very_long_list_is_read_up_to_its_last_whole_line_within_the_limit() {
+    let line = format!("{ONE} {}\n", "n".repeat(100));
+    let mut list = line.repeat(MOST_LIST_BYTES as usize / line.len());
+    let whole = list.len();
+    // Longer than the room left, so it is cut by the limit.
+    list.push_str(&format!("{TWO} {}\n", "cut off ".repeat(40)).repeat(100));
+    let volume = Volume::new(Some(list.as_bytes()), None);
+    let read = read_list(&volume.0.join(GUEST_TRUST_FILE)).unwrap();
+    assert_eq!(read.len(), whole);
+    assert!(read.ends_with('\n') && !read.contains(TWO));
+    assert_eq!(volume.given().trusted, format!("{VIEWER} Guesthouse\n{line}"));
+}
