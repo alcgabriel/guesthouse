@@ -340,8 +340,8 @@ impl<W: Work> Service<W> {
                         .collect(),
                     working: entry.busy.clone(),
                     address: entry.settings.address.clone(),
-                    remote_view: entry.remote_view.allow_remote_view,
-                    remote_port: entry.remote_view.remote_port,
+                    remote_view: entry.remote_view.values().0,
+                    remote_port: entry.remote_view.values().1,
                 }
             })
             .collect();

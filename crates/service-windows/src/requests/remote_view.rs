@@ -287,7 +287,10 @@ impl<W: Work> Service<W> {
             driver.step(StepEvent::Read);
             let answered = service.sessions.with(&name, |session| {
                 session.busy = false;
-                session.reason.is_none() && session.reading.is_some()
+                let reading = session.reading.as_ref().filter(|_| session.reason.is_none())?;
+                let hidden =
+                    reading.devices.iter().filter(|device| policy.hides(&device.fingerprint)).count();
+                Some((reading.devices.len(), hidden))
             });
             service.told_answered(&name, answered, began.elapsed());
             let _ = done.send(());
@@ -296,19 +299,20 @@ impl<W: Work> Service<W> {
     }
 
     /// Writes in the service's log when the guest's remoteman first answers this run, and when that
-    /// changes: whether, and how long a reading took. Nothing it said.
-    fn told_answered(&self, name: &str, answered: bool, took: Duration) {
+    /// changes: whether, how long a reading took, and how many devices it trusts, of which how many
+    /// are Guesthouse's own viewer. Nothing it said: no name, no fingerprint, no code.
+    fn told_answered(&self, name: &str, answered: Option<(usize, usize)>, took: Duration) {
         let changed = {
             let mut entries = self.machines.lock();
             let Some(entry) = entries.get_mut(name).filter(|entry| entry.ctl.is_some()) else { return };
-            let changed = entry.view_answered != Some(answered);
-            entry.view_answered = Some(answered);
+            let changed = entry.view_answered != Some(answered.is_some());
+            entry.view_answered = Some(answered.is_some());
             changed
         };
         if changed {
-            let line = if answered {
+            let line = if let Some((devices, hidden)) = answered {
                 format!(
-                    "{name}: remoteman in the guest answered over the serial port, in {} ms.",
+                    "{name}: remoteman in the guest answered over the serial port, in {} ms: {devices} devices trusted, {hidden} of them Guesthouse's own viewer.",
                     took.as_millis()
                 )
             } else {
@@ -360,7 +364,7 @@ impl<W: Work> Service<W> {
             let entry = entries.get(name).ok_or_else(|| standing(ShareState::Off, None))?;
             (entry.remote_view, entry.settings.network, entry.run_address.clone())
         };
-        let port = match (switch.allow_remote_view, switch.remote_port) {
+        let port = match switch.values() {
             (true, Some(port)) => port,
             _ => return Err(standing(ShareState::Off, None)),
         };

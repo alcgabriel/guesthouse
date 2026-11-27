@@ -23,6 +23,8 @@ struct Pretend {
     disks: FileDisks,
     /// remoteman's host in the guest, at the far end of its serial port.
     remoteman: Arc<Remoteman>,
+    /// The service's log.
+    logged: Mutex<Vec<String>>,
 }
 
 /// remoteman's host in a pretend Windows guest: it keeps the words of each `ctl` request that
@@ -141,6 +143,10 @@ impl Work for Pretend {
 
     fn port_free(&self, port: u16) -> bool {
         !self.busy_ports.lock().unwrap().contains(&port)
+    }
+
+    fn log(&self, text: &str) {
+        self.logged.lock().unwrap().push(text.to_owned());
     }
 
     fn udp_port_free(&self, port: u16) -> bool {

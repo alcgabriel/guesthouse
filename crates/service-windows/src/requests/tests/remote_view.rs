@@ -339,6 +339,14 @@ fn what_remoteman_says_is_read_when_asked_with_guesthouses_own_viewer_kept_out_o
     assert!(idle.devices.is_empty(), "{:?}", idle.devices);
     assert_eq!((idle.viewer, idle.pending), (None, None), "the window onto it is Guesthouse's own");
     assert_eq!(service.work.remoteman.asked(), ["status"], "a reading writes one request");
+    let logged = service.work.logged.lock().unwrap().clone();
+    assert_eq!(logged.len(), 1, "{logged:?}");
+    assert!(logged[0].starts_with("win: remoteman in the guest answered over the serial port, in "));
+    assert!(
+        logged[0].ends_with(" ms: 1 devices trusted, 1 of them Guesthouse's own viewer."),
+        "{}",
+        logged[0]
+    );
     // Asked again at once, the reading is still new.
     shown(service, "win");
     assert_eq!(service.work.remoteman.asked(), ["status"]);
@@ -392,6 +400,9 @@ fn a_device_found_waiting_is_shown_and_nothing_it_said_reaches_a_log() {
     }
     stop(service, "win");
 
+    for line in service.work.logged.lock().unwrap().iter() {
+        assert!(!line.contains("Zo") && !line.contains("123 456") && !line.contains(PHONE), "{line}");
+    }
     let events = fs::read_to_string(service.machines().store.events("win")).unwrap();
     for history in super::network::log(service, "win") {
         let text = format!("{history:?}");
