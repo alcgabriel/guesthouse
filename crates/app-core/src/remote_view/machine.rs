@@ -25,14 +25,14 @@ use crate::machine::{Kind, Machine, load, load_all};
 use crate::tasks::{State, status};
 use guesthouse_daemon::slot::Slot;
 use guesthouse_remote_view_core::ctl::{self, Ack, Words, parse_ack};
-use guesthouse_remote_view_core::encoder_for;
+use guesthouse_remote_view_core::encoder_for_maker;
 use guesthouse_remote_view_core::install::{self, Check, INSTALLED, Pin};
 use guesthouse_remote_view_core::pairing::{Event, HostWide, Millis};
 use guesthouse_remote_view_core::policy::Policy;
 use guesthouse_remote_view_core::session::{Driver, Guest, Sessions, StepEvent, Unanswered};
 use guesthouse_remote_view_core::share::{ShareInfo, ShareState, pairing_seconds};
 use guesthouse_remote_view_core::status::{Reply, parse_reply};
-use guesthouse_remote_view_core::switch::{SWITCH_FILE, Switch};
+use guesthouse_remote_view_core::switch::{SWITCH_FILE, Switch, others_ports};
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::process::Child;
@@ -101,11 +101,7 @@ pub fn set_allowed(context: &Context, machine: &Machine, on: bool) -> Result<Swi
         return Err(Failure::new(NOT_WINDOWS));
     }
     let (machines, _) = load_all(context);
-    let taken: Vec<u16> = machines
-        .iter()
-        .filter(|other| other.id != machine.id)
-        .filter_map(|other| port(context, other))
-        .collect();
+    let taken = others_ports(&machines, |other| other.id == machine.id, |other| port(context, other));
     let switch =
         read_switch(context, machine).turned(on, &taken, guesthouse_relay::udp_port_free).map_err(Failure)?;
     write_switch(context, machine, &switch)?;
@@ -137,13 +133,7 @@ fn running_slot(context: &Context, machine: &Machine) -> Option<Slot> {
 
 /// The encoder for the machine's card, as remoteman's host takes it.
 pub fn encoder(machine: &Machine) -> &'static str {
-    let vendor = match machine.windows_maker() {
-        Some(GpuMaker::Nvidia) => "10DE",
-        Some(GpuMaker::Amd) => "1002",
-        Some(GpuMaker::Intel) => "8086",
-        None => "",
-    };
-    encoder_for(&format!("PCI\\VEN_{vendor}"))
+    encoder_for_maker(machine.windows_maker().map(GpuMaker::vendor))
 }
 
 /// remoteman's host installer at this host's pin, the release every host pins in
@@ -625,6 +615,7 @@ mod tests {
     use super::*;
     use crate::agent::stand_in::ScriptedAgent;
     use crate::testing::{Scratch, scratch_context};
+    use guesthouse_remote_view_core::encoder_for;
     use guesthouse_remote_view_core::pairing::Pairing;
     use guesthouse_remote_view_core::session::fresh_pairing;
     use guesthouse_remote_view_core::status::Status;
