@@ -6,6 +6,7 @@
 //! and each page a column of sections, each a heading over a card of rows. Every colour is one of
 //! WinUI's theme brushes, so light and dark both follow Windows.
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use guesthouse_control::client::Unreached;
@@ -17,6 +18,7 @@ use crate::app::{
     self, Account, ConsoleState, DELETE_KEY, Draft, EDITIONS, FolderFor, Kind, Line, Main, Message, NEW_TAG,
     Page, REPORT_TAG, Ready, ReportStage,
 };
+use crate::log::Log;
 
 /// The app's icon, the same as the GTK app's, for where it's shown large.
 const LOGO_SVG: &[u8] =
@@ -35,6 +37,9 @@ const SECTION_GAP: f64 = 24.0;
 const HEADING_GAP: f64 = 8.0;
 /// How tall a log is before it scrolls.
 const LOG_HEIGHT: f64 = 320.0;
+/// Around a log's lines, inside its card, and between one line and the next.
+const LOG_MARGIN: Thickness = Thickness::new(16.0, 12.0, 16.0, 12.0);
+const LOG_LINE_GAP: f64 = 4.0;
 /// A log's font: Windows Terminal's, and Consolas where that isn't installed.
 const MONO: &str = "Cascadia Mono, Consolas";
 /// The size of the app's icon on a page that says one thing.
@@ -1866,20 +1871,61 @@ fn copy_row(glyph: &str, heading: &str, text: &str, context: &ViewContext<Main>)
 }
 
 /// Lines of a log, newest at the foot, which the view keeps in sight as lines come.
-fn log(lines: &[Line], empty: &str) -> View {
-    let shown: Vec<View> =
-        if lines.is_empty() { vec![caption(empty).into()] } else { lines.iter().map(log_line).collect() };
+///
+/// A list that makes only the rows in view, each kept by its line's ID, so a new line adds a row
+/// and leaves the rows drawn before it alone, and the rest of a long log costs nothing until it's
+/// scrolled to.
+fn log(lines: &Log<Line>, empty: &str) -> View {
+    let shown: View = if lines.is_empty() {
+        caption(empty).margin(LOG_MARGIN).into()
+    } else {
+        ItemsRepeater::new()
+            .virtual_source(log_source(lines))
+            // Less below, where the last line's own gap is.
+            .margin(Thickness::new(16.0, 12.0, 16.0, 12.0 - LOG_LINE_GAP))
+            .into()
+    };
     card(
         ScrollView::new()
             .height(LOG_HEIGHT)
             // Anchored at the foot, so a new line keeps the newest in view while the person
             // hasn't scrolled up.
             .vertical_anchor_ratio(1.0)
-            .content(
-                StackPanel::new().spacing(4.0).margin(Thickness::new(16.0, 12.0, 16.0, 12.0)).children(shown),
-            ),
+            .content(shown),
     )
     .into()
+}
+
+thread_local! {
+    /// The sources the logs were last drawn from, by their logs' revisions, newest last.
+    static LOG_SOURCES: RefCell<Vec<(u64, VirtualSource)>> = const { RefCell::new(Vec::new()) };
+}
+/// How many log sources are kept: more than the window shows at once.
+const LOG_SOURCES_KEPT: usize = 4;
+
+/// The rows of `lines`, made only as the list asks for them. A render that left the log as it was
+/// gets the source it had before, which the list takes as unchanged, so it touches none of its rows,
+/// where a new one, however alike, would have each row in view drawn again.
+fn log_source(lines: &Log<Line>) -> VirtualSource {
+    let revision = lines.revision();
+    LOG_SOURCES.with_borrow_mut(|sources| {
+        if let Some((_, source)) = sources.iter().find(|(kept, _)| *kept == revision) {
+            return source.clone();
+        }
+        let (keys, rows) = (lines.lines(), lines.lines());
+        let source = VirtualSource::new(
+            // The keys are asked for again only when this or the count changes.
+            revision,
+            rows.len(),
+            move |index| keys[index].0,
+            move |index| log_line(&rows[index].1),
+        );
+        if sources.len() == LOG_SOURCES_KEPT {
+            sources.remove(0);
+        }
+        sources.push((revision, source.clone()));
+        source
+    })
 }
 
 /// A line of a log, in a fixed-width font. A problem has a mark before it and is in red; what the
@@ -1914,6 +1960,8 @@ fn log_line(line: &Line) -> View {
     Grid::new()
         .columns([GridLength::Pixel(16.0), GridLength::STAR])
         .column_spacing(6.0)
+        // The gap between lines, as the list has none of its own.
+        .margin(Thickness::new(0.0, 0.0, 0.0, LOG_LINE_GAP))
         .children((mark, text))
         .into()
 }
