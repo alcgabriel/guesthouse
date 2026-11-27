@@ -1,0 +1,67 @@
+# Builds the Mac host's graphics process and the QEMU it runs with on a Mac, and runs the graphics
+# process's tests that don't need the framework's device. The device isn't made here: the runner is
+# a virtual machine on a macOS build the guard has no profile for, and the tests that would make it
+# say so and pass. The folder qemu/mac/build.sh and mac/build-pvg-host.sh make is kept for a few
+# days as an artifact, for trying it in the app. No secrets, so a pull request from a fork runs it.
+#
+# Xcode 27 is on the `xcode-27` image only (macOS 27, Apple silicon). If a newer image replaces that
+# label, it is the one line to change, in `runs-on`.
+name: Mac graphics
+
+on:
+  pull_request:
+    paths:
+      - crates/pvg-sys/**
+      - crates/pvg-host/**
+      - qemu/mac/**
+      - mac/build-pvg-host.sh
+      - .github/workflows/mac-graphics.yml
+  push:
+    branches: [main]
+    paths:
+      - crates/pvg-sys/**
+      - crates/pvg-host/**
+      - qemu/mac/**
+      - mac/build-pvg-host.sh
+      - .github/workflows/mac-graphics.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-graphics-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  XCODE: /Applications/Xcode_27.2.app
+
+jobs:
+  build:
+    name: graphics process and QEMU on a Mac
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Use Xcode 27.2
+        run: |
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+      - name: Clippy
+        run: cargo clippy --locked -p guesthouse-pvg-sys -p guesthouse-pvg-host --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --locked -p guesthouse-pvg-sys -p guesthouse-pvg-host
+      - name: Build the graphics process
+        run: sh mac/build-pvg-host.sh
+      - name: Install what QEMU's build needs
+        run: brew install glib pixman libslirp ninja pkgconf
+      - name: Build QEMU
+        run: sh qemu/mac/build.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mac-helpers
+          path: target/mac-helpers
+          retention-days: 7

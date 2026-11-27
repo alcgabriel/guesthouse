@@ -47,7 +47,16 @@ cargo clippy -p guesthouse-host-mac --all-targets -- -D warnings
 mac/build.sh
 ```
 
-`mac/README.md` says what the app needs beyond that, and [docs/mac-host.md](docs/mac-host.md) says what the Mac host is, what it can't do yet and what it needs that isn't in this repository. The checks on pull requests run on Linux only, so build a Mac change on a Mac before you send it.
+The graphics process, `crates/pvg-host`, and the guard in front of the framework's device, `crates/pvg-sys`, aren't default members either. Their calls into Apple's framework build on a Mac only. The guard builds everywhere, so its tests run on Linux as well. A few tests make the framework's real device (`tests/picture.rs` in pvg-sys, `tests/serve.rs` and `tests/export.rs` in pvg-host). They need a Mac on a macOS build the guard has a profile for, and on any other build they say so and pass without running. `qemu/mac/build.sh` builds the QEMU they run with. A pull request that changes any of this is also built on a GitHub-hosted Mac (`.github/workflows/mac-graphics.yml`).
+
+```sh
+cargo test -p guesthouse-pvg-sys -p guesthouse-pvg-host
+cargo clippy -p guesthouse-pvg-sys -p guesthouse-pvg-host --all-targets -- -D warnings
+sh qemu/mac/build.sh
+sh mac/build-pvg-host.sh
+```
+
+`mac/README.md` says what the app needs beyond that, and [docs/mac-host.md](docs/mac-host.md) says what the Mac host is, what it can't do yet and what it needs that isn't in this repository. The other checks on pull requests run on Linux only, so build a Mac change on a Mac before you send it.
 
 ## Legal rules
 
@@ -79,7 +88,7 @@ Recordings hold guest data. They never go in git. Keep them in `/captures/`, whi
 - Comments say why. If a comment says what the next line does, delete it.
 - The message path shouldn't allocate or lock. Measure first, though: `core/tests/no_allocation.rs` and the benchmark will tell you, and a clever change needs a number behind it.
 - Dependencies are few, and each one has a comment saying why it's there.
-- `unsafe` lives in `daemon`, in the parts of the backends that talk to the kernel or to memory the GPU reads, in `hcs`, whose every job is a call into Windows (`src/dns_sd.rs` too, which announces a machine's remote view through Windows' own mDNS responder), and in the Windows parts of `jail` and of `service-windows` (`src/windows/`), which talk to the kernel's security and to the service manager, and in `relay` (`src/signal.rs`, a signal handler that only sets a flag), and in `installer-windows` (`src/system.rs` and the pages' window procedure), which talks to the shell, the registry and the service manager, with a `SAFETY` comment on each block. There are two exceptions in `app`: `viewer/import.rs`, as GTK's call for a texture on a dmabuf is `unsafe`, and `main.rs`, which sets an environment variable before GTK starts. The Windows app keeps its own in `app-windows/src/system.rs`, for the few calls WinUI doesn't make: the file dialog, the clipboard, and cancelling a read on the pipe, and in `app-windows/src/console.rs`, which hosts Windows' Remote Desktop control and RdpBase's pipe connector, through COM interfaces declared by hand, and in its example, which takes that file as it is and asks which process serves a pipe. Two tests have it too: `core/tests/no_allocation.rs` and `backend-intel/tests/quiet_path.rs` count allocations, and a global allocator has to be `unsafe`.
+- `unsafe` lives in `daemon`, in the parts of the backends that talk to the kernel or to memory the GPU reads, in `hcs`, whose every job is a call into Windows (`src/dns_sd.rs` too, which announces a machine's remote view through Windows' own mDNS responder), in `pvg-sys` (`src/framework.rs` and `src/memory.rs`), which calls macOS's paravirtualized graphics framework and maps the guest memory it reads, in `pvg-host`, which maps the files QEMU hands it (`src/guest_ram.rs`), polls its sockets (`src/host.rs`) and calls its own Objective-C files for the window, the input and the frame export (`src/window.rs`, `src/input.rs`, `src/export.rs`), and in the Windows parts of `jail` and of `service-windows` (`src/windows/`), which talk to the kernel's security and to the service manager, and in `relay` (`src/signal.rs`, a signal handler that only sets a flag), and in `installer-windows` (`src/system.rs` and the pages' window procedure), which talks to the shell, the registry and the service manager, with a `SAFETY` comment on each block. There are two exceptions in `app`: `viewer/import.rs`, as GTK's call for a texture on a dmabuf is `unsafe`, and `main.rs`, which sets an environment variable before GTK starts. The Windows app keeps its own in `app-windows/src/system.rs`, for the few calls WinUI doesn't make: the file dialog, the clipboard, and cancelling a read on the pipe, and in `app-windows/src/console.rs`, which hosts Windows' Remote Desktop control and RdpBase's pipe connector, through COM interfaces declared by hand, and in its example, which takes that file as it is and asks which process serves a pipe. Two tests have it too: `core/tests/no_allocation.rs` and `backend-intel/tests/quiet_path.rs` count allocations, and a global allocator has to be `unsafe`.
 
 ## Keeping the layers apart
 
