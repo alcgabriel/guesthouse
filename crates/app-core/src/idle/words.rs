@@ -132,6 +132,32 @@ mod tests {
         );
     }
 
+    /// Each unit's edges, as today's wording says them: seconds are dropped once there are minutes, and
+    /// a part of a unit is dropped, not rounded.
+    #[test]
+    fn spans_at_the_edges_of_each_unit() {
+        for (seconds, said) in [
+            (0, "0 seconds"),
+            (1, "1 second"),
+            (2, "2 seconds"),
+            (59, "59 seconds"),
+            (60, "1 minute"),
+            (61, "1 minute"),
+            (119, "1 minute"),
+            (120, "2 minutes"),
+            (3599, "59 minutes"),
+            (3600, "1 hour"),
+            (3659, "1 hour"),
+            (3660, "1 hour 1 minute"),
+            (7199, "1 hour 59 minutes"),
+            (86_400, "24 hours"),
+            (90_061, "25 hours 1 minute"),
+            (u64::MAX, "5124095576030431 hours"),
+        ] {
+            assert_eq!(span(seconds), said, "{seconds} s");
+        }
+    }
+
     #[test]
     fn a_quiet_windows_guest_says_each_signal_and_that_it_would_count_as_idle() {
         let text = describe(&quiet(), &Limits::default(), "a Windows guest").join("\n");

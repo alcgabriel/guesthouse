@@ -1600,6 +1600,10 @@ fn size_words(bytes: u64) -> String {
     if bytes >= 1 << 30 { format!("{:.1} GB", bytes as f64 / GB) } else { format!("{} MB", bytes >> 20) }
 }
 
+#[cfg(test)]
+#[path = "requests/size_words_tests.rs"]
+mod size_words_tests;
+
 mod forwards;
 
 #[cfg(test)]

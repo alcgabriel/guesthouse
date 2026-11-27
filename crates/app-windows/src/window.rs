@@ -1917,3 +1917,46 @@ fn log_line(line: &Line) -> View {
         .children((mark, text))
         .into()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A machine's memory, held as it is at the edges: whole GB only when it is a whole number of them.
+    #[test]
+    fn memory_is_whole_gb_or_mb() {
+        for (mb, said) in [
+            (0, "0 MB"),
+            (1, "1 MB"),
+            (1023, "1023 MB"),
+            (1024, "1 GB"),
+            (1025, "1025 MB"),
+            (1536, "1536 MB"),
+            (2048, "2 GB"),
+            (16_383, "16383 MB"),
+            (16_384, "16 GB"),
+            (u64::MAX, "18446744073709551615 MB"),
+        ] {
+            assert_eq!(memory_words(mb), said, "{mb} MB");
+        }
+    }
+
+    /// A card's memory, held as it is at the edges: to the nearest GB from 1 GB, half a GB going up.
+    #[test]
+    fn card_memory_is_the_nearest_gb_or_mb() {
+        for (mb, said) in [
+            (0, "0 MB"),
+            (1023, "1023 MB"),
+            (1024, "1 GB"),
+            (1535, "1 GB"),
+            (1536, "2 GB"),
+            (2047, "2 GB"),
+            (8191, "8 GB"),
+            (24_063, "23 GB"),
+            (24_064, "24 GB"),
+            (24_564, "24 GB"),
+        ] {
+            assert_eq!(card_memory_words(mb), said, "{mb} MB");
+        }
+    }
+}
