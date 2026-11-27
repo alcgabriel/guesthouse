@@ -51,8 +51,7 @@ final class ScreenSession {
     /// Who is looking at the picture: the screen window, which asks for every refresh, the
     /// machine's preview, and the sidebar's small picture, which ask for a few a second.
     private struct Presenter {
-        let interval: TimeInterval
-        var last = Date.distantPast
+        var pace: PresenterPace
         let show: (IOSurfaceRef?) -> Void
     }
 
@@ -106,13 +105,17 @@ final class ScreenSession {
     /// ask. `interval` is the least time between pictures for this presenter (0: every
     /// refresh). A window also opens the machine's input.
     func addPresenter(_ id: UUID, interval: TimeInterval, isWindow: Bool = false, show: @escaping (IOSurfaceRef?) -> Void) {
-        presenters[id] = Presenter(interval: interval, show: show)
+        var presenter = Presenter(pace: PresenterPace(interval: interval), show: show)
+        if let shown {
+            presenter.pace.given(at: Date())
+            show(shown.surface)
+        }
+        presenters[id] = presenter
         Library.shared.screens[machineID] = self
         if isWindow {
             windowCount += 1
             if input == nil, let qmpSocket { input = GuestInput(socket: qmpSocket) }
         }
-        if let shown { show(shown.surface) }
         start()
         updateDriver()
     }
@@ -158,18 +161,39 @@ final class ScreenSession {
     private func updateDriver() {
         idleTimer?.invalidate()
         idleTimer = nil
-        guard running, windowCount == 0, let interval = presenters.values.map(\.interval).min() else { return }
+        guard running, windowCount == 0, let interval = presenters.values.map(\.pace.interval).min() else { return }
         idleTimer = Timer.scheduledTimer(withTimeInterval: max(interval, 0.05), repeats: true) { [unowned self] _ in
             MainActor.assumeIsolated { refresh() }
         }
     }
 
+    /// A new frame, to each presenter whose interval is up; the others are owed it.
     private func show(_ surface: IOSurfaceRef?) {
         let now = Date()
-        for (id, var presenter) in presenters where now.timeIntervalSince(presenter.last) >= presenter.interval {
-            presenter.last = now
+        for (id, var presenter) in presenters {
+            let given = presenter.pace.offered(at: now)
             presenters[id] = presenter
-            presenter.show(surface)
+            if given { presenter.show(surface) }
+        }
+    }
+
+    /// The picture on show, to each presenter owed it whose interval is up.
+    private func catchUp() {
+        guard let shown else { return }
+        let now = Date()
+        for (id, var presenter) in presenters where presenter.pace.due(at: now) {
+            presenters[id] = presenter
+            presenter.show(shown.surface)
+        }
+    }
+
+    /// No picture, to every presenter at once.
+    private func showNothing() {
+        let now = Date()
+        for (id, var presenter) in presenters {
+            presenter.pace.given(at: now)
+            presenters[id] = presenter
+            presenter.show(nil)
         }
     }
 
@@ -177,7 +201,10 @@ final class ScreenSession {
     /// the frame that left the screen at the refresh before.
     func refresh() {
         giveBack(&leaving)
-        guard let next = waitingFrame else { return }
+        guard let next = waitingFrame else {
+            catchUp()
+            return
+        }
         waitingFrame = nil
         leaving = shown
         shown = next
@@ -209,7 +236,7 @@ final class ScreenSession {
         giveBack(&shown)
         reader.close()
         slots = nil
-        show(nil)
+        showNothing()
         pictureSize = nil
         state = .waiting
     }

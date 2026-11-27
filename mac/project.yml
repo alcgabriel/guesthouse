@@ -109,6 +109,7 @@ targets:
       - App/ReportText.swift
       - App/UpdateText.swift
       - App/LocalNetwork.swift
+      - App/PresenterPace.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ruxn.guesthouse.tests
