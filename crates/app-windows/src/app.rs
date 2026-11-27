@@ -21,10 +21,13 @@ use guesthouse_control::{
 };
 use windows_reactor::*;
 
-use crate::bridge::{self, Ended, Job, Seen, Watch, Window};
+use crate::bridge::{self, Ended, Job, Looking, Seen, Watch, Window};
 use crate::console::{self, Console};
 use crate::log::Log;
+use crate::remote_view::{Ask, Facts, Viewing};
 use crate::report::{self, Asked, Prepared};
+use guesthouse_control::ShareInfo;
+use guesthouse_remote_view_core::share::ShareState;
 
 #[cfg(feature = "preview")]
 mod preview;
@@ -180,6 +183,13 @@ impl Line {
         };
         Line { kind, text }
     }
+}
+
+/// Milliseconds since 1970, which the service's times are in.
+pub fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| u64::try_from(since.as_millis()).unwrap_or(u64::MAX))
 }
 
 /// An empty log, which keeps up to [`LOG_LIMIT`] lines.
@@ -554,6 +564,11 @@ pub struct Main {
     pub theme: WindowTheme,
     /// Whether the machines are the service's. A preview's aren't, and nothing is asked of it.
     live: bool,
+    /// The shown Windows machine's remote view.
+    pub viewing: Option<Viewing>,
+    /// What asks about it, while its page shows, and which of those it is.
+    looking: Option<Looking>,
+    looking_id: u64,
 }
 
 /// The key of Delete in a machine's More menu.
@@ -683,6 +698,15 @@ pub enum Message {
     GetUpdate,
     /// Put the update aside until the app next starts.
     LaterUpdate,
+    /// One of the Remote View group's controls.
+    RemoteView(Ask),
+    /// The service's answer to what was asked of the remote view, and which machine's it was.
+    RemoteViewAnswered(u64, Ask, Result<ShareInfo, String>),
+    /// How the remote view stands, with this PC's address on its network.
+    RemoteViewSeen(u64, Result<ShareInfo, String>, Option<IpAddr>),
+    /// Ask about removing the paired device with this fingerprint.
+    RemoveDevice(String),
+    RemoveAnswered(ContentDialogResult),
 }
 
 impl Main {
@@ -976,6 +1000,131 @@ impl Main {
         }
     }
 
+    /// What the page knows of the shown machine's remote view from the list.
+    pub fn remote_view_facts(&self) -> Option<Facts> {
+        let machine = self.machine()?;
+        Some(Facts {
+            running: machine.state == State::Running,
+            bridged: matches!(machine.network_mode, NetworkMode::Bridged { .. }),
+            switch: machine.remote_view,
+            port: machine.remote_port,
+        })
+    }
+
+    /// Asks about the shown Windows machine's remote view while its page shows, and lets go of
+    /// another machine's.
+    fn follow_remote_view(&mut self) {
+        let wanted = self
+            .machine()
+            .filter(|machine| self.page == Page::Machine && machine.system == System::Windows)
+            .map(|machine| machine.name.clone());
+        if self.viewing.as_ref().map(|viewing| &viewing.machine) != wanted.as_ref() {
+            self.viewing = wanted.as_deref().map(Viewing::new);
+            self.looking = None;
+        }
+        let (Some(viewing), Some(facts)) = (&self.viewing, self.remote_view_facts()) else { return };
+        // The list says on while the last answer said off when the switch was turned elsewhere, and
+        // a look then finds it.
+        let on = viewing.on(&facts) || facts.switch;
+        if !self.live {
+            return;
+        }
+        match &self.looking {
+            Some(looking) => looking.set_on(on),
+            None => {
+                self.looking_id += 1;
+                let looking = bridge::look(self.looking_id, viewing.machine.clone(), on, self.window.clone());
+                self.looking = Some(looking);
+            }
+        }
+    }
+
+    fn ask_remote_view(&mut self, ask: Ask) {
+        let Some(facts) = self.remote_view_facts() else { return };
+        let Some(viewing) = self.viewing.as_mut() else { return };
+        // A switch set from an answer says so too, which isn't the person asking.
+        let shown = viewing.shown(&facts);
+        let same = match &ask {
+            Ask::Switch(on) => *on == shown.on,
+            Ask::Allow { fingerprint, what, on } => shown
+                .devices
+                .iter()
+                .filter(|device| &device.fingerprint == fingerprint)
+                .flat_map(|device| &device.permissions)
+                .any(|permission| permission.what == *what && permission.on == *on),
+            _ => false,
+        };
+        if same {
+            return;
+        }
+        viewing.asked(&ask);
+        if self.live {
+            if let Some(looking) = &self.looking {
+                looking.ask(ask);
+            }
+        } else {
+            #[cfg(feature = "preview")]
+            self.pretend(ask);
+        }
+    }
+
+    /// A preview's answer to what was asked, as a service's would be, with the request written to
+    /// a file in place of being sent.
+    #[cfg(feature = "preview")]
+    fn pretend(&mut self, ask: Ask) {
+        let Some(viewing) = &self.viewing else { return };
+        let machine = viewing.machine.clone();
+        preview::asked(&ask.request(&machine));
+        let info = viewing.info.clone().unwrap_or_else(|| ShareInfo::off(&machine));
+        let answer = match preview::refusal(&ask) {
+            Some(reason) => Err(reason),
+            None => crate::remote_view::pretend(&info, &ask, now_ms()),
+        };
+        self.remote_view_answered(ask, answer);
+    }
+
+    fn remote_view_answered(&mut self, ask: Ask, answer: Result<ShareInfo, String>) {
+        let Some(viewing) = self.viewing.as_mut() else { return };
+        let problem = viewing.answered(&ask, answer, now_ms());
+        self.note_pairing();
+        if let Some(problem) = problem {
+            self.tell(problem, true);
+        }
+    }
+
+    fn remote_view_seen(&mut self, seen: Result<ShareInfo, String>, address: Option<IpAddr>) {
+        let Some(viewing) = self.viewing.as_mut() else { return };
+        let info = seen.unwrap_or_else(|reason| {
+            // Shown as the sharing's failure, with the rest as it was last seen, as Linux does.
+            let mut info = viewing.info.clone().unwrap_or_else(|| ShareInfo::off(&viewing.machine));
+            info.state = ShareState::Failed;
+            info.reason = Some(reason);
+            info
+        });
+        viewing.take(info, address, now_ms());
+        self.note_pairing();
+    }
+
+    /// Notes whether the shown machine's pairing is open, for closing it as the app goes.
+    fn note_pairing(&self) {
+        if let Some(viewing) = self.viewing.as_ref().filter(|_| self.live) {
+            bridge::note_pairing(&viewing.machine, viewing.pairing_open());
+        }
+    }
+
+    fn ask_remove(&mut self, fingerprint: String) {
+        let Some(viewing) = self.viewing.as_mut() else { return };
+        let name = viewing
+            .info
+            .iter()
+            .flat_map(|info| &info.devices)
+            .find(|device| device.fingerprint == fingerprint)
+            .map(crate::remote_view::device_name);
+        if let Some(name) = name {
+            viewing.removing = Some((fingerprint, name));
+        }
+    }
+
     /// Shows `name`'s page and starts its log afresh, as a watch begins with the recent events.
     fn select(&mut self, name: Option<String>) {
         self.selected = name;
@@ -1258,6 +1407,9 @@ impl Component for Main {
             icon: crate::system::icon_file().map(Rc::from),
             theme: WindowTheme::System,
             live,
+            viewing: None,
+            looking: None,
+            looking_id: 0,
         };
         #[cfg(feature = "preview")]
         if !live {
@@ -1558,7 +1710,25 @@ impl Component for Main {
                 }
             }
             Message::LaterUpdate => self.update = None,
+            Message::RemoteView(ask) => self.ask_remote_view(ask),
+            Message::RemoteViewAnswered(id, ask, answer) if id == self.looking_id => {
+                self.remote_view_answered(ask, answer)
+            }
+            Message::RemoteViewSeen(id, seen, address) if id == self.looking_id => {
+                self.remote_view_seen(seen, address)
+            }
+            Message::RemoteViewAnswered(..) | Message::RemoteViewSeen(..) => {}
+            Message::RemoveDevice(fingerprint) => self.ask_remove(fingerprint),
+            Message::RemoveAnswered(result) => {
+                let removing = self.viewing.as_mut().and_then(|viewing| viewing.removing.take());
+                if let Some((fingerprint, _)) = removing
+                    && result == ContentDialogResult::Primary
+                {
+                    self.ask_remote_view(Ask::Revoke(fingerprint));
+                }
+            }
         }
+        self.follow_remote_view();
     }
 
     fn view(&self, _: &Start, context: &mut ViewContext<Self>) -> View {
