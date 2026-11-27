@@ -99,6 +99,11 @@ jobs:
       - name: Kernel driver, user-mode driver and tools
         run: sh drivers/windows-pvg/ruxnwddm/build.sh "$ROOT"
       - name: winemetal, DXMT and the test programs
+        # Without the first triangle's stand-in and the checks that draw on this Mac's GPU: the
+        # stand-in needs a shader tool that isn't public, and a release doesn't carry it.
+        env:
+          RUXN_STANDIN: "0"
+          CHECKS: "0"
         run: sh drivers/windows-pvg/dxmt-win/build.sh "$ROOT"
       - name: Forget the key
         if: ${{ always() }}
