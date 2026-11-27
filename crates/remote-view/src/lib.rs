@@ -130,9 +130,15 @@ mod tests {
 
     #[test]
     fn the_guest_script_uses_the_names_the_host_writes() {
-        for name in
-            [GUEST_SETUP, "trusted", "viewer.txt", "encoder.txt", "logon.txt", r"C:\Guesthouse\screen"]
-        {
+        for name in [
+            GUEST_SETUP,
+            "trusted",
+            "viewer.txt",
+            "encoder.txt",
+            "logon.txt",
+            "hosts.txt",
+            r"C:\Guesthouse\screen",
+        ] {
             assert!(SCRIPT.contains(name), "{name}");
         }
         assert!(SETUP.ends_with(GUEST_SETUP));

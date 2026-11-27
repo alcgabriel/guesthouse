@@ -75,6 +75,7 @@ mod tests {
         let addresses = [Ipv4Addr::new(192, 168, 1, 20), Ipv4Addr::new(172, 30, 0, 1)];
         assert_eq!(hosts_file(true, &addresses), "bridged\n192.168.1.20\n172.30.0.1\n");
         assert_eq!(hosts_file(false, &[]), "shared\n");
+        assert!(SCRIPT.contains(&format!("'{HOSTS_FILE}'")), "the guest reads the file by this name");
     }
 
     #[test]
