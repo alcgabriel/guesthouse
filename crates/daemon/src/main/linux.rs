@@ -1,5 +1,6 @@
 use guesthouse_daemon::logger;
 use guesthouse_daemon::slot::Slot;
+use guesthouse_daemon_shell::fail;
 use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -9,18 +10,12 @@ pub fn main() -> ExitCode {
     logger::start(verbose);
     let slot = match Slot::from_environment() {
         Ok(slot) => slot,
-        Err(error) => {
-            eprintln!("{error}");
-            return ExitCode::FAILURE;
-        }
+        Err(error) => return fail("", error),
     };
     let project = env::args_os().nth(1).map_or_else(|| PathBuf::from("."), PathBuf::from);
     match serve(slot, project) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("{error}");
-            ExitCode::FAILURE
-        }
+        Err(error) => fail("", error),
     }
 }
 
