@@ -1921,21 +1921,11 @@ fn system_glyph(system: System) -> &'static str {
     }
 }
 
-const MB_PER_GB: u64 = 1024;
-
 /// A machine's memory, as it was given: in GB when it's a whole number of them, and in MB otherwise.
-fn memory_words(mb: u64) -> String {
-    if mb >= MB_PER_GB && mb.is_multiple_of(MB_PER_GB) {
-        format!("{} GB", mb / MB_PER_GB)
-    } else {
-        format!("{mb} MB")
-    }
-}
+use guesthouse_basics::words::memory_as_given as memory_words;
 
 /// A card's memory, to the nearest GB, as a card's driver gives a little under its size.
-fn card_memory_words(mb: u64) -> String {
-    if mb >= MB_PER_GB { format!("{} GB", (mb + MB_PER_GB / 2) / MB_PER_GB) } else { format!("{mb} MB") }
-}
+use guesthouse_basics::words::card_memory_to_nearest_gb as card_memory_words;
 
 /// The colour of a machine's dot: green when running, amber on its way somewhere, grey when stopped.
 fn state_brush(state: State) -> ThemeBrush {
@@ -2245,4 +2235,47 @@ fn log_line(line: &Line) -> View {
         .margin(Thickness::new(0.0, 0.0, 0.0, LOG_LINE_GAP))
         .children((mark, text))
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A machine's memory, held as it is at the edges: whole GB only when it is a whole number of them.
+    #[test]
+    fn memory_is_whole_gb_or_mb() {
+        for (mb, said) in [
+            (0, "0 MB"),
+            (1, "1 MB"),
+            (1023, "1023 MB"),
+            (1024, "1 GB"),
+            (1025, "1025 MB"),
+            (1536, "1536 MB"),
+            (2048, "2 GB"),
+            (16_383, "16383 MB"),
+            (16_384, "16 GB"),
+            (u64::MAX, "18446744073709551615 MB"),
+        ] {
+            assert_eq!(memory_words(mb), said, "{mb} MB");
+        }
+    }
+
+    /// A card's memory, held as it is at the edges: to the nearest GB from 1 GB, half a GB going up.
+    #[test]
+    fn card_memory_is_the_nearest_gb_or_mb() {
+        for (mb, said) in [
+            (0, "0 MB"),
+            (1023, "1023 MB"),
+            (1024, "1 GB"),
+            (1535, "1 GB"),
+            (1536, "2 GB"),
+            (2047, "2 GB"),
+            (8191, "8 GB"),
+            (24_063, "23 GB"),
+            (24_064, "24 GB"),
+            (24_564, "24 GB"),
+        ] {
+            assert_eq!(card_memory_words(mb), said, "{mb} MB");
+        }
+    }
 }

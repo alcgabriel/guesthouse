@@ -941,6 +941,7 @@ dependencies = [
 name = "guesthouse-app-windows"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-basics",
  "guesthouse-control",
  "guesthouse-relay",
  "guesthouse-remote-view-core",
@@ -1029,6 +1030,7 @@ dependencies = [
 name = "guesthouse-control"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-basics",
  "guesthouse-remote-view-core",
  "guesthouse-report-core",
  "guesthouse-update-check",
@@ -1209,6 +1211,7 @@ dependencies = [
 name = "guesthouse-service"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-basics",
  "guesthouse-control",
  "guesthouse-hcs",
  "guesthouse-host-windows",
