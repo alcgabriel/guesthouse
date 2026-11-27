@@ -38,8 +38,9 @@ fn confirm_seconds() -> u64 {
     CONFIRM_SECONDS
 }
 
-/// A new device that waits for an answer, as remoteman's `status.pending` has it.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+/// A new device that waits for an answer, as remoteman's `status.pending` has it. Its `Debug` never
+/// prints the name or the code, which never go to a log.
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct Pending {
     pub name: String,
     pub fingerprint: String,
@@ -48,6 +49,16 @@ pub struct Pending {
     /// How long there is still to answer, when this was said.
     #[serde(default = "confirm_seconds")]
     pub seconds: u64,
+}
+
+/// The fingerprint and the seconds; what is left out is shown as `..`.
+impl std::fmt::Debug for Pending {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Pending")
+            .field("fingerprint", &self.fingerprint)
+            .field("seconds", &self.seconds)
+            .finish_non_exhaustive()
+    }
 }
 
 /// What a trusted device may do, as remoteman's `status.devices[].permissions`. A host that does
@@ -175,3 +186,5 @@ impl ShareInfo {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_debug;
