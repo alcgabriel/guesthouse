@@ -3,6 +3,9 @@
 //! That file is often in memory, in the run folder, and the verbose log grows by megabytes a
 //! minute. So a log that is a file is kept under a limit: its start stays, the middle goes but for
 //! the lines a [`Keeper`] keeps, and the newest part follows.
+//!
+//! That is the Linux daemon's style, [`Style::Levelled`]. Another host's lines may have a prefix and
+//! no level word, [`Style::Prefixed`], and a log of those is never cut.
 
 use log::{Level, Log, Metadata, Record};
 use std::collections::VecDeque;
@@ -271,6 +274,62 @@ pub fn start(verbose: bool) {
 /// times that match them.
 pub fn started() -> Instant {
     *STARTED.get_or_init(Instant::now)
+}
+
+/// How a host's daemon writes its lines, which is the host's own: people and scripts read them and
+/// expect them as they are.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Style {
+    /// The Linux daemon's, which [`start`] gives: the level padded to five, a space and the message,
+    /// with the time after the level in a verbose log, and a log that is a file kept under its limit,
+    /// with the lines a [`Keeper`] keeps.
+    Levelled,
+    /// The prefix, then the message, at every level: no level word, no time and no limit. Such lines
+    /// carry no level, so a [`Keeper`] would take each as part of the line before it, and a log of
+    /// them is never cut. A message's own line breaks pass through, so only its first line has the
+    /// prefix. For a host whose per-machine process prints lines with a fixed prefix and no level
+    /// word.
+    Prefixed(&'static str),
+}
+
+/// Starts logging in a host's style. Which lines are written is the same in every style: error,
+/// warning and info lines, debug lines as well when `verbose`, and never trace lines, as [`start`]
+/// has it. A style changes only how a line looks and whether a log file is kept under its limit.
+///
+/// A prefixed debug line looks like any other, with no level to tell it by, and a prefixed log has no
+/// limit, so debug lines stay off unless asked for there too. As with [`start`], the first start in a
+/// process holds and any later one changes nothing.
+pub fn start_styled(style: Style, verbose: bool) {
+    match style {
+        Style::Levelled => start(verbose),
+        Style::Prefixed(prefix) => {
+            let level = if verbose { Level::Debug } else { Level::Info };
+            if log::set_logger(Box::leak(Box::new(PrefixedLines { prefix }))).is_ok() {
+                log::set_max_level(level.to_level_filter());
+            }
+        }
+    }
+}
+
+/// [`Style::Prefixed`]'s lines, to standard error.
+struct PrefixedLines {
+    prefix: &'static str,
+}
+
+impl Log for PrefixedLines {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        metadata.level() <= log::max_level()
+    }
+
+    fn log(&self, record: &Record<'_>) {
+        if self.enabled(record.metadata()) {
+            // The whole line in one write, so lines from two threads never mix.
+            let line = format!("{}{}\n", self.prefix, record.args());
+            eprint!("{line}");
+        }
+    }
+
+    fn flush(&self) {}
 }
 
 #[cfg(test)]
