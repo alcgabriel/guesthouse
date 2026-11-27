@@ -10,6 +10,7 @@ use crate::kept_logs;
 use crate::machine::{Kind, MAX_REFRESH_HZ, MIN_REFRESH_HZ, Machine, load_all, sorted_names};
 use crate::monitor::{Command, failed};
 use crate::network;
+use crate::recipe::RecipeKind;
 use crate::remote_access::{Access, access_problem, write_access};
 use crate::settings::with_suffix;
 use crate::setup::guest_driver::guest_driver;

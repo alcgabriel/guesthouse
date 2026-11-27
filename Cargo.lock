@@ -935,6 +935,7 @@ dependencies = [
  "guesthouse-guest-names-core",
  "guesthouse-idle-core",
  "guesthouse-jail",
+ "guesthouse-recipes-core",
  "guesthouse-relay",
  "guesthouse-remote-view-core",
  "guesthouse-report-core",
@@ -951,7 +952,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "toml",
 ]
 
 [[package]]
@@ -1251,6 +1251,18 @@ name = "guesthouse-pvg-sys"
 version = "0.11.0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "guesthouse-recipes-core"
+version = "0.11.0"
+dependencies = [
+ "guesthouse-answers-core",
+ "guesthouse-basics",
+ "guesthouse-guest-names-core",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

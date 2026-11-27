@@ -31,6 +31,7 @@ default-members = [
     "crates/jail",
     "crates/messages",
     "crates/p9",
+    "crates/recipes",
     "crates/relay",
     "crates/remote-view",
     "crates/replay",
@@ -87,6 +88,7 @@ guesthouse-catalog-core = { path = "crates/catalog" }
 guesthouse-serial-words-core = { path = "crates/serial-words" }
 guesthouse-idle-core = { path = "crates/idle" }
 guesthouse-guest-names-core = { path = "crates/guest-names" }
+guesthouse-recipes-core = { path = "crates/recipes" }
 # The Mac host's graphics process and the guard in front of the framework it calls.
 guesthouse-pvg-sys = { path = "crates/pvg-sys" }
 

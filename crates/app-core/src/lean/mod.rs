@@ -6,6 +6,10 @@
 //! `list` is what it takes out and switches off. Before the account's first logon it runs from the
 //! answer disc, in Setup's specialize pass, and once the install is up it runs again through the agent
 //! (`actions/lean.rs`), to catch what reached the account anyway.
+//!
+//! The tables, the words and the files a machine keeps are `guesthouse_recipes_core::lean`'s, and the
+//! answer file's step is `guesthouse_answers_core::linux_host::lean`'s. This module keeps the names they
+//! have always had here, and adds where a machine's folder is.
 
 mod list;
 mod record;
@@ -18,77 +22,30 @@ pub use record::{
 use crate::context::Context;
 use crate::failure::{Failure, Result};
 use crate::machine::Machine;
-use crate::settings::write_json;
-use serde::{Deserialize, Serialize};
+pub use guesthouse_recipes_core::lean::{DATA_ON_DISC, LEAN_FILE, SCRIPT};
+#[cfg(test)]
 use std::fs;
-use std::path::PathBuf;
 
-/// Beside `machine.json`, as `remote-access.json` is. A machine made without the choice has none.
-pub const LEAN_FILE: &str = "lean.json";
-/// The guest's script, and the list it reads, by these names on the answer disc.
-pub const SCRIPT: &str = "lean.ps1";
-pub const DATA_ON_DISC: &str = "lean.json";
 /// The command that runs the script in Setup's specialize pass, the last moment before any account
 /// exists, as the shared crate adds it.
 #[cfg(test)]
 use guesthouse_answers_core::linux_host::lean::SPECIALIZE_COMMAND;
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Chosen {
-    lean: bool,
-}
-
-fn lean_file(context: &Context, machine: &Machine) -> PathBuf {
-    machine.folder(context).join(LEAN_FILE)
-}
-
 /// Whether the machine was made lean. A file that can't be read is no, which leaves Windows as it is.
 pub fn is_lean(context: &Context, machine: &Machine) -> bool {
-    let text = fs::read_to_string(lean_file(context, machine)).unwrap_or_default();
-    serde_json::from_str::<Chosen>(&text).is_ok_and(|chosen| chosen.lean)
+    guesthouse_recipes_core::lean::is_lean(&machine.folder(context))
 }
 
 /// Keeps the choice. Off leaves no file, so a machine made without it looks as one always did.
 pub fn write_lean(context: &Context, machine: &Machine, lean: bool) -> Result<()> {
-    if !lean {
-        return match fs::remove_file(lean_file(context, machine)) {
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.into()),
-            _ => Ok(()),
-        };
-    }
-    write_json(&lean_file(context, machine), &Chosen { lean })
+    Ok(guesthouse_recipes_core::lean::write_lean(&machine.folder(context), lean)?)
 }
 
 /// An import's copies of the choice and of what lean Windows did, read as the app's own and written
 /// out again, or left out. What it did keeps only names on the list, and none of what the other PC's
 /// guest said: the first start here looks again.
 pub fn remake_imported(folder: &std::path::Path) -> Result<()> {
-    let choice = folder.join(LEAN_FILE);
-    if let Ok(text) = fs::read_to_string(&choice) {
-        match serde_json::from_str::<Chosen>(&text) {
-            Ok(Chosen { lean: true }) => write_json(&choice, &Chosen { lean: true })?,
-            _ => fs::remove_file(&choice)?,
-        }
-    }
-    let result = folder.join(RESULT_FILE);
-    if let Ok(text) = fs::read_to_string(&result) {
-        let said: Outcome = serde_json::from_str(&text).unwrap_or_default();
-        let on_list = |names: &[String]| -> Vec<String> {
-            APPS.iter().map(|app| app.name.to_owned()).filter(|name| names.contains(name)).collect()
-        };
-        let kept = Outcome {
-            taken_out: on_list(&said.taken_out),
-            put_back: on_list(&said.put_back),
-            still_back: None,
-        };
-        if kept == Outcome::default() {
-            fs::remove_file(&result)?;
-        } else {
-            write_json(&result, &kept)?;
-        }
-    }
-    Ok(())
+    Ok(guesthouse_recipes_core::lean::remake_imported(folder)?)
 }
 
 /// The filled answer file with one command more in the specialize pass, which runs the script on the

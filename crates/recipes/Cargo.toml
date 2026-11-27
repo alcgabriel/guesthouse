@@ -1,0 +1,25 @@
+[package]
+name = "guesthouse-recipes-core"
+description = "Recipes and lean Windows: the recipe file and its checks, where recipes are found, what one says it will do, its settings fitted to a PC's limits, what a machine keeps of it, and lean Windows' tables and files. Nothing here calls the system but to read and write those files, so every host can build on it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# A machine's notes of its recipe and of lean Windows are small JSON files, written in one step.
+guesthouse-basics.workspace = true
+# The folders a recipe may name for Defender to leave out are checked by the guest's name rules.
+guesthouse-guest-names-core.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Recipes are small hand-written files with scripts in them, which TOML holds as plain text.
+toml = { version = "1", default-features = false, features = ["parse", "serde"] }
+
+[dev-dependencies]
+# The answer file's step that runs lean Windows from the disc, which names this crate's files.
+guesthouse-answers-core.workspace = true
+
+[lints]
+workspace = true
