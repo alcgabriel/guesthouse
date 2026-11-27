@@ -18,12 +18,11 @@ pub mod issue;
 pub mod manifest;
 pub mod parts;
 pub mod scrub;
-pub mod send;
 pub mod stage;
 pub mod trim;
 
 // The pieces every host shares, under the names they had here.
-pub use guesthouse_report_core::{answer, contract, kind, summary};
+pub use guesthouse_report_core::{answer, contract, kind, send, summary};
 
 pub use answer::read_answer;
 pub use contract::{KEPT_DAYS, MOST_REPORT_BYTES, NEW_ISSUE, report_address};

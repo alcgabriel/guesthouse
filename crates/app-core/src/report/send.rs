@@ -1,18 +1,15 @@
 //! Sends a written report to the server with the system's `curl`, which `install.sh` already needs, so
 //! the workspace needs no HTTP of its own.
 
-use super::bundle::{Bundle, FORMAT};
+use super::bundle::Bundle;
 use super::endpoint::{MOST_REPORT_BYTES, report_address};
 use crate::failure::{Failure, Result};
+use guesthouse_report_core::send::{curl_arguments, read_reply};
 use std::fs;
 use std::process::Command;
 
-/// A report is small, but a slow line can take a while with one near the limit.
-const MOST_SECONDS: &str = "600";
-const CONNECT_SECONDS: &str = "20";
-
 /// Sends the report, and gives back the ID the server gave it. On failure, the server's own sentence
-/// if it gave one.
+/// if it gave one. The arguments and the reading of curl's answer are every host's.
 pub fn send(bundle: &Bundle) -> Result<String> {
     let size = fs::metadata(&bundle.path)?.len();
     if size > MOST_REPORT_BYTES {
@@ -21,39 +18,23 @@ pub fn send(bundle: &Bundle) -> Result<String> {
     let address = report_address();
     let answer_file = bundle.path.with_extension("answer");
     let mut curl = Command::new("curl");
-    // Only https for the real server. A stand-in on this PC for a test can be plain http.
-    let protocol = if address.starts_with("https://") { "=https" } else { "=http,https" };
-    curl.args(["--proto", protocol, "--silent", "--show-error"])
-        .args(["--max-time", MOST_SECONDS, "--connect-timeout", CONNECT_SECONDS])
-        .args(["--header", "Content-Type: application/octet-stream"])
-        .args(["--header", &format!("X-Report-Format: {FORMAT}")])
-        // curl waits a second for a go-ahead before a large body, which this server never sends.
-        .args(["--header", "Expect:"]);
-    let summary = bundle.summary.header();
-    if !summary.is_empty() {
-        curl.args(["--header", &format!("X-Report-Summary: {summary}")]);
-    }
-    let mut body = std::ffi::OsString::from("@");
-    body.push(&bundle.path);
-    curl.arg("--data-binary").arg(body);
-    curl.arg("--output").arg(&answer_file).args(["--write-out", "%{http_code}"]).arg(&address);
+    curl.args(curl_arguments(&address, &bundle.summary.header(), &bundle.path, &answer_file));
     let result = curl.output();
     let answer = fs::read_to_string(&answer_file).unwrap_or_default();
     let _ = fs::remove_file(&answer_file);
     let result =
         result.map_err(|error| Failure(format!("curl could not run, so nothing was sent: {error}")))?;
-    let status: u16 = String::from_utf8_lossy(&result.stdout).trim().parse().unwrap_or(0);
-    if status == 0 || !result.status.success() {
-        let said = String::from_utf8_lossy(&result.stderr);
-        return Err(Failure(format!(
-            "The report server couldn't be reached: {}",
-            said.trim().trim_start_matches("curl: ")
-        )));
-    }
-    read_answer(status, &answer)
+    read_reply(
+        &String::from_utf8_lossy(&result.stdout),
+        &String::from_utf8_lossy(&result.stderr),
+        result.status.success(),
+        &answer,
+    )
+    .map_err(Failure)
 }
 
 /// The ID if the server took the report, read as every host reads it.
+#[cfg(test)]
 fn read_answer(status: u16, answer: &str) -> Result<String> {
     guesthouse_report_core::answer::read_answer(status, answer).map_err(Failure)
 }
