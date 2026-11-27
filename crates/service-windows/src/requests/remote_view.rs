@@ -34,6 +34,7 @@ use guesthouse_remote_view_core::pairing::{Event, Millis};
 use guesthouse_remote_view_core::policy::Policy;
 use guesthouse_remote_view_core::session::{Driver, StepEvent};
 use guesthouse_remote_view_core::share::{ShareState, pairing_seconds};
+use guesthouse_remote_view_core::switch::others_ports;
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::Path;
@@ -270,11 +271,11 @@ impl<W: Work> Service<W> {
         }
         let (now, taken) = {
             let entries = self.machines.lock();
-            let taken: Vec<u16> = entries
-                .iter()
-                .filter(|(other, _)| *other != name)
-                .filter_map(|(_, entry)| entry.remote_view.remote_port)
-                .collect();
+            let taken = others_ports(
+                entries.iter(),
+                |(other, _)| *other == name,
+                |(_, entry)| entry.remote_view.remote_port,
+            );
             (entries[name].remote_view, taken)
         };
         let turned = now.turned(on, &taken, |port| self.work.udp_port_free(port))?;

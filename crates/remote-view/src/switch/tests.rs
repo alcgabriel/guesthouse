@@ -92,3 +92,20 @@ fn the_two_values_go_in_and_out_wherever_a_host_keeps_them() {
     assert_eq!((on, port), (true, Some(7793)));
     assert_eq!(Switch::new(on, port).turned(false, &[], |_| true).unwrap().values(), (false, Some(7793)));
 }
+
+#[test]
+fn every_other_machines_port_is_taken_and_its_own_is_not() {
+    let machines = [("one", Some(7792)), ("two", None), ("three", Some(7794)), ("four", Some(7793))];
+    let taken = others_ports(machines, |(name, _)| *name == "three", |(_, port)| *port);
+    assert_eq!(taken, [7792, 7793]);
+    let asked = std::cell::RefCell::new(Vec::new());
+    others_ports(
+        machines,
+        |(name, _)| *name == "one",
+        |(name, port)| {
+            asked.borrow_mut().push(*name);
+            *port
+        },
+    );
+    assert_eq!(*asked.borrow(), ["two", "three", "four"], "only the others are read");
+}

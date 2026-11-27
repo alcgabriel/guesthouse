@@ -95,6 +95,20 @@ pub fn encoder_for(instance_id: &str) -> &'static str {
     if instance_id.to_ascii_uppercase().contains("VEN_10DE") { "auto" } else { "d3d12" }
 }
 
+/// The encoder for a card by its maker's PCI vendor number, read as [`encoder_for`] reads the card's
+/// instance ID with that vendor in it: for a host that knows a machine's card by its maker rather than
+/// by its instance ID. A machine with no maker, or a maker other than NVIDIA, AMD and Intel, reads as
+/// one with no vendor, which is Direct3D 12's. The Linux host gives it its machine's maker.
+pub fn encoder_for_maker(vendor: Option<u16>) -> &'static str {
+    let vendor = match vendor {
+        Some(0x10DE) => "10DE",
+        Some(0x1002) => "1002",
+        Some(0x8086) => "8086",
+        _ => "",
+    };
+    encoder_for(&format!("PCI\\VEN_{vendor}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,6 +142,16 @@ mod tests {
         assert_eq!(encoder_for(r"PCI\VEN_10DE&DEV_2B85"), "auto");
         assert_eq!(encoder_for(r"PCI\VEN_1002&DEV_13C0"), "d3d12");
         assert_eq!(encoder_for(r"PCI\VEN_8086&DEV_7D55"), "d3d12");
+    }
+
+    #[test]
+    fn the_encoder_suits_the_makers_vendor_number() {
+        for (vendor, encoder) in
+            [(Some(0x10DE), "auto"), (Some(0x1002), "d3d12"), (Some(0x8086), "d3d12"), (None, "d3d12")]
+        {
+            assert_eq!(encoder_for_maker(vendor), encoder, "{vendor:?}");
+        }
+        assert_eq!(encoder_for_maker(Some(0x1234)), "d3d12");
     }
 
     #[test]

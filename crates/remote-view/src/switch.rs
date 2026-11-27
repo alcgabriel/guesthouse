@@ -33,6 +33,18 @@ pub fn choose_port(taken: &[u16], is_free: impl Fn(u16) -> bool) -> Option<u16> 
     (FIRST_PORT..=LAST_PORT).find(|port| !taken.contains(port) && is_free(*port))
 }
 
+/// The ports the other machines have, which a machine's switch can't be given: the port `port` reads
+/// for each of `machines` that `is_own` doesn't say is the machine itself, in their order. `port` is
+/// asked only of the others. The Linux host reads each machine's file, the Windows service the
+/// switches it holds.
+pub fn others_ports<M>(
+    machines: impl IntoIterator<Item = M>,
+    is_own: impl Fn(&M) -> bool,
+    port: impl Fn(&M) -> Option<u16>,
+) -> Vec<u16> {
+    machines.into_iter().filter(|machine| !is_own(machine)).filter_map(|machine| port(&machine)).collect()
+}
+
 /// What is said when every port is taken.
 pub const NO_PORT: &str = "No port is free for sharing the screen (7792 to 7899 are all in use).";
 
