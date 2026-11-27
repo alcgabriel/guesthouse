@@ -65,29 +65,15 @@ pub fn write_in_reports_folder(
 
 /// What to tell the tester before they send, if the report would be thin: no logs of the machine
 /// running, or a machine that isn't running to ask. One message for both, and none for a machine that
-/// couldn't be running for the problem they have. Sending anyway is always theirs to choose.
+/// couldn't be running for the problem they have. Sending anyway is always theirs to choose. The words
+/// are every host's, from `guesthouse-report-core`.
 pub fn before_sending(collection: &Collection, kind: ProblemKind) -> Option<String> {
-    collection.machine.as_ref()?;
-    let can_run = !matches!(kind, ProblemKind::WontStart | ProblemKind::InstallFailed);
-    let not_running = can_run && !collection.machine_running;
-    let no_logs = !collection.has_run_logs;
-    let text = match (no_logs, not_running) {
-        (true, true) => {
-            "This report has no logs of the machine running, and logs from inside the guest need it running. \
-             The fullest report comes with the machine running: start it, make the problem happen again if \
-             you can, then send."
-        }
-        (true, false) => {
-            "This report has no logs of the machine running. Start it, make the problem happen again, then \
-             send. If it won't start at all, send anyway."
-        }
-        (false, true) => {
-            "The machine isn't running, so the report has nothing from inside the guest. The fullest report \
-             comes with it running: start it, make the problem happen if you can, then send."
-        }
-        (false, false) => return None,
-    };
-    Some(text.to_owned())
+    guesthouse_report_core::warning::before_sending(
+        collection.machine.is_some(),
+        collection.machine_running,
+        collection.has_run_logs,
+        kind,
+    )
 }
 
 /// What takes this PC's names out of a report, and every machine's ID, with `about` as `<machine>`.

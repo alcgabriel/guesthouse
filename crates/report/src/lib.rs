@@ -4,7 +4,8 @@
 //! read (`send`, `answer`), times
 //! written in UTC (`clock`) a long file cut to its end (`trim`), the
 //! note that says what a bundle holds (`manifest`) the link that opens an issue about a sent
-//! report (`issue`), and the Windows host's scrubber (`scrub`).
+//! report (`issue`), the Windows host's scrubber (`scrub`), and
+//! what to say before a thin report is sent (`warning`).
 //!
 //! Each host gathers its own files and facts, packs them and runs `curl` its own way. Where the
 //! hosts still differ in what they do with a report, each host's way is kept as it is, and the
@@ -22,3 +23,4 @@ pub mod scrub;
 pub mod send;
 pub mod summary;
 pub mod trim;
+pub mod warning;
