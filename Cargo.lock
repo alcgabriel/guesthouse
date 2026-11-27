@@ -1159,6 +1159,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "guesthouse-host-mac"
+version = "0.11.0"
+dependencies = [
+ "guesthouse-account-core",
+ "guesthouse-answers-core",
+ "guesthouse-basics",
+ "guesthouse-remote-view-core",
+ "guesthouse-report-core",
+ "guesthouse-state-core",
+ "guesthouse-update-check",
+ "libc",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "guesthouse-host-windows"
 version = "0.11.0"
 dependencies = [

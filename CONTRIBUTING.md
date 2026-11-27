@@ -37,6 +37,18 @@ cargo build --release -p guesthouse-app-windows
 
 The checks on pull requests run on Linux only, so build a Windows change on Windows before you send it.
 
+### On a Mac
+
+You need macOS 27 on Apple silicon, Xcode 27, XcodeGen and Rust with the `aarch64-apple-darwin` target. The Mac host's core, `crates/host-mac`, builds on a Mac only: on Linux and Windows it is an empty crate, so `cargo test --workspace` works there, and it isn't one of the default members.
+
+```sh
+cargo test -p guesthouse-host-mac
+cargo clippy -p guesthouse-host-mac --all-targets -- -D warnings
+mac/build.sh
+```
+
+`mac/README.md` says what the app needs beyond that. The checks on pull requests run on Linux only, so build a Mac change on a Mac before you send it.
+
 ## Legal rules
 
 These matter more than anything else here, because text inside code is something `.gitignore` can't catch.

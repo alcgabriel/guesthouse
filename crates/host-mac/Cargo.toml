@@ -1,0 +1,42 @@
+[package]
+name = "guesthouse-host-mac"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Guest machines on a Mac host: the Rust core of the Mac app, behind a C interface. Builds for macOS only."
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "guesthouse_core"
+crate-type = ["staticlib", "rlib"]
+
+# Everything the Mac core uses is for macOS, so on any other system the crate is empty and pulls in
+# nothing, as the Windows host's is on Linux.
+[target.'cfg(target_os = "macos")'.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"
+sha2 = "0.11"
+# What every host shares about viewing a machine from other devices: the state types, the
+# controls' words, the port choice, the pairing and the sentences.
+guesthouse-remote-view-core.workspace = true
+# Bug reports, the part no host differs in (the report server's words, the summary, the scrubber, how it is
+# sent), shared with the Linux and Windows hosts.
+guesthouse-report-core.workspace = true
+# The rules every host shares: the account an install makes in a guest and its password, the
+# answer-file XML escape, and a JSON file written in one step.
+guesthouse-account-core.workspace = true
+guesthouse-answers-core.workspace = true
+guesthouse-state-core.workspace = true
+guesthouse-basics.workspace = true
+# Whether a newer Guesthouse is out, for every host.
+guesthouse-update-check.workspace = true
+
+# The report tool for when the app will not open, named and used as the Linux host's is.
+[[bin]]
+name = "guesthouse-report"
+path = "src/bin/guesthouse_report.rs"
