@@ -16,6 +16,7 @@ use guesthouse_hcs::drivers::copy_driver;
 use guesthouse_hcs::gpu::{self, Card};
 use guesthouse_hcs::host;
 use guesthouse_hcs::schema::{Attachment, AttachmentType};
+use guesthouse_remote_view_core::trust;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -218,7 +219,10 @@ fn refresh_windows_disk(
     give_share(&windows.root, shares, sink)?;
     match setup {
         Some(setup) => give_screen(disk, &windows.root, &setup, card, sink),
-        None => Ok(()),
+        None => {
+            keep_trust(disk, &windows.root, sink);
+            Ok(())
+        }
     }
 }
 
@@ -279,7 +283,7 @@ fn copy_if_changed(from: &Path, to: &Path) -> std::io::Result<bool> {
 }
 
 /// Puts what the guest needs for its screen in its screen folder: remoteman's installer, the script
-/// that runs it, the viewer as the one the guest trusts, the encoder for its card, and its account,
+/// that runs it, the devices the guest trusts, the encoder for its card, and its account,
 /// so it signs in by itself. The report, written before this, runs the script.
 fn give_screen(
     disk: &Path,
@@ -296,7 +300,7 @@ fn give_screen(
     std::fs::create_dir_all(&folder).map_err(|error| format!("{}: {error}", folder.display()))?;
     let state = screen::state_beside(disk);
     let viewer = screen::viewer_identity(&state)?;
-    write("trusted", &screen::trust_list(&viewer))?;
+    give_trust(&folder, root, &viewer)?;
     write("encoder.txt", card.map_or("auto", |card| screen::encoder_for(&card.instance_id)))?;
     write("screen.ps1", screen::SCRIPT)?;
     let account = disk.with_extension("account.txt");
@@ -313,6 +317,33 @@ fn give_screen(
     let _ = std::fs::remove_dir_all(folder.join("remoteman-host"));
     sink.note(format!("The guest has remoteman for its screen. The viewer's folder is {}.", state.display()));
     Ok(())
+}
+
+/// Writes whom the guest trusts in its screen folder: the viewer's line, which decides whether
+/// remoteman's installer runs again, and the list it's given when it does, the viewer and every
+/// device the guest has paired, read off its disk now (see `trust`).
+fn give_trust(folder: &Path, root: &Path, viewer: &str) -> Result<(), String> {
+    let given = trust::given(viewer, root)?;
+    for (name, text) in [("viewer.txt", &given.viewer), ("trusted", &given.trusted)] {
+        let path = folder.join(name);
+        std::fs::write(&path, text).map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    Ok(())
+}
+
+/// With no installer to give, a guest given one before still runs its script, which runs the
+/// installer when remoteman's service has gone. Its list is made again from the guest's own, so the
+/// installer never gets the one from an earlier boot, with a device revoked since on it.
+fn keep_trust(disk: &Path, root: &Path, sink: &dyn Sink) {
+    let folder = root.join(screen::GUEST_FOLDER);
+    if !folder.join("screen.ps1").is_file() {
+        return;
+    }
+    let kept = screen::viewer_identity(&screen::state_beside(disk))
+        .and_then(|viewer| give_trust(&folder, root, &viewer));
+    if let Err(error) = kept {
+        sink.problem(format!("The guest's list of devices to trust wasn't written: {error}"));
+    }
 }
 
 /// The NVAPI wrapper for NVIDIA guests, in the program's guest folder. Not beside the program, where
