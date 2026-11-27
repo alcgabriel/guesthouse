@@ -15,7 +15,9 @@
 //!   nothing escaped, in one pass, so a value with braces in it is never filled in again ([`fill`]). A time left is written by [`super::countdown`] (minutes, a colon, two digits of
 //!   seconds) and seconds as a whole number.
 //! - **Hosts**: a sentence shown or true on some hosts only names them in `hosts` ("linux",
-//!   "windows") with a `note` on why; one with no `hosts` is for every host.
+//!   "windows", or "mac" for another host that is not in this repository) with a `note` on why; one
+//!   with no `hosts` is for every host. A sentence is the same words on every host it names; words
+//!   that differ by host are separate keys.
 //! - **The file**: [`json`] is `{"version": 1, "keys": {KEY: {"en": TEXT, "params": [NAME, ...],
 //!   "hosts": [...], "note": ...}}}`, keys in order, two-space indents and a line end at the end. It
 //!   is kept as `wording.json` in this crate's folder, and a test fails when it is not what [`json`]
@@ -39,6 +41,8 @@ pub const KEY_PREFIX: &str = "remote_view.";
 
 pub const LINUX: &str = "linux";
 pub const WINDOWS: &str = "windows";
+/// Another host, which shows some of the sentences too, by the name it goes by in `hosts`.
+pub const MAC: &str = "mac";
 
 /// One sentence, with its key.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -187,12 +191,43 @@ pub fn sentences() -> Vec<Sentence> {
         one("left_to_answer", left_to_answer_of("{seconds}")),
         one("switch_name", switch_name("{label}", "{device}")),
     ];
-    all.extend(windows.into_iter().map(|sentence| only(sentence, &[WINDOWS], windows_app)));
+    let shown_by_two = "Shown by the Windows app and by another host's app, in the same words.";
+    all.extend(windows.into_iter().map(|sentence| {
+        let both = [
+            "remote_view.address_label",
+            "remote_view.fingerprint_label",
+            "remote_view.cancel",
+            "remote_view.switch_name",
+        ];
+        if both.contains(&sentence.key.as_str()) {
+            only(sentence, &[WINDOWS, MAC], shown_by_two)
+        } else {
+            only(sentence, &[WINDOWS], windows_app)
+        }
+    }));
     let one_device = "True on a host whose guest serves one device at a time, its own window included, and \
                       whose window does not connect again by itself: the Windows host. The Linux host says \
                       remote_view.only_notice instead.";
     all.push(only(one("takes_screen", takes_screen("{name}")), &[WINDOWS], one_device));
     all.push(only(one("screen_line", screen_line("{name}")), &[WINDOWS], one_device));
+    let read_out = "What a screen reader says on another host, whose app shows the time left as a running \
+                    countdown of its own.";
+    all.extend([
+        only(one("open_time_left", OPEN_TIME_LEFT), &[MAC], read_out),
+        only(one("waiting_time_left", WAITING_TIME_LEFT), &[MAC], read_out),
+        only(one("code_label", code_label("{code}")), &[MAC], read_out),
+        only(
+            one("code_time_left", code_time_left_of("{code}", "{seconds}")),
+            &[LINUX],
+            "The Linux app's line for a waiting device: its code and the seconds left to answer.",
+        ),
+        only(
+            one("spoken_code", spoken_code_of("{digits}")),
+            &[WINDOWS],
+            "What a screen reader says for the code in the Windows app: the digits one by one, with a space \
+             between each.",
+        ),
+    ]);
     all
 }
 

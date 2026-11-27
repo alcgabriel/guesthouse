@@ -391,8 +391,7 @@ pub fn waiting_left(until_ms: u64, now_ms: u64) -> String {
 
 /// The six digits of a pairing code, for a screen reader to read one by one.
 pub fn spoken_code(code: &str) -> String {
-    let digits: Vec<String> = code.chars().filter(char::is_ascii_digit).map(String::from).collect();
-    format!("Code {}", digits.join(" "))
+    wording::spoken_code(code)
 }
 
 /// What a preview answers to `ask`, as a service would, so its buttons do something with no service.

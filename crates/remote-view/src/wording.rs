@@ -246,6 +246,37 @@ pub fn switch_name(label: &str, device: &str) -> String {
     format!("{label} for {device}")
 }
 
+/// What a screen reader says beside an open pairing's own countdown, on a host whose app shows the
+/// time left as a running clock.
+pub const OPEN_TIME_LEFT: &str = "Open, time left";
+/// The same beside a waiting device's countdown.
+pub const WAITING_TIME_LEFT: &str = "Waiting for you, time left";
+
+/// What a screen reader says for a waiting device's code, as a host with a running clock says it.
+pub fn code_label(code: &str) -> String {
+    format!("Pairing code {code}")
+}
+
+/// The Linux app's line for a waiting device: its code, and the whole seconds left to answer.
+pub fn code_time_left(code: &str, seconds: u64) -> String {
+    code_time_left_of(code, &seconds.to_string())
+}
+
+fn code_time_left_of(code: &str, seconds: &str) -> String {
+    format!("Code {code}, {seconds} s left to answer")
+}
+
+/// The six digits of a pairing code, for a screen reader to read one by one, as the Windows app says
+/// them: "Code 4 8 2 9 1 7".
+pub fn spoken_code(code: &str) -> String {
+    let digits: Vec<String> = code.chars().filter(char::is_ascii_digit).map(String::from).collect();
+    spoken_code_of(&digits.join(" "))
+}
+
+fn spoken_code_of(digits: &str) -> String {
+    format!("Code {digits}")
+}
+
 pub mod data;
 
 #[cfg(test)]

@@ -74,6 +74,11 @@ fn the_keys_are_these_and_never_change() {
         "switch_name",
         "takes_screen",
         "screen_line",
+        "open_time_left",
+        "waiting_time_left",
+        "code_label",
+        "code_time_left",
+        "spoken_code",
     ]
     .map(|key| format!("{KEY_PREFIX}{key}"));
     assert_eq!(keys, want);
@@ -155,6 +160,12 @@ fn filled_in_each_is_what_its_function_says() {
         ),
         (fill(&text("takes_screen"), &[("name", "Phone")]), takes_screen("Phone")),
         (fill(&text("screen_line"), &[("name", "Phone")]), screen_line("Phone")),
+        (fill(&text("code_label"), &[("code", "482 917")]), code_label("482 917")),
+        (
+            fill(&text("code_time_left"), &[("code", "482 917"), ("seconds", "42")]),
+            code_time_left("482 917", 42),
+        ),
+        (fill(&text("spoken_code"), &[("digits", "4 8 2 9 1 7")]), spoken_code("482 917")),
     ];
     for (filled, said) in table {
         assert_eq!(filled, said);
@@ -172,6 +183,14 @@ fn the_picture_comes_back_sentence_and_the_one_device_sentences_are_kept_apart_b
     assert!(find("only_notice").en.contains("comes back when {name} leaves"));
     assert_eq!(find("takes_screen").hosts, [WINDOWS]);
     assert_eq!(find("screen_line").hosts, [WINDOWS]);
+    for key in ["address_label", "fingerprint_label", "cancel", "switch_name"] {
+        assert_eq!(find(key).hosts, [WINDOWS, MAC], "{key}");
+    }
+    for key in ["open_time_left", "waiting_time_left", "code_label"] {
+        assert_eq!(find(key).hosts, [MAC], "{key}");
+    }
+    assert_eq!(find("code_time_left").hosts, [LINUX]);
+    assert_eq!(find("spoken_code").hosts, [WINDOWS]);
     assert!(all.iter().all(|sentence| sentence.hosts.is_empty() == sentence.note.is_none()));
     // The rest of the shared sentences are every host's.
     assert!(find("wants_to_pair").hosts.is_empty() && find("headline.ready").hosts.is_empty());
@@ -210,4 +229,16 @@ fn filling_in_is_one_pass_and_a_value_with_braces_is_kept_as_it_is() {
     assert_eq!(fill("{name} wants to pair", &[]), "{name} wants to pair");
     assert_eq!(fill("no braces", &[("name", "x")]), "no braces");
     assert_eq!(fill("open { brace", &[("name", "x")]), "open { brace");
+}
+
+#[test]
+fn the_sentences_another_host_asked_for_are_word_for_word() {
+    assert_eq!(OPEN_TIME_LEFT, "Open, time left");
+    assert_eq!(WAITING_TIME_LEFT, "Waiting for you, time left");
+    assert_eq!(code_label("482 917"), "Pairing code 482 917");
+    assert_eq!(code_time_left("482 917", 42), "Code 482 917, 42 s left to answer");
+    assert_eq!(spoken_code("482 917"), "Code 4 8 2 9 1 7");
+    // The words that host shows for the four it shares with the Windows app.
+    assert_eq!((ADDRESS_LABEL, FINGERPRINT_LABEL, CANCEL), ("Address", "Fingerprint", "Cancel"));
+    assert_eq!(switch_name("Control", "Den"), "Control for Den");
 }

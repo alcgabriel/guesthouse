@@ -580,7 +580,7 @@ fn button(label: &str) -> gtk::Button {
 /// What a waiting device's row says: its code, which the person compares, and the time to answer in.
 fn pending_text(info: &ShareInfo, left: u64) -> String {
     let code = info.pending.as_ref().map_or("", |pending| pending.code.as_str());
-    format!("Code {code}, {left} s left to answer\n{}", wording::COMPARE_CODE_LINE)
+    format!("{}\n{}", wording::code_time_left(code, left), wording::COMPARE_CODE_LINE)
 }
 
 #[cfg(test)]

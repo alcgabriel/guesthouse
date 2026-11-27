@@ -9,9 +9,10 @@
       "en": "Address",
       "params": [],
       "hosts": [
-        "windows"
+        "windows",
+        "mac"
       ],
-      "note": "Shown by the Windows app."
+      "note": "Shown by the Windows app and by another host's app, in the same words."
     },
     "remote_view.allow_title": {
       "en": "Allow viewing from other devices",
@@ -29,9 +30,10 @@
       "en": "Cancel",
       "params": [],
       "hosts": [
-        "windows"
+        "windows",
+        "mac"
       ],
-      "note": "Shown by the Windows app."
+      "note": "Shown by the Windows app and by another host's app, in the same words."
     },
     "remote_view.closed_text.closed": {
       "en": "Closed",
@@ -72,6 +74,27 @@
         "windows"
       ],
       "note": "Shown by the Windows app."
+    },
+    "remote_view.code_label": {
+      "en": "Pairing code {code}",
+      "params": [
+        "code"
+      ],
+      "hosts": [
+        "mac"
+      ],
+      "note": "What a screen reader says on another host, whose app shows the time left as a running countdown of its own."
+    },
+    "remote_view.code_time_left": {
+      "en": "Code {code}, {seconds} s left to answer",
+      "params": [
+        "code",
+        "seconds"
+      ],
+      "hosts": [
+        "linux"
+      ],
+      "note": "The Linux app's line for a waiting device: its code and the seconds left to answer."
     },
     "remote_view.compare_code_line": {
       "en": "Check that this code matches the one shown on the device before you press Accept.",
@@ -116,9 +139,10 @@
       "en": "Fingerprint",
       "params": [],
       "hosts": [
-        "windows"
+        "windows",
+        "mac"
       ],
-      "note": "Shown by the Windows app."
+      "note": "Shown by the Windows app and by another host's app, in the same words."
     },
     "remote_view.headline.failed": {
       "en": "The screen could not be shared: {why}",
@@ -191,6 +215,14 @@
         "linux"
       ],
       "note": "Says the picture comes back when the device leaves, which is true on the Linux host. The Windows host's own window does not come back by itself, so the Windows app shows remote_view.takes_screen instead."
+    },
+    "remote_view.open_time_left": {
+      "en": "Open, time left",
+      "params": [],
+      "hosts": [
+        "mac"
+      ],
+      "note": "What a screen reader says on another host, whose app shows the time left as a running countdown of its own."
     },
     "remote_view.pair_new_device": {
       "en": "Pair a New Device",
@@ -292,6 +324,16 @@
       ],
       "note": "True on a host whose guest serves one device at a time, its own window included, and whose window does not connect again by itself: the Windows host. The Linux host says remote_view.only_notice instead."
     },
+    "remote_view.spoken_code": {
+      "en": "Code {digits}",
+      "params": [
+        "digits"
+      ],
+      "hosts": [
+        "windows"
+      ],
+      "note": "What a screen reader says for the code in the Windows app: the digits one by one, with a space between each."
+    },
     "remote_view.stop": {
       "en": "Stop",
       "params": []
@@ -303,9 +345,10 @@
         "device"
       ],
       "hosts": [
-        "windows"
+        "windows",
+        "mac"
       ],
-      "note": "Shown by the Windows app."
+      "note": "Shown by the Windows app and by another host's app, in the same words."
     },
     "remote_view.takes_screen": {
       "en": "One device shows this machine at a time, so {name} has its screen and the machine's window here has lost it. Open screen takes it back, and {name}'s view ends. Neither connects again by itself.",
@@ -316,6 +359,14 @@
         "windows"
       ],
       "note": "True on a host whose guest serves one device at a time, its own window included, and whose window does not connect again by itself: the Windows host. The Linux host says remote_view.only_notice instead."
+    },
+    "remote_view.waiting_time_left": {
+      "en": "Waiting for you, time left",
+      "params": [],
+      "hosts": [
+        "mac"
+      ],
+      "note": "What a screen reader says on another host, whose app shows the time left as a running countdown of its own."
     },
     "remote_view.wants_to_pair": {
       "en": "{name} wants to pair",
