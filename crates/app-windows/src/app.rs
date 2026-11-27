@@ -17,7 +17,7 @@ use guesthouse_control::report::{ProblemKind, issue_link};
 use guesthouse_control::updates::Latest;
 use guesthouse_control::{
     Answer, Bridging, Card, CardInfo, Event, Forward, Machine, MachineSettings, NetworkMode, NewMachine,
-    Share, State, System, forwards_refusal, shares_refusal, valid_name, valid_user,
+    Share, State, System, forwards_refusal, shares_refusal, user_problem, valid_name,
 };
 use windows_reactor::*;
 
@@ -288,7 +288,7 @@ impl Form {
         let name = self.name.trim();
         let image = self.image.trim().trim_matches('"');
         let user = self.user.trim();
-        if !valid_name(name) || image.is_empty() || !(user.is_empty() || valid_user(user)) {
+        if !valid_name(name) || image.is_empty() || user_problem(user).is_some() {
             return None;
         }
         Some(NewMachine {
@@ -1899,6 +1899,20 @@ mod tests {
         assert!(!offers_dlss(System::Linux, &Card::Default, &cards));
         // With no card the default, the default is no one's.
         assert!(!offers_dlss(System::Windows, &Card::Default, &cards[1..]));
+    }
+
+    #[test]
+    fn a_user_either_system_takes_is_sent_and_one_neither_takes_isnt() {
+        let form = |user: &str| Form {
+            name: "win".into(),
+            image: "win.iso".into(),
+            user: user.into(),
+            ..Form::default()
+        };
+        assert_eq!(form("").machine().unwrap().user, "", "empty is the default");
+        assert_eq!(form(" Ann B.Lee ").machine().unwrap().user, "Ann B.Lee");
+        assert_eq!(form("_build").machine().unwrap().user, "_build");
+        assert!(form("a@b").machine().is_none());
     }
 
     #[test]

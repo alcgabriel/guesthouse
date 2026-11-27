@@ -9,7 +9,8 @@ use crate::store::{OWN_FILES, Settings, Store, empty, usable_name};
 use guesthouse_control::report::pieces;
 use guesthouse_control::{
     Answer, Bridging, Card, CardInfo, DEFAULT_USER, Event, Machine, MachineSettings, NetworkMode, NewMachine,
-    Request, Share, SnapshotInfo, State, System, forwards_refusal, shares_refusal, valid_edition, valid_user,
+    Request, Share, SnapshotInfo, State, System, forwards_refusal, shares_refusal, user_problem,
+    valid_edition,
 };
 use guesthouse_host_windows::events::Sink;
 use guesthouse_host_windows::guest_ctl::GuestCtl;
@@ -399,12 +400,8 @@ impl<W: Work> Service<W> {
         if !(SIZE_GB.0..=SIZE_GB.1).contains(&machine.size_gb) {
             return Some(format!("A machine's disk is {} to {} GB.", SIZE_GB.0, SIZE_GB.1));
         }
-        if !machine.user.is_empty() && !valid_user(&machine.user) {
-            return Some(
-                "A guest's user is up to 20 lowercase letters, digits, - and _, starting with a letter, and \
-                 not one of Windows' own accounts."
-                    .into(),
-            );
+        if let Some(problem) = user_problem(&machine.user) {
+            return Some(problem);
         }
         if !valid_edition(&machine.edition) {
             return Some(

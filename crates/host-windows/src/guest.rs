@@ -51,9 +51,6 @@ const COMPONENT: &str = r#"processorArchitecture="amd64" publicKeyToken="31bf385
 
 /// An answer file for the oobeSystem pass: English (US), every first-start question skipped, and one
 /// local administrator.
-/// Whether `user` is one of Windows' own accounts, and so can't be made as a new one.
-pub use guesthouse_account_core::windows_host::windows_account;
-
 pub fn answer_file(user: &str, password: &str) -> String {
     let (user, password) = (escape(user), escape(password));
     format!(
@@ -97,18 +94,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn windows_own_accounts_are_known_whatever_their_case() {
-        assert!(windows_account("guest"));
-        assert!(windows_account("ADMINISTRATOR"));
-        assert!(!windows_account("guesthouse"));
-    }
-
-    #[test]
     fn the_answer_file_makes_the_named_administrator() {
         let file = answer_file("guest", "p&ss<word>");
         assert!(file.contains("<Name>guest</Name>"));
         assert!(file.contains("<Value>p&amp;ss&lt;word&gt;</Value>"));
         assert!(file.contains("<Group>Administrators</Group>"));
+    }
+
+    /// The account rules take capitals, dots and spaces between words in a Windows guest's name,
+    /// which go into the file as they are.
+    #[test]
+    fn a_name_with_capitals_dots_and_spaces_is_written_as_it_is() {
+        let file = answer_file("Ann B.Lee", "p");
+        assert!(file.contains("<Name>Ann B.Lee</Name>"));
     }
 
     #[test]

@@ -1,9 +1,9 @@
-//! The rules for a guest's account, as each host has them. The hosts disagree (on the reserved
-//! names, the longest name, whether a capital or a dot is taken, and the password), and a rule made
-//! tighter would refuse an account a machine already has, so each host's rules are a module of their
-//! own and none stands in for another: [`linux_host`] and [`windows_host`].
+//! The rules for a guest's account: which names a Windows and an Ubuntu guest's user may have, the
+//! reserved names, and the password. Every host uses the same rules, in [`common`], and keeps its
+//! own default names: [`linux_host`] has the Linux host's, and the Windows host's is in its control
+//! crate.
 //!
 //! Making a password and keeping it stay with each host, as they draw on the system.
 
+pub mod common;
 pub mod linux_host;
-pub mod windows_host;

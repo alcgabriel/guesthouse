@@ -473,6 +473,11 @@ mod tests {
     fn the_account_is_read_as_prepare_writes_it() {
         assert_eq!(parse_account("user: guesthouse\npassword: x\n"), Some(("guesthouse".into(), "x".into())));
         assert_eq!(parse_account("user: guesthouse\n"), None);
+        // The account rules are for a new name only: a machine's own account is read whatever it is.
+        for user in ["system", "Administrator", "a@b", &"x".repeat(40)] {
+            let text = format!("user: {user}\npassword: x\n");
+            assert_eq!(parse_account(&text), Some((user.to_owned(), "x".into())), "{user}");
+        }
         let store = store("account");
         store.make("win").unwrap();
         fs::write(store.disk("win").with_extension("account.txt"), "user: guesthouse\npassword: p\n")

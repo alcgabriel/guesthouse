@@ -1414,7 +1414,7 @@ fn new_page(main: &Main, context: &ViewContext<Main>) -> View {
         "A Windows 11 ISO, or its install.wim or install.esd, or an Ubuntu Server ISO.",
         image.into(),
     );
-    let user_ok = form.user.trim().is_empty() || guesthouse_control::valid_user(form.user.trim());
+    let user_problem = guesthouse_control::user_problem(form.user.trim());
     let user = TextBox::new()
         .placeholder_text(guesthouse_control::DEFAULT_USER)
         .text(form.user.as_str())
@@ -1425,12 +1425,12 @@ fn new_page(main: &Main, context: &ViewContext<Main>) -> View {
     let user_row = row_with(
         glyph::PERSON,
         "User",
-        caption(if user_ok {
-            "The guest's administrator. Its password is made for it."
-        } else {
-            "Up to 20 lowercase letters, digits, - and _, starting with a letter, and not one of Windows' own."
-        })
-        .foreground(if user_ok { ThemeBrush::SecondaryText } else { ThemeBrush::SystemCritical }),
+        caption(user_problem.as_deref().unwrap_or("The guest's administrator. Its password is made for it."))
+            .foreground(if user_problem.is_none() {
+                ThemeBrush::SecondaryText
+            } else {
+                ThemeBrush::SystemCritical
+            }),
         Some(user.into()),
     );
     let editions: Vec<String> =

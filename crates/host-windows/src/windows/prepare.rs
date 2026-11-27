@@ -11,6 +11,7 @@ use crate::machine::Guest;
 use crate::record::Record;
 use crate::settings::PrepareSettings;
 use crate::wim_info;
+use guesthouse_account_core::common::windows_name_problem;
 use guesthouse_hcs::disk::{self, Kind, VirtualDisk};
 use guesthouse_hcs::host;
 use std::fs;
@@ -32,12 +33,6 @@ pub fn prepare(settings: &PrepareSettings, sink: &dyn Sink) -> Result<(), String
         return Err(format!(
             "{} is there already. prepare makes a new disk, and never writes over one.",
             disk.display()
-        ));
-    }
-    if guest::windows_account(&settings.user) {
-        return Err(format!(
-            "{} is one of Windows' own accounts, which are disabled. Pick another name.",
-            settings.user
         ));
     }
     let card = chosen_card(&settings.gpu)?;
@@ -64,6 +59,10 @@ pub fn prepare(settings: &PrepareSettings, sink: &dyn Sink) -> Result<(), String
     } else {
         (None, image.clone())
     };
+    // Only now is it known to be Windows, so only now is Windows' rule for the name asked.
+    if let Some(problem) = windows_name_problem(&settings.user) {
+        return Err(problem);
+    }
 
     let listing = run_captured(
         Command::new(system_program("dism.exe"))

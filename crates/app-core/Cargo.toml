@@ -42,7 +42,7 @@ guesthouse-backend-nvidia.workspace = true
 guesthouse-update-check.workspace = true
 # Small pieces every host shares that belong to no one subject.
 guesthouse-basics.workspace = true
-# Which names and passwords a guest's account takes, as each host has them.
+# Which names and passwords a guest's account takes, the rules every host shares.
 guesthouse-account-core.workspace = true
 # The export file's format, which every host can read and write.
 guesthouse-carry-core.workspace = true
