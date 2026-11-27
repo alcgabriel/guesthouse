@@ -27,6 +27,10 @@ use std::time::{Duration, Instant};
 /// How long a caller should give the guest to answer: longer than the guest gives `ctl` itself,
 /// with room for a few KB at the port's speed.
 pub const ANSWER_WAIT: Duration = Duration::from_secs(20);
+/// How long the shared driver gives a `status` reading. A reading changes nothing, so one that
+/// comes too late is only read again, and a request written before the guest's report listens,
+/// which nothing ever answers, holds the channel for this long rather than [`ANSWER_WAIT`].
+pub const STATUS_WAIT: Duration = Duration::from_secs(4);
 
 /// The port's writing end, one whole line at a time.
 pub trait LineWriter: Send + Sync {
@@ -293,7 +297,9 @@ impl GuestCtl {
 /// [`Unanswered`], so the driver reads the status again before it sends anything more.
 impl session::Guest for GuestCtl {
     fn ctl(&self, words: &Words) -> Result<String, Unanswered> {
-        match self.ask(words, ANSWER_WAIT) {
+        let wait =
+            if *words == guesthouse_remote_view_core::ctl::status() { STATUS_WAIT } else { ANSWER_WAIT };
+        match self.ask(words, wait) {
             Ok(answer) => Ok(answer.text),
             Err(refused @ (CtlError::NotAllowed(_) | CtlError::Guest(Failure::Refused))) => {
                 Ok(format!("error: {refused}"))

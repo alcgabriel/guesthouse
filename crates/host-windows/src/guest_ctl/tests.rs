@@ -301,3 +301,14 @@ fn the_driver_asks_through_the_channel_and_is_told_what_may_have_run() {
     assert_eq!(ctl.ctl(&ctl::status()).unwrap_err().0, CtlError::Stopped.to_string());
     assert_eq!(GuestCtl::new().ctl(&ctl::status()).unwrap_err().0, CtlError::NoPort.to_string());
 }
+
+/// A reading that nobody answers holds the channel for a few seconds, not for a command's time.
+#[test]
+fn a_status_nobody_answers_gives_up_sooner_than_a_command() {
+    use guesthouse_remote_view_core::session::Guest as _;
+    let (ctl, _fake) = guest(|_, _| Vec::new());
+    let began = Instant::now();
+    assert_eq!(ctl.ctl(&ctl::status()).unwrap_err().0, CtlError::Silent.to_string());
+    let took = began.elapsed();
+    assert!(took >= STATUS_WAIT && took < ANSWER_WAIT, "{took:?}");
+}
