@@ -182,6 +182,10 @@ pub fn fetch_android_image(paths: &Paths, step: &dyn Fn(&str)) -> Result<PathBuf
 }
 
 #[cfg(test)]
+#[path = "downloads_pins.rs"]
+pub(crate) mod pins;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::testing::Scratch;

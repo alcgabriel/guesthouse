@@ -142,6 +142,10 @@ pub fn ensure(paths: &Paths, step: &dyn Fn(&str)) -> Result<()> {
 }
 
 #[cfg(test)]
+#[path = "macos_part_pins.rs"]
+mod pins;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
