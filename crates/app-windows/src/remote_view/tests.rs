@@ -1,5 +1,5 @@
 use super::*;
-use guesthouse_remote_view_core::share::Pending;
+use guesthouse_remote_view_core::share::{CloseReason, Pending, Permissions};
 use std::net::Ipv4Addr;
 
 const NOW: u64 = 1_800_000_000_000;

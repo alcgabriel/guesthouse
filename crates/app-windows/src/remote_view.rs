@@ -16,9 +16,7 @@
 use std::net::IpAddr;
 
 use guesthouse_control::Request;
-use guesthouse_remote_view_core::share::{
-    CloseReason, DeviceInfo, PAIRING_SECONDS, PERMISSIONS, Permissions, ShareInfo, ShareState,
-};
+use guesthouse_remote_view_core::share::{DeviceInfo, PAIRING_SECONDS, PERMISSIONS, ShareInfo, ShareState};
 use guesthouse_remote_view_core::wording;
 
 /// Words this host shows that the shared wording doesn't have. They're proposed: each should move
@@ -393,7 +391,9 @@ pub fn spoken_code(code: &str) -> String {
 }
 
 /// What a preview answers to `ask`, as a service would, so its buttons do something with no service.
+#[cfg(any(feature = "preview", test))]
 pub fn pretend(info: &ShareInfo, ask: &Ask, now_ms: u64) -> Result<ShareInfo, String> {
+    use guesthouse_remote_view_core::share::{CloseReason, Permissions};
     let mut info = info.clone();
     match ask {
         Ask::Switch(on) => {

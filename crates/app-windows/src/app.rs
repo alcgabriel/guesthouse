@@ -1060,16 +1060,22 @@ impl Main {
             if let Some(looking) = &self.looking {
                 looking.ask(ask);
             }
-            return;
+        } else {
+            #[cfg(feature = "preview")]
+            self.pretend(ask);
         }
-        #[cfg(feature = "preview")]
-        {
-            let machine = viewing.machine.clone();
-            preview::asked(&ask.request(&machine));
-            let info = viewing.info.clone().unwrap_or_else(|| ShareInfo::off(&machine));
-            let answer = crate::remote_view::pretend(&info, &ask, now_ms());
-            self.remote_view_answered(ask, answer);
-        }
+    }
+
+    /// A preview's answer to what was asked, as a service's would be, with the request written to
+    /// a file in place of being sent.
+    #[cfg(feature = "preview")]
+    fn pretend(&mut self, ask: Ask) {
+        let Some(viewing) = &self.viewing else { return };
+        let machine = viewing.machine.clone();
+        preview::asked(&ask.request(&machine));
+        let info = viewing.info.clone().unwrap_or_else(|| ShareInfo::off(&machine));
+        let answer = crate::remote_view::pretend(&info, &ask, now_ms());
+        self.remote_view_answered(ask, answer);
     }
 
     fn remote_view_answered(&mut self, ask: Ask, answer: Result<ShareInfo, String>) {
