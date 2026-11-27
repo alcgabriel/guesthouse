@@ -4,21 +4,12 @@
 use super::bundle::{Bundle, FORMAT};
 use super::endpoint::{MOST_REPORT_BYTES, report_address};
 use crate::failure::{Failure, Result};
-use serde::Deserialize;
 use std::fs;
 use std::process::Command;
 
 /// A report is small, but a slow line can take a while with one near the limit.
 const MOST_SECONDS: &str = "600";
 const CONNECT_SECONDS: &str = "20";
-const CREATED: u16 = 201;
-const ID_LENGTH: usize = 10;
-
-#[derive(Deserialize)]
-struct Answer {
-    id: Option<String>,
-    error: Option<String>,
-}
 
 /// Sends the report, and gives back the ID the server gave it. On failure, the server's own sentence
 /// if it gave one.
@@ -62,21 +53,9 @@ pub fn send(bundle: &Bundle) -> Result<String> {
     read_answer(status, &answer)
 }
 
+/// The ID if the server took the report, read as every host reads it.
 fn read_answer(status: u16, answer: &str) -> Result<String> {
-    let parsed: Option<Answer> = serde_json::from_str(answer).ok();
-    if status == CREATED {
-        let id = parsed.and_then(|answer| answer.id).unwrap_or_default();
-        if id.len() == ID_LENGTH && id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Ok(id);
-        }
-        return Err(Failure::new("The report server took the report but gave no ID it could be found by."));
-    }
-    match parsed.and_then(|answer| answer.error).filter(|error| !error.trim().is_empty()) {
-        Some(error) => Err(Failure(error)),
-        None => {
-            Err(Failure(format!("The report server answered with an error ({status}), and gave no reason.")))
-        }
-    }
+    guesthouse_report_core::answer::read_answer(status, answer).map_err(Failure)
 }
 
 #[cfg(test)]
