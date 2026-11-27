@@ -28,6 +28,9 @@ preview = []
 guesthouse-basics.workspace = true
 # The words on the service's pipe, and the pipe itself. The only way the app reaches the service.
 guesthouse-control.workspace = true
+# The app's own settings, kept as a small JSON file (src/preferences.rs).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 windows-reactor = { path = "../../vendor/windows-reactor" }
 # Remote View's states, wording and limits, the same as every host shows them.
 guesthouse-remote-view-core.workspace = true
@@ -36,7 +39,8 @@ guesthouse-relay.workspace = true
 # The few calls WinUI doesn't make for us: the file dialog, the clipboard, cancelling a read that
 # waits on the pipe, and the console, which is Windows' Remote Desktop control in a window of our
 # own (OLE and variants for the control, the library loader for RdpBase and ATL, the pipe's wait,
-# and the window). The same crate and version as `hcs`.
+# and the window), and the registry, where Windows keeps what opens when the person signs in. The
+# same crate and version as `hcs`.
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
@@ -47,6 +51,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Memory",
     "Win32_System_Ole",
     "Win32_System_Pipes",
+    "Win32_System_Registry",
     "Win32_System_Time",
     "Win32_System_Variant",
     "Win32_UI_Controls_Dialogs",
@@ -62,6 +67,9 @@ guesthouse-remote-view-core.workspace = true
 guesthouse-control.workspace = true
 # The requests' words on the wire, which the tests compare.
 serde_json = "1"
+# The app's own settings and how an update stands are plain logic too, tested on any system.
+guesthouse-basics.workspace = true
+serde = { version = "1", features = ["derive"] }
 
 [target.'cfg(windows)'.build-dependencies]
 # Stages the Windows App Runtime beside the exe and embeds the manifest that finds it there, so the

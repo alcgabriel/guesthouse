@@ -16,7 +16,6 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use guesthouse_control::client::{self, Unreached};
-use guesthouse_control::updates;
 use guesthouse_control::{
     Answer, Bridging, CardInfo, Event, Machine, MachineSettings, NewMachine, Request, ShareInfo,
 };
@@ -25,6 +24,7 @@ use windows_reactor::ComponentCompletion;
 use crate::app::Message;
 use crate::pace::{Batch, Changes};
 use crate::remote_view::{self, Ask};
+use crate::update::Updater;
 
 /// How often the service is asked how things stand.
 const EVERY: Duration = Duration::from_secs(2);
@@ -149,17 +149,11 @@ pub fn start(window: Window) -> Sender<Job> {
     jobs
 }
 
-/// Asks the file drop for the newest Windows host, once, on a thread of its own, and tells the window
-/// if it's newer than this one. Nothing is said when it isn't, or when the file can't be had: an
-/// update is offered, never needed.
-pub fn check_for_update(window: Window) {
+/// Asks the file drop for the newest Windows host through `updater`, on a thread of its own, and
+/// hands the window what came back, for the look numbered `attempt`.
+pub fn look_for_update(updater: Arc<dyn Updater>, attempt: u64, window: Window) {
     let _ = thread::Builder::new().name("update".into()).spawn(move || {
-        let Some(latest) = crate::system::fetch_latest().and_then(|text| updates::parse(&text)) else {
-            return;
-        };
-        if updates::newer(&latest.version, guesthouse_control::WINDOWS_VERSION) {
-            let _ = window.tell(Message::Update(latest));
-        }
+        let _ = window.tell(Message::Looked(attempt, updater.fetch()));
     });
 }
 

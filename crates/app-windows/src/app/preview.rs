@@ -13,7 +13,12 @@
 //! `failed`, `delete`, `settings` (a stopped machine's settings being changed) and `settings-refused`
 //! (the service said no to them), `report-new` (the report page, being written), `report` (a
 //! prepared report, and `report-sent` once it has an ID) and `report-away` (the report page when the
-//! service can't be reached). Nothing is sent to the service, whatever is pressed.
+//! service can't be reached). `update` is Home with a newer Guesthouse out, the dot on the gear, and
+//! the app's Settings page is `app-settings`, with how the updates stand as `updates-newest` (the
+//! same), `updates-looking`, `updates-out`, `updates-unreached` and `updates-repo` (a build of the
+//! repo). A preview counts as installed, reads and writes none of the person's settings, and never
+//! reaches the file drop: Look now finds what its state did. Nothing is sent to the service,
+//! whatever is pressed.
 
 use guesthouse_control::client::Unreached;
 use guesthouse_control::{
@@ -26,10 +31,12 @@ use crate::bridge::Status;
 use crate::log::Log;
 use crate::remote_view::{Ask, Viewing};
 use crate::report::Prepared;
+use crate::update::{self, Fake, Fetched, Updates, release_file};
 use guesthouse_control::ShareInfo;
 use guesthouse_control::report::Summary;
 use guesthouse_remote_view_core::share::{CloseReason, DeviceInfo, Pending, Permissions, ShareState};
 use std::net::{IpAddr, Ipv4Addr};
+use std::sync::Arc;
 
 const STATE: &str = "GUESTHOUSE_APP_PREVIEW";
 const THEME: &str = "GUESTHOUSE_APP_THEME";
@@ -43,6 +50,10 @@ pub fn wanted() -> bool {
 pub fn stage(main: &mut Main) {
     let state = std::env::var(STATE).unwrap_or_default();
     main.live = false;
+    // As an installed app, which looks for updates, though it never reaches the file drop.
+    main.installed = true;
+    main.updater = Arc::new(Fake { fetched: Fetched::Unreached });
+    main.updates = Updates::new(true, guesthouse_control::WINDOWS_VERSION);
     main.theme = match std::env::var(THEME).as_deref() {
         Ok("light") => WindowTheme::Light,
         Ok("dark") => WindowTheme::Dark,
@@ -113,13 +124,32 @@ pub fn stage(main: &mut Main) {
             }
         }
         "update" => {
-            show(main, "win11", State::Off);
-            main.update = Some(guesthouse_control::updates::Latest {
-                version: "0.10.0".to_owned(),
-                installer: "https://files.ruxn.com/p/guesthouse/guesthouse-setup-0.10.0.exe".to_owned(),
-                sha256: "0".repeat(64),
-                notes: String::new(),
-            });
+            for (name, state) in [("win11", State::Running), ("build-box", State::Off)] {
+                show(main, name, state);
+            }
+            main.page = Page::Home;
+            updates(main, Some(Fetched::Text(release_file(&next_version()))));
+        }
+        "app-settings" | "updates-newest" => {
+            main.page = Page::AppSettings;
+            updates(main, Some(Fetched::Text(release_file(guesthouse_control::WINDOWS_VERSION))));
+        }
+        "updates-looking" => {
+            main.page = Page::AppSettings;
+            updates(main, None);
+        }
+        "updates-out" => {
+            main.page = Page::AppSettings;
+            updates(main, Some(Fetched::Text(release_file(&next_version()))));
+        }
+        "updates-unreached" => {
+            main.page = Page::AppSettings;
+            updates(main, Some(Fetched::Unreached));
+        }
+        "updates-repo" => {
+            main.page = Page::AppSettings;
+            main.installed = false;
+            main.updates = Updates::new(false, guesthouse_control::WINDOWS_VERSION);
         }
         "report-new" => {
             show(main, "win11", State::Off);
@@ -171,6 +201,33 @@ pub fn stage(main: &mut Main) {
     }
     if let Some(section) = std::env::var(SECTION).ok().as_deref().and_then(Section::of_label) {
         main.section = section;
+    }
+}
+
+/// Pretends the app is installed and has looked for a newer Guesthouse: the look is still going
+/// with `None`, and found what `fetched` says otherwise. Look now finds the same again.
+fn updates(main: &mut Main, fetched: Option<Fetched>) {
+    main.installed = true;
+    main.updates = Updates::new(true, guesthouse_control::WINDOWS_VERSION);
+    main.updater = Arc::new(Fake { fetched: fetched.clone().unwrap_or(Fetched::Unreached) });
+    let [update::Effect::Fetch { attempt }] = main.updates.step(update::Input::Look, NOW)[..] else {
+        return;
+    };
+    if let Some(fetched) = fetched {
+        main.updates.step(update::Input::Looked { attempt, fetched }, NOW);
+    }
+}
+
+/// When a preview's look was, in seconds since 1970.
+const NOW: u64 = 1_795_000_000;
+
+/// The version after this one, as a newer release would be.
+fn next_version() -> String {
+    let parts: Vec<u64> =
+        guesthouse_control::WINDOWS_VERSION.trim().split('.').filter_map(|part| part.parse().ok()).collect();
+    match parts[..] {
+        [major, minor, _] => format!("{major}.{}.0", minor + 1),
+        _ => "99.0.0".to_owned(),
     }
 }
 

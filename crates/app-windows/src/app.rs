@@ -10,11 +10,12 @@
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::mpsc::Sender;
+use std::time::Duration;
 
 use guesthouse_control::client::Unreached;
 use guesthouse_control::report::{ProblemKind, issue_link};
-use guesthouse_control::updates::Latest;
 use guesthouse_control::{
     Answer, Bridging, Card, CardInfo, Event, Forward, Machine, MachineSettings, NetworkMode, NewMachine,
     Share, State, System, forwards_refusal, shares_refusal, user_problem, valid_name,
@@ -24,8 +25,10 @@ use windows_reactor::*;
 use crate::bridge::{self, Ended, Job, Looking, Seen, Watch, Window};
 use crate::console::{self, Console};
 use crate::log::Log;
+use crate::preferences::{Preferences, Theme};
 use crate::remote_view::{Ask, Facts, Viewing};
 use crate::report::{self, Asked, Prepared};
+use crate::update::{self, Fetched, Updater, Updates};
 use guesthouse_control::ShareInfo;
 use guesthouse_remote_view_core::share::ShareState;
 
@@ -33,7 +36,9 @@ use guesthouse_remote_view_core::share::ShareState;
 mod preview;
 
 /// How long after a page opens its focus is moved, by when it has been laid out.
-const FOCUS_AFTER: std::time::Duration = std::time::Duration::from_millis(100);
+const FOCUS_AFTER: Duration = Duration::from_millis(100);
+/// How often an app left open looks for a newer Guesthouse by itself.
+const LOOK_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 /// The most lines a log keeps. The oldest go first.
 const LOG_LIMIT: usize = 500;
 /// What a new machine is given unless the person changes it.
@@ -107,6 +112,9 @@ pub enum Page {
     New,
     /// Report a problem, which can be reached when the service can't be.
     Report,
+    /// The app's own settings, its updates and what it is, which can be reached when the service
+    /// can't be, too.
+    AppSettings,
 }
 
 pub use crate::shell::{Layout, Section};
@@ -525,9 +533,11 @@ pub struct Making {
 pub struct Main {
     pub seen: Seen,
     pub page: Page,
-    /// Where Back goes from New machine and Report a problem: Home, or the machine's page they
-    /// were opened from.
+    /// Where Back goes from New machine and Report a problem: Home, the machine's page or the
+    /// app's settings they were opened from.
     pub back_to: Page,
+    /// Where Back goes from the app's settings: Home, or the machine's page it was opened from.
+    pub settings_back: Page,
     /// The part of the machine's page that shows.
     pub section: Section,
     /// How the window's width lays the pages out.
@@ -552,8 +562,18 @@ pub struct Main {
     pub news: Option<News>,
     /// The machine whose Delete is being asked about.
     pub deleting: Option<String>,
-    /// A newer Windows host, once the file drop says there is one, until it's put aside.
-    pub update: Option<Latest>,
+    /// Whether a newer Guesthouse is out, as the file drop last said.
+    pub updates: Updates,
+    /// What reaches the file drop: the network, or a preview's fake.
+    updater: Arc<dyn Updater>,
+    /// The timer that looks again a day after the last look by itself.
+    look_timer: Option<ComponentTimer>,
+    /// The app's own settings.
+    pub preferences: Preferences,
+    /// Whether the app opens when the person signs in, as Windows' Run key says.
+    pub opens_at_sign_in: bool,
+    /// Whether this is an installed app, beside the installer's uninstaller. A preview counts as one.
+    pub installed: bool,
     /// The snapshot whose Revert or Delete is being asked about.
     pub snapshot_ask: Option<SnapshotAsk>,
     /// The label typed for the next snapshot of the shown machine.
@@ -574,7 +594,7 @@ pub struct Main {
     /// The window's handle, for the file dialog and the clipboard.
     hwnd: isize,
     pub icon: Option<Rc<str>>,
-    /// Light or dark, or as Windows is. Only a preview chooses.
+    /// Light or dark, or as Windows is, as the app's settings say, or a preview chooses.
     pub theme: WindowTheme,
     /// Whether the machines are the service's. A preview's aren't, and nothing is asked of it.
     live: bool,
@@ -716,12 +736,28 @@ pub enum Message {
     DeleteSnapshot(u64),
     SnapshotAnswered(ContentDialogResult),
     NewsClosed,
-    /// A newer Windows host is out.
-    Update(Latest),
+    /// Open the app's settings.
+    OpenSettings,
+    /// A theme was chosen, by its place in `Theme::ALL`.
+    SetTheme(Option<usize>),
+    /// Look for a newer Guesthouse by itself, or not.
+    SetLookByItself(bool),
+    /// Open the app when the person signs in, or not.
+    SetSignIn(bool),
+    /// Look for a newer Guesthouse now.
+    Look,
+    /// A day has gone by since the app last looked by itself.
+    LookDaily,
+    /// What the look numbered here found.
+    Looked(u64, Fetched),
     /// Open the newer one's installer in the browser.
     GetUpdate,
     /// Put the update aside until the app next starts.
     LaterUpdate,
+    /// Open a version's release notes.
+    ReleaseNotes(String),
+    /// Open the licences of what Guesthouse is built with.
+    Licences,
     /// One of the Remote View group's controls.
     RemoteView(Ask),
     /// The service's answer to what was asked of the remote view, and which machine's it was.
@@ -909,10 +945,20 @@ impl Main {
         self.go(Page::Report);
     }
 
-    /// Shows `page`. New machine and Report a problem note where they were opened from, for Back.
+    /// Shows `page`. New machine, Report a problem and the app's settings note where they were
+    /// opened from, for Back: a report opened from the settings goes back to them, and they go back
+    /// to where they were opened from.
     fn go(&mut self, page: Page) {
-        if matches!(page, Page::New | Page::Report) && matches!(self.page, Page::Home | Page::Machine) {
-            self.back_to = self.page;
+        match page {
+            Page::New | Page::Report
+                if matches!(self.page, Page::Home | Page::Machine | Page::AppSettings) =>
+            {
+                self.back_to = self.page
+            }
+            Page::AppSettings if matches!(self.page, Page::Home | Page::Machine) => {
+                self.settings_back = self.page
+            }
+            _ => {}
         }
         self.page = page;
     }
@@ -922,6 +968,7 @@ impl Main {
         self.page = match self.page {
             Page::Home | Page::Machine => Page::Home,
             Page::New | Page::Report => self.back_to,
+            Page::AppSettings => self.settings_back,
         };
     }
 
@@ -1209,8 +1256,14 @@ impl Main {
                 if self.page == Page::Machine {
                     self.page = Page::Home;
                 }
-                // Back from New machine or Report a problem has no machine's page to go to now.
-                self.back_to = Page::Home;
+                // Back from New machine, Report a problem or the app's settings has no machine's
+                // page to go to now.
+                if self.back_to == Page::Machine {
+                    self.back_to = Page::Home;
+                }
+                if self.settings_back == Page::Machine {
+                    self.settings_back = Page::Home;
+                }
             }
             Some(_) if self.rewatch && was_away => self.select(self.selected.clone()),
             Some(_) | None => {}
@@ -1399,6 +1452,72 @@ impl Main {
         }
     }
 
+    /// Takes in what happened to the updates, and does what that says to.
+    fn updates_step(&mut self, input: update::Input) {
+        let now = now_ms() / 1000;
+        for effect in self.updates.step(input, now) {
+            match effect {
+                update::Effect::Fetch { attempt } => {
+                    bridge::look_for_update(self.updater.clone(), attempt, self.window.clone());
+                }
+            }
+        }
+    }
+
+    /// Whether the app looks for a newer Guesthouse by itself: the settings say to, and
+    /// GUESTHOUSE_UPDATE_CHECK=0 doesn't say not to.
+    pub fn looks_by_itself(&self) -> bool {
+        self.preferences.look_by_itself && !looking_turned_off()
+    }
+
+    /// Changes the app's settings and keeps them. A preview keeps them only while it runs, so it
+    /// never writes over the person's own.
+    fn prefer(&mut self, change: impl FnOnce(&mut Preferences)) {
+        let mut preferences = self.preferences.clone();
+        change(&mut preferences);
+        if preferences == self.preferences {
+            return;
+        }
+        self.preferences = preferences;
+        self.theme = window_theme(self.preferences.theme);
+        if !self.live {
+            return;
+        }
+        let kept = match crate::preferences::folder() {
+            Some(folder) => self.preferences.write(&folder).map_err(|error| error.to_string()),
+            None => Err("Windows doesn't say where this user's app data is".to_owned()),
+        };
+        if let Err(why) = kept {
+            self.tell(
+                format!("The app's settings couldn't be kept: {why}. They last until it closes."),
+                true,
+            );
+        }
+    }
+
+    fn set_sign_in(&mut self, on: bool) {
+        if on == self.opens_at_sign_in {
+            return;
+        }
+        if !self.live {
+            self.opens_at_sign_in = on;
+            return;
+        }
+        match crate::system::set_opens_at_sign_in(on) {
+            Ok(()) => self.opens_at_sign_in = crate::system::opens_at_sign_in(),
+            Err(words) => self.tell(words, true),
+        }
+    }
+
+    /// Opens a page in the browser, which a preview only pretends to.
+    fn open_page(&mut self, link: &str) {
+        if self.live
+            && let Err(words) = crate::system::open_link(link)
+        {
+            self.tell(words, true);
+        }
+    }
+
     fn browse(&mut self) {
         let window = self.window.clone();
         let opened = crate::system::pick_image(self.hwnd, move |path| {
@@ -1408,6 +1527,25 @@ impl Main {
             self.tell("The file dialog didn't open. Type the image's path instead.", true);
         }
     }
+}
+
+/// Whether GUESTHOUSE_UPDATE_CHECK=0 turns looking by itself off.
+pub fn looking_turned_off() -> bool {
+    std::env::var("GUESTHOUSE_UPDATE_CHECK").is_ok_and(|value| value == "0")
+}
+
+/// The window's theme for the one the settings say.
+fn window_theme(theme: Theme) -> WindowTheme {
+    match theme {
+        Theme::System => WindowTheme::System,
+        Theme::Light => WindowTheme::Light,
+        Theme::Dark => WindowTheme::Dark,
+    }
+}
+
+/// The release notes of a version, on the release's page.
+pub fn notes_of(version: &str) -> String {
+    format!("https://github.com/ruxnlabs/guesthouse/releases/tag/windows-v{version}")
 }
 
 /// The machine's address, if it's one. It comes from what the guest wrote, so it's only used once
@@ -1440,10 +1578,17 @@ impl Component for Main {
         let live = live();
         // A preview's calls go nowhere, as nothing takes them.
         let jobs = if live { bridge::start(window.clone()) } else { std::sync::mpsc::channel().0 };
+        // A preview reads none of the person's settings, and writes none.
+        let preferences = match crate::preferences::folder().filter(|_| live) {
+            Some(folder) => Preferences::read(&folder),
+            None => Preferences::default(),
+        };
+        let installed = crate::system::installed();
         let mut main = Main {
             seen: Err(Unreached::NoService.words().to_owned()),
             page: Page::Home,
             back_to: Page::Home,
+            settings_back: Page::Home,
             section: Section::Overview,
             layout: Layout::of(crate::window::WIDTH),
             focus: ElementRef::new(),
@@ -1458,7 +1603,13 @@ impl Component for Main {
             news: None,
             deleting: None,
             bridge_ask: false,
-            update: None,
+            updates: Updates::new(installed, guesthouse_control::WINDOWS_VERSION),
+            updater: Arc::new(crate::system::Network),
+            look_timer: None,
+            theme: window_theme(preferences.theme),
+            preferences,
+            opens_at_sign_in: live && crate::system::opens_at_sign_in(),
+            installed,
             snapshot_ask: None,
             snapshot_label: String::new(),
             form: Form::default(),
@@ -1471,12 +1622,13 @@ impl Component for Main {
             window,
             hwnd: 0,
             icon: crate::system::icon_file().map(Rc::from),
-            theme: WindowTheme::System,
             live,
             viewing: None,
             looking: None,
             looking_id: 0,
         };
+        // A day from now, and a day from each look after, it looks again if it's to.
+        main.look_timer = Some(context.set_timeout(LOOK_EVERY, Message::LookDaily));
         #[cfg(feature = "preview")]
         if !live {
             preview::stage(&mut main);
@@ -1491,10 +1643,9 @@ impl Component for Main {
         if let Some(name) = only {
             main.enter(name, Section::Overview);
         }
-        // Only an installed app asks, and anyone can turn it off.
-        let asked_not_to = std::env::var("GUESTHOUSE_UPDATE_CHECK").is_ok_and(|value| value == "0");
-        if crate::system::installed() && !asked_not_to {
-            bridge::check_for_update(main.window.clone());
+        // Only an installed app looks, and the settings or GUESTHOUSE_UPDATE_CHECK=0 can turn it off.
+        if main.looks_by_itself() {
+            main.updates_step(update::Input::Look);
         }
         main
     }
@@ -1778,15 +1929,54 @@ impl Component for Main {
                 }
             }
             Message::NewsClosed => self.news = None,
-            Message::Update(latest) => self.update = Some(latest),
+            Message::OpenSettings => {
+                // Windows' Run key may have been changed elsewhere, as in Task Manager.
+                if self.live {
+                    self.opens_at_sign_in = crate::system::opens_at_sign_in();
+                }
+                self.go(Page::AppSettings);
+            }
+            Message::SetTheme(Some(index)) => {
+                if let Some(theme) = Theme::ALL.get(index).copied() {
+                    self.prefer(|preferences| preferences.theme = theme);
+                }
+            }
+            Message::SetTheme(None) => {}
+            Message::SetLookByItself(on) => self.prefer(|preferences| preferences.look_by_itself = on),
+            Message::SetSignIn(on) => self.set_sign_in(on),
+            Message::Look => self.updates_step(update::Input::Look),
+            Message::LookDaily => {
+                self.look_timer = Some(context.set_timeout(LOOK_EVERY, Message::LookDaily));
+                if self.looks_by_itself() {
+                    self.updates_step(update::Input::Look);
+                }
+            }
+            Message::Looked(attempt, fetched) => {
+                self.updates_step(update::Input::Looked { attempt, fetched })
+            }
             Message::GetUpdate => {
-                if let Some(latest) = &self.update
-                    && let Err(words) = crate::system::open_link(&latest.installer)
+                if let Some(link) = self.updates.newer().map(|latest| latest.installer.clone()) {
+                    self.open_page(&link);
+                }
+            }
+            Message::LaterUpdate => self.updates_step(update::Input::PutAside),
+            Message::ReleaseNotes(version) => {
+                // The newer one's file may name its page, which is on the release's own site.
+                let link = match self.updates.newer() {
+                    Some(latest) if latest.version == version && !latest.notes.is_empty() => {
+                        latest.notes.clone()
+                    }
+                    _ => notes_of(&version),
+                };
+                self.open_page(&link);
+            }
+            Message::Licences => {
+                if self.live
+                    && let Err(words) = crate::system::open_licences()
                 {
                     self.tell(words, true);
                 }
             }
-            Message::LaterUpdate => self.update = None,
             Message::RemoteView(ask) => self.ask_remote_view(ask),
             Message::RemoteViewAnswered(id, ask, answer) if id == self.looking_id => {
                 self.remote_view_answered(ask, answer)

@@ -108,11 +108,12 @@ pub fn switcher(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> 
         .into()
 }
 
-/// What can be done to the machine, at the right of the title bar: Start, or Stop while it's on;
-/// Open screen for a Windows guest; and More, with Delete and Report a problem.
-pub fn actions(machine: &Machine, context: &ViewContext<Main>) -> View {
+/// What can be done to the machine, at the right of the title bar, after the app's settings: Start,
+/// or Stop while it's on; Open screen for a Windows guest; and More, with Delete and Report a
+/// problem.
+pub fn actions(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> View {
     let state = machine.state;
-    let mut parts: Vec<View> = Vec::new();
+    let mut parts: Vec<View> = vec![super::app_settings::gear(main, context)];
     if matches!(state, State::Off | State::Failed | State::Installing) {
         let start = button("Start", context.message(Message::Start), true)
             .is_enabled(matches!(state, State::Off | State::Failed) && machine.working.is_none());
@@ -146,27 +147,9 @@ pub fn actions(machine: &Machine, context: &ViewContext<Main>) -> View {
 
 // ---- Overview ----
 
-/// A newer Windows host, at the top of Home and of a machine's Overview, until it's put aside.
-pub fn update_card(main: &Main, context: &ViewContext<Main>) -> Option<View> {
-    let latest = main.update.as_ref()?;
-    let words = format!(
-        "You have {}. Download the installer and run it: it keeps your machines, and asks each running one to shut down first.",
-        guesthouse_control::WINDOWS_VERSION
-    );
-    let download = button("Download", context.message(Message::GetUpdate), true)
-        .automation_name(format!("Download Guesthouse {}", latest.version));
-    let later = button("Not now", context.message(Message::LaterUpdate), false);
-    Some(group(vec![row(
-        &format!("Guesthouse {} is out", latest.version),
-        &[&words],
-        Some(side_by_side((download, later)).into()),
-    )]))
-}
-
 fn overview(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> View {
     let wide = main.layout.wide;
-    let mut parts: Vec<View> = update_card(main, context).into_iter().collect();
-    parts.push(pair(wide, 2.0, hero(main, machine), facts(main, machine)));
+    let mut parts: Vec<View> = vec![pair(wide, 2.0, hero(main, machine), facts(main, machine))];
     let connect = group(connect_rows(main, machine, context));
     parts.push(pair(wide, 1.0, connect, log_card(main, context)));
     ScrollViewer::new()
