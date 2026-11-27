@@ -25,8 +25,8 @@ use crate::machine::{Kind, MACHINE_FILE, Machine};
 use crate::network::Mode;
 use crate::render_cards::render_cards;
 use crate::settings::{max_vram_gib_for, write_json};
-use crate::snapshots::SNAPSHOT_TAG;
 use crate::token_change::plan_token_change_at;
+use guesthouse_snapshot_core::linux_host::is_snapshot_tag;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs::{self, File, OpenOptions};
@@ -47,8 +47,6 @@ const QEMU_IMG_MEMORY: &str = "--as=2147483648";
 const QEMU_IMG_SECONDS: &str = "--cpu=60";
 /// The same for time spent waiting, which a limit on the CPU doesn't count.
 const QEMU_IMG_WAIT: &str = "120";
-/// The hex digits after the tag in a snapshot's name, as [`crate::snapshots`] makes them.
-const SNAPSHOT_HEX_DIGITS: usize = 8;
 const TOKEN_FILE: &str = "guest.token";
 const PRIVATE: u32 = 0o600;
 
@@ -250,13 +248,6 @@ fn disk_from_elsewhere(disk: &Path) -> Result<Value> {
     serde_json::from_slice(&looked.stdout).map_err(|error| Failure(error.to_string()))
 }
 
-fn is_snapshot_tag(name: &str) -> bool {
-    name.strip_prefix(SNAPSHOT_TAG).is_some_and(|rest| {
-        rest.len() == SNAPSHOT_HEX_DIGITS
-            && rest.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    })
-}
-
 /// Refuses a disk that would reach past itself, or whose snapshots would name files of their own
 /// choosing. Its header is read here first, so qemu-img never opens one that names another file.
 fn check_disk(disk: &Path) -> Result<()> {
@@ -419,6 +410,9 @@ fn guest_facts(folder: &Path, kind: Kind) -> Result<()> {
 }
 
 mod accepted;
+
+#[cfg(test)]
+mod tag_pins;
 
 #[cfg(test)]
 mod tests;

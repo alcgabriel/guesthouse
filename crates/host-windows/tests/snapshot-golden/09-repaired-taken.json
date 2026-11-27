@@ -1,0 +1,13 @@
+{
+  "snapshots": [
+    {
+      "id": 1,
+      "label": "half",
+      "taken": 7,
+      "parent": null,
+      "hidden": false
+    }
+  ],
+  "current": 1,
+  "next_id": 2
+}

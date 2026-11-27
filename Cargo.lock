@@ -942,6 +942,7 @@ dependencies = [
  "guesthouse-sensors",
  "guesthouse-serial-words-core",
  "guesthouse-settings-core",
+ "guesthouse-snapshot-core",
  "guesthouse-state-core",
  "guesthouse-update-check",
  "guesthouse-window-cells-core",
@@ -1190,6 +1191,7 @@ dependencies = [
  "guesthouse-jail",
  "guesthouse-remote-view-core",
  "guesthouse-serial-words-core",
+ "guesthouse-snapshot-core",
  "if-addrs",
  "serde",
  "serde_json",
@@ -1336,6 +1338,14 @@ dependencies = [
 [[package]]
 name = "guesthouse-settings-core"
 version = "0.11.0"
+
+[[package]]
+name = "guesthouse-snapshot-core"
+version = "0.11.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "guesthouse-state-core"

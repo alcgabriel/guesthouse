@@ -1195,6 +1195,7 @@ mod network;
 mod pairing;
 mod places;
 mod remote_view;
+mod snapshot_labels;
 use network::FakeNet;
 #[test]
 fn nested_virtualization_is_off_until_asked_for_and_reaches_the_next_boot() {

@@ -1,0 +1,20 @@
+{
+  "snapshots": [
+    {
+      "id": 1,
+      "label": "first",
+      "taken": 1000,
+      "parent": null,
+      "hidden": false
+    },
+    {
+      "id": 2,
+      "label": "Ünï \"quoted\" \\ tab\t",
+      "taken": 2000,
+      "parent": 1,
+      "hidden": false
+    }
+  ],
+  "current": 1,
+  "next_id": 3
+}

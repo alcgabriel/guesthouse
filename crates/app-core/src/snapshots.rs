@@ -10,15 +10,13 @@ use crate::processes::running_vms;
 use crate::random::random_hex;
 use crate::settings::with_suffix;
 use crate::snapshot_state;
-use serde_json::{Value, json};
+pub use guesthouse_snapshot_core::linux_host::{MAX_SNAPSHOT_NAME, SNAPSHOT_TAG};
+use guesthouse_snapshot_core::linux_host::{
+    NAME_TAKEN, TAG_RANDOM_BYTES, checked_name, name_taken, note_text, read_note,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
-/// A name inside the qcow2 of ours, as qemu-img would read a name like 1 as a snapshot's number.
-pub const SNAPSHOT_TAG: &str = "guesthouse-";
-pub const MAX_SNAPSHOT_NAME: usize = 60;
-const TAG_RANDOM_BYTES: usize = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
@@ -52,12 +50,12 @@ pub fn list_snapshots(context: &Context, machine: &Machine) -> Vec<Snapshot> {
         .filter_map(|entry| {
             let tag = entry["name"].as_str()?;
             let saved = fs::read_to_string(snapshot_file(context, machine, tag, ".json")).ok()?;
-            let saved: Value = serde_json::from_str(&saved).ok()?;
+            let saved = read_note(&saved)?;
             snapshot_file(context, machine, tag, ".fd").exists().then(|| Snapshot {
                 tag: tag.to_owned(),
-                name: saved["name"].as_str().unwrap_or_default().to_owned(),
+                name: saved.name,
                 taken: entry["date-sec"].as_i64().unwrap_or(0),
-                automatic: saved["auto"].as_bool().unwrap_or(false),
+                automatic: saved.automatic,
             })
         })
         .collect();
@@ -120,12 +118,11 @@ pub fn take_snapshot(task: &mut Task, name: &str) -> Result<()> {
 /// reading and the tag is what tells them apart.
 pub(crate) fn make_snapshot(task: &mut Task, name: &str, automatic: bool) -> Result<String> {
     let (context, machine) = (task.context, task.machine.clone());
-    let name = name.trim();
-    if name.is_empty() || name.chars().count() > MAX_SNAPSHOT_NAME {
-        return Err(Failure(format!("A snapshot needs a name of up to {MAX_SNAPSHOT_NAME} characters.")));
-    }
-    if !automatic && list_snapshots(context, &machine).iter().any(|snapshot| snapshot.name == name) {
-        return Err(Failure::new("There is already a snapshot with that name."));
+    let name = checked_name(name).map_err(Failure)?;
+    if !automatic
+        && name_taken(name, list_snapshots(context, &machine).iter().map(|snapshot| &*snapshot.name))
+    {
+        return Err(Failure::new(NAME_TAKEN));
     }
     if let Some(problem) = snapshot_problem(context, &machine) {
         return Err(problem);
@@ -139,8 +136,7 @@ pub(crate) fn make_snapshot(task: &mut Task, name: &str, automatic: bool) -> Res
         copy_tree(&tpm, &snapshot_file(context, &machine, &tag, ".tpm"))?;
     }
     snapshot_state::keep(context, &machine, &snapshot_file(context, &machine, &tag, ".state"))?;
-    let saved = json!({"name": name, "auto": automatic, "nvme": machine.nvme});
-    fs::write(snapshot_file(context, &machine, &tag, ".json"), saved.to_string())?;
+    fs::write(snapshot_file(context, &machine, &tag, ".json"), note_text(name, automatic, machine.nvme))?;
     let made = auto_snapshot::record::keeping_back_to(context, &machine, || {
         change_snapshots(context, &machine, &["-c", &tag])
     });
@@ -215,6 +211,9 @@ pub(crate) fn delete_tag(context: &Context, machine: &Machine, tag: &str) -> Res
     })?;
     remove_snapshot_files(context, machine, tag)
 }
+
+#[cfg(test)]
+mod pins;
 
 #[cfg(test)]
 mod tests {

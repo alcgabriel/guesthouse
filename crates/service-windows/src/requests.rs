@@ -1038,18 +1038,10 @@ impl<W: Work> Service<W> {
         if let Some(refused) = self.unusable(&name) {
             return refused;
         }
-        let label = label.trim().to_owned();
-        if label.is_empty()
-            || label.chars().count() > snapshots::LONGEST_LABEL
-            || label.chars().any(char::is_control)
-        {
-            return Answer::Refused {
-                reason: format!(
-                    "A snapshot's label is 1 to {} characters on one line.",
-                    snapshots::LONGEST_LABEL
-                ),
-            };
-        }
+        let label = match snapshots::checked_label(&label) {
+            Ok(label) => label.to_owned(),
+            Err(reason) => return Answer::Refused { reason },
+        };
         let disk = self.machines.store.disk(&name);
         if !Record::load(&disk).unwrap_or_default().installed {
             return Answer::Refused {
@@ -1058,13 +1050,10 @@ impl<W: Work> Service<W> {
                 ),
             };
         }
-        if snapshots::list(&disk).map_or(0, |list| list.len()) >= snapshots::MOST {
-            return Answer::Refused {
-                reason: format!(
-                    "{name} has {} snapshots, the most a machine has. Delete one first.",
-                    snapshots::MOST
-                ),
-            };
+        if let Some(reason) =
+            snapshots::count_refusal(&name, snapshots::list(&disk).map_or(0, |list| list.len()))
+        {
+            return Answer::Refused { reason };
         }
         let doing = format!("Taking the snapshot {label}");
         self.in_background(&name, doing, move |service, disk| {

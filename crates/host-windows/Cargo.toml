@@ -25,6 +25,8 @@ guesthouse-hcs.workspace = true
 guesthouse-remote-view-core.workspace = true
 # What a shared folder is called in the guest.
 guesthouse-guest-names-core.workspace = true
+# The snapshot index and the label and count rules, as each host has them.
+guesthouse-snapshot-core.workspace = true
 # What a guest says on its serial port and how it is read, as each host has them.
 guesthouse-serial-words-core.workspace = true
 # The record beside each disk, and events and settings as the service's pipe carries them.
