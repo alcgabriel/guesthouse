@@ -69,6 +69,11 @@ const FIRST_START_MAX_MS: u64 = 20 * 60_000;
 const UBUNTU_UP_MS: u64 = 30_000;
 /// Share of the usual time a wait is shown as done at most, so the bar never says finished early.
 const GUESS_CEILING: f64 = 0.95;
+/// What Ubuntu's own installer and the driver's step usually take on a Mac (2026-11-27: the
+/// installer three and a half to four minutes, the driver half a minute), for the bar's guess.
+/// The limits above stay as they are: these only say how fast the bar moves.
+const UBUNTU_INSTALL_USUAL_MS: u64 = 5 * 60_000;
+const UBUNTU_DRIVER_USUAL_MS: u64 = 2 * 60_000;
 const WINDOWS_COMPUTER_NAME: &str = "GUESTHOUSE";
 const WINDOWS_EDITION: &str = "Windows 11 Pro";
 
@@ -333,9 +338,11 @@ impl RealSteps<'_> {
     }
 
     /// Waits for a line the guest says, or the machine to go wrong. `done` reads the serial text.
+    /// The bar shows the time gone of `usual_ms`, at most `GUESS_CEILING`; `max_ms` is the limit.
     fn wait_for<T>(
         &mut self,
         max_ms: u64,
+        usual_ms: u64,
         from: usize,
         progress: Progress,
         mut done: impl FnMut(&str) -> Option<Result<T, StepError>>,
@@ -361,7 +368,7 @@ impl RealSteps<'_> {
                 ));
             }
             if !progress(Report::Fraction(
-                (elapsed as f64 / max_ms as f64).min(GUESS_CEILING),
+                (elapsed as f64 / usual_ms.max(1) as f64).min(GUESS_CEILING),
             )) {
                 return Ok(None);
             }
@@ -373,16 +380,26 @@ impl RealSteps<'_> {
         self.start_installer()?;
         let guest = self.setup.guest;
         let id = self.setup.id.clone();
-        let heard = self.wait_for(SYSTEM_INSTALL_MAX_MS, 0, progress, |text| match guest {
-            Guest::Windows => text
-                .contains(windows::marker::SYSTEM_INSTALLED)
-                .then_some(Ok(())),
-            Guest::Ubuntu if text.contains(ubuntu::FAILED) => Some(Err(StepError::coded(
-                "autoinstall",
-                "Ubuntu's installer reported an error. Its log is in the machine's serial.log.",
-            ))),
-            Guest::Ubuntu => text.contains(ubuntu::FINISHED).then_some(Ok(())),
-        })?;
+        let usual = match guest {
+            Guest::Windows => SYSTEM_INSTALL_MAX_MS,
+            Guest::Ubuntu => UBUNTU_INSTALL_USUAL_MS,
+        };
+        let heard = self.wait_for(
+            SYSTEM_INSTALL_MAX_MS,
+            usual,
+            0,
+            progress,
+            |text| match guest {
+                Guest::Windows => text
+                    .contains(windows::marker::SYSTEM_INSTALLED)
+                    .then_some(Ok(())),
+                Guest::Ubuntu if text.contains(ubuntu::FAILED) => Some(Err(StepError::coded(
+                    "autoinstall",
+                    "Ubuntu's installer reported an error. Its log is in the machine's serial.log.",
+                ))),
+                Guest::Ubuntu => text.contains(ubuntu::FINISHED).then_some(Ok(())),
+            },
+        )?;
         if heard.is_none() {
             return Ok(Ended::Stopped);
         }
@@ -406,7 +423,7 @@ impl RealSteps<'_> {
         if self.setup.guest == Guest::Ubuntu {
             return self.ubuntu_driver(progress);
         }
-        let heard = self.wait_for(DRIVER_MAX_MS, 0, progress, |text| {
+        let heard = self.wait_for(DRIVER_MAX_MS, DRIVER_MAX_MS, 0, progress, |text| {
             if let Some(line) = text
                 .lines()
                 .find(|l| l.contains(windows::marker::DRIVER_FAILED))
@@ -439,10 +456,16 @@ impl RealSteps<'_> {
         match self.setup.guest {
             Guest::Windows => {
                 // The guest restarts itself after the driver; its next start says it came up.
-                let heard = self.wait_for(FIRST_START_MAX_MS, 0, progress, |text| {
-                    text.contains(windows::marker::FIRST_START)
-                        .then_some(Ok(()))
-                })?;
+                let heard = self.wait_for(
+                    FIRST_START_MAX_MS,
+                    FIRST_START_MAX_MS,
+                    0,
+                    progress,
+                    |text| {
+                        text.contains(windows::marker::FIRST_START)
+                            .then_some(Ok(()))
+                    },
+                )?;
                 Ok(if heard.is_some() {
                     Ended::Done
                 } else {

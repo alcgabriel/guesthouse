@@ -3,7 +3,7 @@
 
 use super::{
     DRIVER_MAX_MS, FIRST_START_MAX_MS, GUESS_CEILING, POLL_MS, POWER_OFF_MAX_MS, RealSteps,
-    UBUNTU_UP_MS, set_keys,
+    UBUNTU_DRIVER_USUAL_MS, UBUNTU_UP_MS, set_keys,
 };
 use crate::install::driver::{self, LINUX};
 use crate::install::runner::{Ended, Progress, Report, StepError};
@@ -130,7 +130,7 @@ impl RealSteps<'_> {
         if self.control.machine_state(&id).0 != "running" {
             self.control.start(&id).map_err(StepError::new)?;
         }
-        let heard = self.wait_for(DRIVER_MAX_MS, 0, progress, |text| {
+        let heard = self.wait_for(DRIVER_MAX_MS, UBUNTU_DRIVER_USUAL_MS, 0, progress, |text| {
             if let Some(line) = text.lines().find(|l| l.contains(marker::DRIVER_FAILED)) {
                 let code = line.rsplit(' ').next().unwrap_or("").trim().to_string();
                 return Some(Ok(Some(code)));
@@ -172,9 +172,13 @@ impl RealSteps<'_> {
             if self.control.machine_state(&self.setup.id).0 != "running" {
                 self.control.start(&self.setup.id).map_err(StepError::new)?;
             }
-            let heard = self.wait_for(FIRST_START_MAX_MS, 0, progress, |text| {
-                text.contains(marker::FIRST_START).then_some(Ok(()))
-            })?;
+            let heard = self.wait_for(
+                FIRST_START_MAX_MS,
+                FIRST_START_MAX_MS,
+                0,
+                progress,
+                |text| text.contains(marker::FIRST_START).then_some(Ok(())),
+            )?;
             return Ok(if heard.is_some() {
                 Ended::Done
             } else {
