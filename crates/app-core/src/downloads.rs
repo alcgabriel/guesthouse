@@ -230,6 +230,48 @@ mod tests {
         assert_eq!(newest_server_disc("aa *ubuntu-26.04-desktop-amd64.iso\n"), None);
     }
 
+    /// The picker on Ubuntu's own list as it was saved, and on the lines it has to tell apart.
+    #[test]
+    fn the_picker_on_a_saved_list_and_at_its_edges() {
+        let saved = include_str!("../tests/catalog/releases-ubuntu-26.04-SHA256SUMS");
+        assert_eq!(
+            newest_server_disc(saved),
+            Some((
+                "ubuntu-26.04.1-live-server-amd64.iso".to_owned(),
+                "cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927".to_owned()
+            ))
+        );
+        let pick = |sums: &str| newest_server_disc(sums).map(|(name, sum)| format!("{sum} {name}"));
+        let ten = "b *ubuntu-26.04.10-live-server-amd64.iso\na *ubuntu-26.04.9-live-server-amd64.iso\n";
+        assert_eq!(pick(ten).unwrap(), "b ubuntu-26.04.10-live-server-amd64.iso", "points sort as numbers");
+        let plain = "a  ubuntu-26.04-live-server-amd64.iso  \n";
+        assert_eq!(pick(plain).unwrap(), "a ubuntu-26.04-live-server-amd64.iso", "no star, spaces trimmed");
+        let odd = "a *ubuntu-26.04-live-server-amd64.iso\nb *ubuntu-26.04x-live-server-amd64.iso\n";
+        assert_eq!(pick(odd).unwrap(), "b ubuntu-26.04x-live-server-amd64.iso", "an odd middle counts as 0");
+        let same = "a *ubuntu-26.04.1-live-server-amd64.iso\nb *ubuntu-26.04.1-live-server-amd64.iso\n";
+        assert_eq!(pick(same).unwrap(), "b ubuntu-26.04.1-live-server-amd64.iso", "the last of a tie");
+        let short = "NOTAHASH *ubuntu-26.04-live-server-amd64.iso\n";
+        assert_eq!(
+            pick(short).unwrap(),
+            "NOTAHASH ubuntu-26.04-live-server-amd64.iso",
+            "the sum isn't checked"
+        );
+        assert_eq!(pick("x *ubuntu-26.04-live-server-arm64.iso\nno-space-line\n\n"), None);
+        assert_eq!(pick(""), None);
+    }
+
+    /// Where each image comes from and what it must hash to, as they were pinned.
+    #[test]
+    fn the_catalog_is_what_it_was() {
+        assert_eq!(UBUNTU_RELEASE, "https://releases.ubuntu.com/26.04/");
+        assert_eq!(UBUNTU_SUMS, "SHA256SUMS");
+        assert_eq!((UBUNTU_PREFIX, UBUNTU_SUFFIX), ("ubuntu-26.04", "-live-server-amd64.iso"));
+        assert_eq!(ANDROID_IMAGE_NAME, "guesthouse-android-17-2026-11-23.qcow2");
+        assert_eq!(ANDROID_IMAGE_SHA256, "d547bda57a11624e201bd6c4ea50f3e8da3f63997d5a2ffb575220050ec10917");
+        assert_eq!(ANDROID_IMAGE_HOST, "https://files.ruxn.com/p/guesthouse/");
+        assert_eq!((UBUNTU_FOLDER, ANDROID_FOLDER), ("ubuntu", "android"));
+    }
+
     #[test]
     fn a_file_is_kept_only_if_it_s_the_one_it_should_be() {
         let scratch = Scratch::new();
