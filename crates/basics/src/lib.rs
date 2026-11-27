@@ -4,4 +4,9 @@
 //!
 //! A piece moves here from a host as it was, and keeps working at its old path there.
 
+pub mod clock;
+pub mod json_file;
 pub mod json_lines;
+pub mod random;
+pub mod text;
+pub mod words;

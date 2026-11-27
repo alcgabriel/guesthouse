@@ -483,3 +483,13 @@ fn nothing_needs_polling_until_pairing_is_open() {
     assert_eq!(run.pairing.poll_ms(), None);
     assert!(!run.pairing.busy());
 }
+
+#[test]
+fn owing_more_adds_to_what_is_owed_and_nothing_adds_nothing() {
+    let mut pairing = Pairing::new(plain());
+    pairing.owe(None);
+    assert_eq!(pairing.held(), None);
+    pairing.owe(Some(HostWide { clipboard: true, files: false }));
+    pairing.owe(Some(HostWide { clipboard: false, files: true }));
+    assert_eq!(pairing.held(), Some(HostWide { clipboard: true, files: true }));
+}

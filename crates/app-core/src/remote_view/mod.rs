@@ -22,7 +22,6 @@
 
 mod clocks;
 mod control;
-mod lan;
 mod machine;
 mod mdns;
 mod process;
@@ -32,14 +31,14 @@ pub use clocks::{ClockHolder, NIXOS_CLOCK_HELPER, OWN_CLOCK_HELPER, Said, clock_
 pub use control::{
     Counters, RelayClient, RelayReply, RelayStatus, Request, ShareState, ask, listener, serve, socket_path,
 };
+pub use guesthouse_relay::{Lan, LanSettings, lan_address};
 pub use guesthouse_remote_view_core::announce::{
     Announcement, Announcer, BadAnnouncement, FINGERPRINT_DIGITS, SERVICE_TYPE, host_name, lan_interface,
 };
-pub use lan::Lan;
 pub use machine::{
     HELD_FILE, TOO_OLD, allowed, bring_up, device_allow, device_drop, device_revoke, encoder,
-    ensure_installed, info, installer, lan_address, launched, pair_accept, pair_close, pair_decline, port,
-    quitting, reap, set_allowed, share, stopped, stream_clocks_changed, sweep_clocks,
+    ensure_installed, info, installer, launched, pair_accept, pair_close, pair_decline, port, quitting, reap,
+    set_allowed, share, stopped, stream_clocks_changed, sweep_clocks,
 };
 pub use mdns::Mdns;
 pub use process::{end, pid, start, write_pid_file};

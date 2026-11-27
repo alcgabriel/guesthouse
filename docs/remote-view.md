@@ -2,7 +2,9 @@
 
 Remote view lets another device on your network see and use a Windows machine through remoteman's viewer: a laptop on the sofa, a phone, another PC. It is a preview, and it is off for every machine until you switch it on.
 
-The machine's own window stays as it is. remoteman's host runs in Windows beside Guesthouse's display driver, and a device that connects gets a screen of its own.
+It works on a Linux host and on a Windows host, which differ in a few things: [On a Windows host](#on-a-windows-host) says how. What follows is the Linux host.
+
+On a Linux host the machine's own window stays as it is. remoteman's host runs in Windows beside Guesthouse's display driver, and a device that connects gets a screen of its own.
 
 ## What it needs
 
@@ -31,3 +33,29 @@ Turning the switch off closes pairing, turns every device away and stops listeni
 - While a device shows the machine on its screen only (remoteman's "only" placement), the machine's own window here has no picture until that device leaves.
 - Windows in the machine doesn't lock when a device connects. A paired device lands on the open desktop.
 - On an NVIDIA card, the card's memory clock is held up while a device streams, so pictures arrive sooner. It costs the card's idle power. [The card's memory clock](nvidia.md#the-cards-memory-clock-while-a-device-views-the-machine) says how to turn it off.
+
+## On a Windows host
+
+A Windows guest on a Windows host has remoteman's host already, as it shows the machine's own screen with it, so nothing is installed when the switch goes on and there is no display driver to update. The service does the work, and the Windows app asks it.
+
+- **Where.** A Windows machine's page in the app has a Remote View group, under Connect, which works while the machine runs. It has the switch Allow viewing from other devices, the address and port a device types in with Copy Address, the guest's fingerprint, Pair a New Device, and the devices that are paired, each with a switch for Control, Clipboard, Files, Sound, Microphone and Camera, and Remove. While pairing is open it counts down and has Stop. A device waiting shows its name and its six-digit code, large, with Accept and Decline. The group and the Screen row say which device is viewing the machine. The app asks the service every two seconds while the page shows and the switch is on, and closes a pairing it left open when it closes.
+- **One device at a time.** remoteman's host in a Windows guest serves one device at a time, whatever placement the device asks for. A device that connects takes the screen from the machine's own window in a few seconds: that window says its session ended, as another device took over, and offers Connect again. The app says which device has the screen, in its Remote View group and on the Screen row. Open screen takes the screen back, in a new window of the viewer, and the device's session ends the same way. Neither side connects again by itself, so they don't take it from each other back and forth, and when the device leaves, the machine's own window doesn't come back on its own: press Open screen.
+- **The address.** Devices use this PC's address and the machine's port, from 7792 to 7899, which stays the same. The service passes them on to the guest, whose own port is 7791. The machine is announced on the network by its name through Windows' own responder, so remoteman's viewer lists it. If its name is taken on this PC already, it isn't listed, and the address and port still work.
+- **Pairing.** Open pairing for a time (two minutes unless asked, up to an hour). The device connects and waits; its name and six-digit code show. Check the code on the device, then accept or decline. Pairing closes after one device, or when the time is up. While it is open, the machine's clipboard and file sharing pause, the machine's own window's included, so a new device never has them; they come back when pairing closes, and the new device's own stay off until you switch them on for it.
+- **Off.** Turning the switch off closes pairing, stops listening on this PC, takes the firewall rule and the announcement away, and the device viewing loses its picture. It never turns remoteman off in the guest, as that would cut the machine's own window too. Paired devices stay paired. There is no Disconnect for the device viewing, in the app or here, for the same reason: remoteman's own one cuts whichever device has the screen. Open screen takes it back.
+- **The guest's firewall.** At every start the guest lets only this PC reach remoteman's port, so a device can't go round the service, its switch or its firewall rule to the guest's own address, which matters most when the machine is bridged onto your network. A machine from before this has its rules narrowed at its first start with the new service.
+- **Shared and bridged.** Both are supported. On the shared network devices reach the guest only through this PC. A bridged guest has an address on your network, and this PC's own address there is what the guest lets in; if this PC's address on that network changes while the machine runs, other devices can't view it until the machine starts again, and the app says so. Bridged has not been tried on a real network yet.
+
+Without the app, from a command line, with the service running, in a checkout of Guesthouse's source:
+
+```powershell
+cargo run -p guesthouse-control --example ask -- '{"ask":"share","name":"NAME","on":true}'
+cargo run -p guesthouse-control --example ask -- '{"ask":"share","name":"NAME","pairing":true}'
+cargo run -p guesthouse-control --example ask -- '{"ask":"remote_view","name":"NAME"}'
+cargo run -p guesthouse-control --example ask -- '{"ask":"pair_accept","name":"NAME"}'
+cargo run -p guesthouse-control --example ask -- '{"ask":"device_allow","name":"NAME","fingerprint":"FP","what":"clipboard","on":true}'
+cargo run -p guesthouse-control --example ask -- '{"ask":"device_revoke","name":"NAME","fingerprint":"FP"}'
+cargo run -p guesthouse-control --example ask -- '{"ask":"share","name":"NAME","on":false}'
+```
+
+`remote_view` answers where it stands: the port, the devices, a device waiting with its code, and which device has the screen. `pair_decline` and `pair_close` turn a waiting device away and close pairing. [docs/windows-host.md](windows-host.md#viewing-from-other-devices) has how it works.

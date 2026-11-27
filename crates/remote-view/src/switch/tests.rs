@@ -82,3 +82,13 @@ fn running_out_of_ports_is_said() {
     let nearly: Vec<u16> = (7792..7899).collect();
     assert_eq!(choose_port(&nearly, |_| true), Some(7899));
 }
+
+#[test]
+fn the_two_values_go_in_and_out_wherever_a_host_keeps_them() {
+    assert_eq!(Switch::new(true, Some(7800)).values(), (true, Some(7800)));
+    assert_eq!(Switch::new(true, Some(7900)).values(), (true, None), "a port outside the range is dropped");
+    assert_eq!(Switch::new(false, None), Switch::default());
+    let (on, port) = Switch::new(false, None).turned(true, &[7792], |_| true).unwrap().values();
+    assert_eq!((on, port), (true, Some(7793)));
+    assert_eq!(Switch::new(on, port).turned(false, &[], |_| true).unwrap().values(), (false, Some(7793)));
+}

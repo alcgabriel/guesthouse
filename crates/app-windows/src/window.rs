@@ -6,6 +6,7 @@
 //! and each page a column of sections, each a heading over a card of rows. Every colour is one of
 //! WinUI's theme brushes, so light and dark both follow Windows.
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use guesthouse_control::client::Unreached;
@@ -17,6 +18,9 @@ use crate::app::{
     self, Account, ConsoleState, DELETE_KEY, Draft, EDITIONS, FolderFor, Kind, Line, Main, Message, NEW_TAG,
     Page, REPORT_TAG, Ready, ReportStage,
 };
+use crate::log::Log;
+use crate::remote_view::{self, Ask, PairingShown, Shown, proposed};
+use guesthouse_remote_view_core::wording;
 
 /// The app's icon, the same as the GTK app's, for where it's shown large.
 const LOGO_SVG: &[u8] =
@@ -35,6 +39,9 @@ const SECTION_GAP: f64 = 24.0;
 const HEADING_GAP: f64 = 8.0;
 /// How tall a log is before it scrolls.
 const LOG_HEIGHT: f64 = 320.0;
+/// Around a log's lines, inside its card, and between one line and the next.
+const LOG_MARGIN: Thickness = Thickness::new(16.0, 12.0, 16.0, 12.0);
+const LOG_LINE_GAP: f64 = 4.0;
 /// A log's font: Windows Terminal's, and Consolas where that isn't installed.
 const MONO: &str = "Cascadia Mono, Consolas";
 /// The size of the app's icon on a page that says one thing.
@@ -42,6 +49,12 @@ const LOGO_SIZE: f64 = 96.0;
 /// The size of the exe's icon the title bar shows, in pixels: the largest of the plainer drawings
 /// for small sizes, which WinUI shrinks to the title bar's 16 units at most scales.
 const TITLE_ICON_FRAME: u8 = 24;
+/// A pairing code's size, large enough to compare with a device's across a room.
+const CODE_SIZE: f64 = 28.0;
+/// Each of a paired device's switches, side by side as far as they fit.
+const SWITCH_WIDTH: f64 = 150.0;
+/// How often a countdown is drawn again.
+const TICK: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Glyphs of Segoe Fluent Icons.
 mod glyph {
@@ -87,6 +100,7 @@ mod glyph {
     pub const MAIL: &str = "\u{E715}";
     pub const SEND: &str = "\u{E724}";
     pub const OPEN: &str = "\u{E8A7}";
+    pub const ACCEPT: &str = "\u{E8FB}";
 }
 
 pub fn view(main: &Main, context: &mut ViewContext<Main>) -> View {
@@ -137,10 +151,15 @@ pub fn view(main: &Main, context: &mut ViewContext<Main>) -> View {
         Border::new().grid_row(1).content(body),
         news.grid_row(1),
     ));
+    let removing = main.viewing.as_ref().and_then(|viewing| viewing.removing.as_ref());
     match (&main.deleting, &main.snapshot_ask) {
         (Some(name), _) => content.content_dialog(delete_dialog(name, context)),
         (None, Some(ask)) => content.content_dialog(snapshot_dialog(ask, context)),
         (None, None) if main.bridge_ask => content.content_dialog(bridge_dialog(main, context)),
+        (None, None) if removing.is_some() => {
+            let name = removing.map(|(_, name)| name.as_str()).unwrap_or_default();
+            content.content_dialog(remove_dialog(name, context))
+        }
         (None, None) => content.into(),
     }
 }
@@ -316,6 +335,9 @@ fn machine_page(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> 
     sections.push(header(machine, context));
     sections.push(group("Status", status_rows(machine, context)));
     sections.push(group("Connect", connect_rows(main, machine, context)));
+    if let (Some(viewing), Some(facts)) = (&main.viewing, main.remote_view_facts()) {
+        sections.push(group(proposed::TITLE, remote_view_rows(&viewing.shown(&facts), context)));
+    }
     if let Some(draft) = main.draft.as_ref().filter(|draft| draft.machine == machine.name) {
         sections.push(settings_section(main, machine, draft, context));
     }
@@ -520,10 +542,20 @@ fn connect_rows(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> 
             let streams = reachable && machine.set_up;
             let screen = button("Open screen", glyph::SCREEN, context.message(Message::Screen), true)
                 .is_enabled(streams);
+            // A device viewing the machine has its screen, which Open screen takes back.
+            let viewer = main
+                .viewing
+                .as_ref()
+                .zip(main.remote_view_facts())
+                .and_then(|(viewing, facts)| viewing.shown(&facts).viewer)
+                .map(|viewer| proposed::screen_line(&viewer));
             rows.push(row(
                 glyph::SCREEN,
                 "Screen",
-                &["The guest's screen at full speed, drawn by its card and streamed by remoteman."],
+                &[
+                    "The guest's screen at full speed, drawn by its card and streamed by remoteman.",
+                    viewer.as_deref().unwrap_or_default(),
+                ],
                 Some(screen.into()),
             ));
             let open =
@@ -612,6 +644,249 @@ fn console_row(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> V
         StackPanel::new().children((caption(about), state)),
         Some(right.into()),
     )
+}
+
+// ---- Remote View ----
+
+/// The Remote View group: the switch, where a device connects, pairing, and the paired devices.
+fn remote_view_rows(shown: &Shown, context: &ViewContext<Main>) -> Vec<View> {
+    let mut under: Vec<View> =
+        vec![caption(&shown.headline).into(), caption(wording::NETWORK_WARNING).into()];
+    if let Some(note) = &shown.note {
+        under.push(caption(note).into());
+    }
+    if let Some(refused) = &shown.refused {
+        under.push(caption(refused).foreground(ThemeBrush::SystemCritical).into());
+    }
+    if shown.bridged {
+        under.push(caption(proposed::BRIDGED).into());
+    }
+    let switch = toggle(
+        wording::ALLOW_TITLE,
+        shown.on,
+        shown.switch_enabled,
+        context.callback(|on| Message::RemoteView(Ask::Switch(on))),
+    );
+    let mut rows =
+        vec![row_with(glyph::NETWORK, wording::ALLOW_TITLE, StackPanel::new().children(under), Some(switch))];
+    if !shown.on {
+        return rows;
+    }
+    if let Some(viewer) = &shown.viewer {
+        let take_back = button("Open screen", glyph::SCREEN, context.message(Message::Screen), false);
+        rows.push(row_with(
+            glyph::SCREEN,
+            &shown.headline,
+            caption(&proposed::takes_screen(viewer)),
+            Some(take_back.into()),
+        ));
+    }
+    if let Some(address) = &shown.address {
+        let heading = if address.contains(':') { proposed::ADDRESS } else { proposed::PORT };
+        let copy = button(
+            wording::COPY_ADDRESS,
+            glyph::COPY,
+            context.message(Message::Copy(address.clone())),
+            false,
+        );
+        let text = TextBlock::new()
+            .text(address)
+            .font_family(MONO)
+            .foreground(ThemeBrush::SecondaryText)
+            .is_text_selection_enabled(true);
+        rows.push(row_with(
+            glyph::REMOTE,
+            heading,
+            StackPanel::new().children((text, caption(wording::PAIRED_HINT))),
+            Some(copy.into()),
+        ));
+    }
+    if let Some(fingerprint) = &shown.fingerprint {
+        let text = TextBlock::new()
+            .text(wording::short_fingerprint(fingerprint))
+            .font_family(MONO)
+            .foreground(ThemeBrush::SecondaryText)
+            .is_text_selection_enabled(true)
+            .automation_name(format!("{} {fingerprint}", proposed::FINGERPRINT))
+            .tooltip(fingerprint);
+        rows.push(row_with(glyph::SHIELD, proposed::FINGERPRINT, text, None));
+    }
+    if let Some(pairing) = &shown.pairing {
+        rows.push(pairing_row(pairing, shown.held, context));
+    }
+    rows.push(devices_row(shown, context));
+    rows
+}
+
+fn pairing_row(pairing: &PairingShown, held: bool, context: &ViewContext<Main>) -> View {
+    let held: Option<View> = held.then(|| caption(proposed::HELD).into());
+    match pairing {
+        PairingShown::Closed { text, can_open } => {
+            let open = button(
+                wording::PAIR_NEW_DEVICE,
+                glyph::ADD,
+                context.message(Message::RemoteView(Ask::OpenPairing)),
+                true,
+            )
+            .is_enabled(*can_open);
+            row(glyph::PERSON, wording::PAIRING_TITLE, &[text, wording::PAIRING_NOTE], Some(open.into()))
+        }
+        PairingShown::Open { until_ms } => {
+            let mut lines: Vec<View> = vec![countdown(*until_ms, None)];
+            for (at, step) in wording::pairing_steps().iter().enumerate() {
+                lines.push(caption(&format!("{}. {step}", at + 1)).into());
+            }
+            lines.push(caption(wording::PAIRING_NOTE).into());
+            lines.extend(held);
+            let stop = button(
+                wording::STOP,
+                glyph::STOP,
+                context.message(Message::RemoteView(Ask::StopPairing)),
+                false,
+            )
+            .automation_name("Stop pairing");
+            row_with(
+                glyph::PERSON,
+                proposed::PAIRING_OPEN,
+                StackPanel::new().spacing(2.0).children(lines),
+                Some(stop.into()),
+            )
+        }
+        PairingShown::Waiting { name, code, until_ms } => {
+            let code_text = TextBlock::new()
+                .text(code)
+                .font_family(MONO)
+                .font_size(CODE_SIZE)
+                .font_weight(FontWeight::SEMI_BOLD)
+                .is_text_selection_enabled(true)
+                .automation_name(remote_view::spoken_code(code));
+            let mut lines: Vec<View> = vec![
+                code_text.into(),
+                countdown(Some(*until_ms), Some(code.clone())),
+                caption(wording::COMPARE_CODE_LINE).into(),
+            ];
+            lines.extend(held);
+            let decline = button(
+                wording::DECLINE,
+                glyph::CLOSE,
+                context.message(Message::RemoteView(Ask::Decline)),
+                false,
+            )
+            .automation_name(format!("{} {name}", wording::DECLINE));
+            let accept = button(
+                wording::ACCEPT,
+                glyph::ACCEPT,
+                context.message(Message::RemoteView(Ask::Accept)),
+                true,
+            )
+            .automation_name(format!("{} {name}", wording::ACCEPT));
+            let right = StackPanel::new()
+                .orientation(Orientation::Horizontal)
+                .spacing(8.0)
+                .children((decline, accept));
+            row_with(
+                glyph::PERSON,
+                &wording::wants_to_pair(name),
+                StackPanel::new().spacing(4.0).children(lines),
+                Some(right.into()),
+            )
+        }
+    }
+}
+
+fn devices_row(shown: &Shown, context: &ViewContext<Main>) -> View {
+    if shown.devices.is_empty() {
+        return row(glyph::PERSON, wording::DEVICES_TITLE, &[wording::NO_DEVICES], None);
+    }
+    let mut parts: Vec<View> = vec![strong(wording::DEVICES_TITLE).into()];
+    for device in &shown.devices {
+        let switches: Vec<View> = device
+            .permissions
+            .iter()
+            .map(|permission| {
+                let (fingerprint, what) = (device.fingerprint.clone(), permission.what);
+                ToggleSwitch::new()
+                    .header(permission.label)
+                    .is_on(permission.on)
+                    .automation_name(proposed::switch_name(permission.label, &device.name))
+                    .on_toggled(context.callback(move |on| {
+                        Message::RemoteView(Ask::Allow { fingerprint: fingerprint.clone(), what, on })
+                    }))
+                    .into()
+            })
+            .collect();
+        let remove = button(
+            wording::REMOVE,
+            glyph::DELETE,
+            context.message(Message::RemoveDevice(device.fingerprint.clone())),
+            false,
+        )
+        .automation_name(format!("{} {}", wording::REMOVE, device.name));
+        let heading = Grid::new().columns([GridLength::STAR, GridLength::Auto]).children((
+            StackPanel::new()
+                .vertical_alignment(VerticalAlignment::Center)
+                .children((
+                    TextBlock::new().text(&device.name).text_wrapping(TextWrapping::Wrap),
+                    caption(&device.line),
+                ))
+                .tooltip(&device.fingerprint),
+            Border::new().grid_column(1).content(remove),
+        ));
+        let grid = VariableSizedWrapGrid::new()
+            .orientation(Orientation::Horizontal)
+            .item_width(SWITCH_WIDTH)
+            .children(switches);
+        parts.push(StackPanel::new().spacing(8.0).children((heading, grid)).into());
+    }
+    Border::new()
+        .padding(Thickness::new(52.0, 12.0, 16.0, 16.0))
+        .content(StackPanel::new().spacing(16.0).children(parts))
+        .into()
+}
+
+/// The time left of an open pairing, or of a waiting device when `code` is its, counting down by
+/// itself, so only its own words are drawn again each second and not the window.
+fn countdown(until_ms: Option<u64>, code: Option<String>) -> View {
+    match until_ms {
+        Some(until_ms) => View::component::<Ticking>(Countdown { until_ms, waiting: code.is_some() }),
+        None => caption("").into(),
+    }
+}
+
+/// A countdown to a time in milliseconds since 1970.
+#[derive(Clone, PartialEq)]
+struct Countdown {
+    until_ms: u64,
+    /// A device waiting to be answered, or else an open pairing.
+    waiting: bool,
+}
+
+/// The countdown's clock, which ticks it each second while it lasts.
+struct Ticking {
+    _tick: ComponentTimer,
+}
+
+impl Component for Ticking {
+    type Input = Countdown;
+    type Message = ();
+
+    fn create(_: &Countdown, context: &ComponentContext<Self>) -> Self {
+        Ticking { _tick: context.set_timeout(TICK, ()) }
+    }
+
+    fn update(&mut self, _: (), context: &ComponentContext<Self>) {
+        self._tick = context.set_timeout(TICK, ());
+    }
+
+    fn view(&self, countdown: &Countdown, _: &mut ViewContext<Self>) -> View {
+        let now = app::now_ms();
+        let words = if countdown.waiting {
+            remote_view::waiting_left(countdown.until_ms, now)
+        } else {
+            remote_view::pairing_left(Some(countdown.until_ms), now)
+        };
+        caption(&words).into()
+    }
 }
 
 /// What the machine is given at each boot, which can be changed while it's off: the same controls
@@ -1396,6 +1671,17 @@ fn delete_dialog(name: &str, context: &ViewContext<Main>) -> ContentDialog {
         .on_closed(context.callback(Message::DeleteAnswered))
 }
 
+fn remove_dialog(name: &str, context: &ViewContext<Main>) -> ContentDialog {
+    ContentDialog::new()
+        .title(wording::remove_question(name))
+        .content(TextBlock::new().text(wording::REMOVE_MESSAGE).text_wrapping(TextWrapping::Wrap))
+        .primary_button_text(wording::REMOVE)
+        .close_button_text(proposed::CANCEL)
+        .default_button(ContentDialogButton::Close)
+        .is_open(true)
+        .on_closed(context.callback(Message::RemoveAnswered))
+}
+
 // ---- Report a problem ----
 
 /// What goes in a report, and what never does, said before it's made.
@@ -1635,21 +1921,11 @@ fn system_glyph(system: System) -> &'static str {
     }
 }
 
-const MB_PER_GB: u64 = 1024;
-
 /// A machine's memory, as it was given: in GB when it's a whole number of them, and in MB otherwise.
-fn memory_words(mb: u64) -> String {
-    if mb >= MB_PER_GB && mb.is_multiple_of(MB_PER_GB) {
-        format!("{} GB", mb / MB_PER_GB)
-    } else {
-        format!("{mb} MB")
-    }
-}
+use guesthouse_basics::words::memory_as_given as memory_words;
 
 /// A card's memory, to the nearest GB, as a card's driver gives a little under its size.
-fn card_memory_words(mb: u64) -> String {
-    if mb >= MB_PER_GB { format!("{} GB", (mb + MB_PER_GB / 2) / MB_PER_GB) } else { format!("{mb} MB") }
-}
+use guesthouse_basics::words::card_memory_to_nearest_gb as card_memory_words;
 
 /// The colour of a machine's dot: green when running, amber on its way somewhere, grey when stopped.
 fn state_brush(state: State) -> ThemeBrush {
@@ -1866,20 +2142,61 @@ fn copy_row(glyph: &str, heading: &str, text: &str, context: &ViewContext<Main>)
 }
 
 /// Lines of a log, newest at the foot, which the view keeps in sight as lines come.
-fn log(lines: &[Line], empty: &str) -> View {
-    let shown: Vec<View> =
-        if lines.is_empty() { vec![caption(empty).into()] } else { lines.iter().map(log_line).collect() };
+///
+/// A list that makes only the rows in view, each kept by its line's ID, so a new line adds a row
+/// and leaves the rows drawn before it alone, and the rest of a long log costs nothing until it's
+/// scrolled to.
+fn log(lines: &Log<Line>, empty: &str) -> View {
+    let shown: View = if lines.is_empty() {
+        caption(empty).margin(LOG_MARGIN).into()
+    } else {
+        ItemsRepeater::new()
+            .virtual_source(log_source(lines))
+            // Less below, where the last line's own gap is.
+            .margin(Thickness::new(16.0, 12.0, 16.0, 12.0 - LOG_LINE_GAP))
+            .into()
+    };
     card(
         ScrollView::new()
             .height(LOG_HEIGHT)
             // Anchored at the foot, so a new line keeps the newest in view while the person
             // hasn't scrolled up.
             .vertical_anchor_ratio(1.0)
-            .content(
-                StackPanel::new().spacing(4.0).margin(Thickness::new(16.0, 12.0, 16.0, 12.0)).children(shown),
-            ),
+            .content(shown),
     )
     .into()
+}
+
+thread_local! {
+    /// The sources the logs were last drawn from, by their logs' revisions, newest last.
+    static LOG_SOURCES: RefCell<Vec<(u64, VirtualSource)>> = const { RefCell::new(Vec::new()) };
+}
+/// How many log sources are kept: more than the window shows at once.
+const LOG_SOURCES_KEPT: usize = 4;
+
+/// The rows of `lines`, made only as the list asks for them. A render that left the log as it was
+/// gets the source it had before, which the list takes as unchanged, so it touches none of its rows,
+/// where a new one, however alike, would have each row in view drawn again.
+fn log_source(lines: &Log<Line>) -> VirtualSource {
+    let revision = lines.revision();
+    LOG_SOURCES.with_borrow_mut(|sources| {
+        if let Some((_, source)) = sources.iter().find(|(kept, _)| *kept == revision) {
+            return source.clone();
+        }
+        let (keys, rows) = (lines.lines(), lines.lines());
+        let source = VirtualSource::new(
+            // The keys are asked for again only when this or the count changes.
+            revision,
+            rows.len(),
+            move |index| keys[index].0,
+            move |index| log_line(&rows[index].1),
+        );
+        if sources.len() == LOG_SOURCES_KEPT {
+            sources.remove(0);
+        }
+        sources.push((revision, source.clone()));
+        source
+    })
 }
 
 /// A line of a log, in a fixed-width font. A problem has a mark before it and is in red; what the
@@ -1914,6 +2231,51 @@ fn log_line(line: &Line) -> View {
     Grid::new()
         .columns([GridLength::Pixel(16.0), GridLength::STAR])
         .column_spacing(6.0)
+        // The gap between lines, as the list has none of its own.
+        .margin(Thickness::new(0.0, 0.0, 0.0, LOG_LINE_GAP))
         .children((mark, text))
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A machine's memory, held as it is at the edges: whole GB only when it is a whole number of them.
+    #[test]
+    fn memory_is_whole_gb_or_mb() {
+        for (mb, said) in [
+            (0, "0 MB"),
+            (1, "1 MB"),
+            (1023, "1023 MB"),
+            (1024, "1 GB"),
+            (1025, "1025 MB"),
+            (1536, "1536 MB"),
+            (2048, "2 GB"),
+            (16_383, "16383 MB"),
+            (16_384, "16 GB"),
+            (u64::MAX, "18446744073709551615 MB"),
+        ] {
+            assert_eq!(memory_words(mb), said, "{mb} MB");
+        }
+    }
+
+    /// A card's memory, held as it is at the edges: to the nearest GB from 1 GB, half a GB going up.
+    #[test]
+    fn card_memory_is_the_nearest_gb_or_mb() {
+        for (mb, said) in [
+            (0, "0 MB"),
+            (1023, "1023 MB"),
+            (1024, "1 GB"),
+            (1535, "1 GB"),
+            (1536, "2 GB"),
+            (2047, "2 GB"),
+            (8191, "8 GB"),
+            (24_063, "23 GB"),
+            (24_064, "24 GB"),
+            (24_564, "24 GB"),
+        ] {
+            assert_eq!(card_memory_words(mb), said, "{mb} MB");
+        }
+    }
 }

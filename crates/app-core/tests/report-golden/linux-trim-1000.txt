@@ -1,0 +1,19 @@
+DEBUG [        0] message Some(QueryAdapter) process=0x400012c0
+[126751 bytes left out here, all but the 3 lines below that aren't debug lines or name a guest program]
+INFO  [     1893] context node=1
+  and its next line
+WARN  [     1953] queue 0x400e93c0 stops at /home/quillon/x
+[the log's end follows]
+DEBUG [     1988] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1989] message Some(QueryAdapter) process=0x400012c0
+INFO  [     1990] context node=1
+  and its next line
+DEBUG [     1991] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1992] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1993] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1994] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1995] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1996] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1997] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1998] message Some(QueryAdapter) process=0x400012c0
+DEBUG [     1999] message Some(QueryAdapter) process=0x400012c0
