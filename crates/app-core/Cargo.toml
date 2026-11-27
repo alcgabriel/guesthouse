@@ -42,6 +42,8 @@ guesthouse-backend-nvidia.workspace = true
 guesthouse-update-check.workspace = true
 # Small pieces every host shares that belong to no one subject.
 guesthouse-basics.workspace = true
+# Which names and passwords a guest's account takes, as each host has them.
+guesthouse-account-core.workspace = true
 # Reads a recorded Intel card, for a lab run on a PC without one. It opens nothing.
 guesthouse-backend-intel.workspace = true
 # Only for its slot names, so the app and the daemon can never disagree about what a VM owns.
