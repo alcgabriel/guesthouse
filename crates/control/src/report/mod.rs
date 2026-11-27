@@ -8,12 +8,11 @@
 //! - `parts` is how the service's files come over the pipe, and are put back together.
 //! - `stage` makes the files from what was gathered, `send` is how they are posted, and `issue` is
 //!   the link that opens an issue about a sent report.
-//! - `clock` writes times in UTC.
+//! - `clock` writes times in UTC, from `guesthouse-report-core`.
 //! - `scrub` and `trim` make each file fit to send, and `manifest` says what the bundle holds.
 //!
 //! Nothing here calls into Windows, so it builds and is tested anywhere.
 
-pub mod clock;
 pub mod issue;
 pub mod manifest;
 pub mod parts;
@@ -22,7 +21,7 @@ pub mod stage;
 pub mod trim;
 
 // The pieces every host shares, under the names they had here.
-pub use guesthouse_report_core::{answer, contract, kind, send, summary};
+pub use guesthouse_report_core::{answer, clock, contract, kind, send, summary};
 
 pub use answer::read_answer;
 pub use contract::{KEPT_DAYS, MOST_REPORT_BYTES, NEW_ISSUE, report_address};
