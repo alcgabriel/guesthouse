@@ -1,0 +1,80 @@
+# Builds the Linux guest driver for the Mac host against Ubuntu 26.04's kernel headers for arm64,
+# the guest the Mac app installs, once with make as a person would and once through DKMS as the
+# package does in the guest. The module isn't loaded: the device is only in a Mac host's guest. Also
+# checks the package's shell scripts that have no .sh ending, which the Scripts workflow doesn't
+# see. No secrets, so a pull request from a fork runs it.
+name: Linux graphics driver
+
+on:
+  pull_request:
+    paths:
+      - drivers/linux-pvg/**
+      - .github/workflows/linux-pvg.yml
+  push:
+    branches: [main]
+    paths:
+      - drivers/linux-pvg/**
+      - .github/workflows/linux-pvg.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-pvg-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  module:
+    name: kernel module on Ubuntu 26.04 arm64
+    runs-on: ubuntu-24.04-arm
+    container: ubuntu:26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the compiler, DKMS and the generic kernel's headers
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get -q update
+          apt-get -q -y install --no-install-recommends build-essential dkms kmod linux-headers-generic
+      - name: Find the headers
+        run: |
+          kernel=$(find /usr/src -maxdepth 1 -name 'linux-headers-*-generic' | sed 's|.*/linux-headers-||' | sort -V | tail -1)
+          test -n "$kernel"
+          echo "KERNEL=$kernel" >> "$GITHUB_ENV"
+          echo "headers for $kernel"
+      - name: Build with make
+        run: |
+          make -C "/usr/src/linux-headers-$KERNEL" M="$PWD/drivers/linux-pvg/driver" modules
+          modinfo drivers/linux-pvg/driver/pvg.ko | grep -E '^(filename|license|vermagic|alias):'
+          make -C "/usr/src/linux-headers-$KERNEL" M="$PWD/drivers/linux-pvg/driver" clean
+      - name: Build with DKMS, as the package's pvg-dkms does
+        run: |
+          version=0.0.0-ci
+          src=/usr/src/pvg-$version
+          mkdir -p "$src"
+          cp -R drivers/linux-pvg/driver drivers/linux-pvg/uapi "$src/"
+          sed "s|@VERSION@|$version|" drivers/linux-pvg/package/dkms/dkms.conf > "$src/dkms.conf"
+          dkms add -m pvg -v "$version"
+          dkms build -m pvg -v "$version" -k "$KERNEL" || {
+            cat "/var/lib/dkms/pvg/$version/build/make.log"
+            exit 1
+          }
+          dkms status -m pvg
+
+  package-scripts:
+    name: package scripts without .sh
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: shellcheck
+        run: |
+          shellcheck --version
+          git ls-files -z drivers/linux-pvg/package |
+            xargs -0 grep -lE '^#!/bin/(ba)?sh' | grep -v '\.sh$' |
+            xargs shellcheck --severity=warning
