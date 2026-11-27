@@ -21,6 +21,7 @@ use windows_reactor::WindowTheme;
 
 use super::{Account, Form, Kind, Line, Main, Making, Page, Ready, ReportStage};
 use crate::bridge::Status;
+use crate::log::Log;
 use crate::report::Prepared;
 use guesthouse_control::report::Summary;
 
@@ -45,15 +46,15 @@ pub fn stage(main: &mut Main) {
         "linux" => {
             show(main, "ubuntu", State::Running);
             main.account = Some(account("ubuntu"));
-            main.log = guest_log();
+            main.log = log(guest_log());
         }
         "starting" => {
             show(main, "build-box", State::Starting);
-            main.log = vec![
+            main.log = log(vec![
                 note("Starting."),
                 note("Its first boot sets it up without the card."),
                 line(Kind::Guest, "Ubuntu 26.04 installing: copying files (41%)"),
-            ];
+            ]);
         }
         "empty" => main.seen = Ok(Status { machines: Vec::new(), ..status() }),
         "away" => main.seen = Err(Unreached::NoService.words().to_owned()),
@@ -76,13 +77,13 @@ pub fn stage(main: &mut Main) {
             };
             main.making = Some(Making {
                 name: "studio".to_owned(),
-                lines: vec![
+                lines: log(vec![
                     note("Reading the image."),
                     note("Windows 11 Pro, from install.wim."),
                     note("Making a 128 GB disk."),
                     line(Kind::Problem, "The disk's folder is compressed, which makes it slower."),
                     note("Applying Windows to the disk. This takes a few minutes."),
-                ],
+                ]),
                 ended,
             });
         }
@@ -136,7 +137,7 @@ pub fn stage(main: &mut Main) {
         _ => {
             show(main, "win11", State::Running);
             main.account = Some(account("win11"));
-            main.log = vec![
+            main.log = log(vec![
                 note("Starting."),
                 note("Giving it NVIDIA GeForce RTX 5090."),
                 line(
@@ -148,7 +149,7 @@ pub fn stage(main: &mut Main) {
                 line(Kind::Guest, "guesthouse: address: 172.24.80.12"),
                 line(Kind::Report, "Display driver loaded in 3.1 s."),
                 note("It's running."),
-            ];
+            ]);
         }
     }
 }
@@ -188,6 +189,8 @@ fn status() -> Status {
         nested_virtualization: false,
         ssh_port: (system == System::Linux).then_some(2201),
         size_gb: Some(256),
+        folder: std::path::PathBuf::from(r"C:\ProgramData\Guesthouse\machines"),
+        problem: None,
         // The stopped Windows machine has two, so the section has rows to look at.
         snapshots: if name == "win11" {
             vec![
@@ -312,6 +315,12 @@ fn guest_log() -> Vec<Line> {
         line(Kind::Guest, "guesthouse: address: 172.24.80.31"),
         note("It's running."),
     ]
+}
+
+fn log(lines: Vec<Line>) -> Log<Line> {
+    let mut log = super::new_log();
+    log.extend(lines);
+    log
 }
 
 fn note(text: &str) -> Line {
