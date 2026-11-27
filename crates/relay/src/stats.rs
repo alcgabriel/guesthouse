@@ -1,16 +1,17 @@
 //! What a relay counts, and how it is read back.
 
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::time::Duration;
 
-/// Totals since the relay was started.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// Totals since the relay was started. A [`RelayStatus`](crate::RelayStatus) carries them as they are.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Counters {
     /// Datagrams from devices that were passed on, and their bytes.
     pub up_packets: u64,
     pub up_bytes: u64,
-    /// Datagrams from the loopback port that were passed on to a device, and their bytes.
+    /// Datagrams from the guest's port that were passed on to a device, and their bytes.
     pub down_packets: u64,
     pub down_bytes: u64,
     /// Devices that got a socket of their own, and how many of them have gone since.
@@ -18,7 +19,15 @@ pub struct Counters {
     pub clients_expired: u64,
     /// Datagrams from a new device that were dropped because the relay already had as many as it allows.
     pub refused_full: u64,
-    /// Sends and receives that failed. A loopback port nobody listens on shows up here.
+    /// Datagrams to a device's socket from anywhere but the guest's port, which were dropped. Only
+    /// counted where the relay checks, as [`Config::only_upstream_answers`] says. Left out by a relay
+    /// older than the count, which reads as none.
+    ///
+    /// [`Config::only_upstream_answers`]: crate::Config::only_upstream_answers
+    #[serde(default)]
+    pub refused_stranger: u64,
+    /// Sends and receives that failed. On Windows that includes each datagram to a guest's port nobody
+    /// listens on, as the device's socket's next receive fails with it. Linux says nothing of those.
     pub errors: u64,
 }
 
@@ -31,6 +40,7 @@ pub(crate) struct Stats {
     clients_started: AtomicU64,
     clients_expired: AtomicU64,
     refused_full: AtomicU64,
+    refused_stranger: AtomicU64,
     errors: AtomicU64,
 }
 
@@ -57,6 +67,10 @@ impl Stats {
         self.refused_full.fetch_add(1, Relaxed);
     }
 
+    pub(crate) fn stranger(&self) {
+        self.refused_stranger.fetch_add(1, Relaxed);
+    }
+
     pub(crate) fn error(&self) {
         self.errors.fetch_add(1, Relaxed);
     }
@@ -70,6 +84,7 @@ impl Stats {
             clients_started: self.clients_started.load(Relaxed),
             clients_expired: self.clients_expired.load(Relaxed),
             refused_full: self.refused_full.load(Relaxed),
+            refused_stranger: self.refused_stranger.load(Relaxed),
             errors: self.errors.load(Relaxed),
         }
     }

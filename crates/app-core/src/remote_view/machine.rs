@@ -34,7 +34,7 @@ use guesthouse_remote_view_core::share::{ShareInfo, ShareState, pairing_seconds}
 use guesthouse_remote_view_core::status::{Reply, parse_reply};
 use guesthouse_remote_view_core::switch::{SWITCH_FILE, Switch};
 use std::fs;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::process::Child;
 use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
 use std::thread;
@@ -107,9 +107,8 @@ pub fn set_allowed(context: &Context, machine: &Machine, on: bool) -> Result<Swi
         .filter(|other| other.id != machine.id)
         .filter_map(|other| port(context, other))
         .collect();
-    let switch = read_switch(context, machine)
-        .turned(on, &taken, |port| UdpSocket::bind((Ipv4Addr::UNSPECIFIED, port)).is_ok())
-        .map_err(Failure)?;
+    let switch =
+        read_switch(context, machine).turned(on, &taken, guesthouse_relay::udp_port_free).map_err(Failure)?;
     write_switch(context, machine, &switch)?;
     Ok(switch)
 }
@@ -370,15 +369,6 @@ pub fn bring_up(
         let _ = write_log(context, &format!("remote view: sharing on: {}", said.trim()));
     }
     open_helper(context, machine, slot, port, fingerprint)
-}
-
-/// This PC's address on its network, which a device on it types in: the one the system would send
-/// from to the internet, if that is on a real network. Nothing is sent to find it out.
-pub fn lan_address() -> Option<IpAddr> {
-    let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok()?;
-    socket.connect((Ipv4Addr::new(192, 0, 2, 1), 9)).ok()?;
-    let address = socket.local_addr().ok()?.ip();
-    (!address.is_loopback() && !address.is_unspecified()).then_some(address)
 }
 
 // ---- Pairing and the state shown ----
