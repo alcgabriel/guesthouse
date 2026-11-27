@@ -6,14 +6,21 @@
 use windows_reactor::*;
 
 use super::parts::*;
+use guesthouse_control::updates::Latest;
+
 use crate::app::{Main, Message};
-use crate::preferences::Theme;
-use crate::update::Phase;
+use crate::preferences::{Theme, WhenOut};
+use crate::update::{self, Failure, Phase};
 
 /// The widest the page is, as the design has it.
 const PAGE_WIDTH: f64 = 900.0;
-/// The widest the theme's list is.
+/// The widest the theme's list is, and the list of what's done when an update is out.
 const THEME_WIDTH: f64 = 200.0;
+const WHEN_OUT_WIDTH: f64 = 340.0;
+
+/// What's said of the machines an install stops while the service isn't answering.
+pub const UNKNOWN_MACHINES: &str = "The service isn't answering, so the app can't tell which machines are running, or \
+     whether one is being made. Installing stops the service, which shuts down any that are running.";
 
 /// The remoteman an installer carries, as its one pin says.
 const REMOTEMAN_PIN: &str = include_str!("../../../remote-view/remoteman.json");
@@ -37,7 +44,11 @@ pub fn gear(main: &Main, context: &ViewContext<Main>) -> View {
                 .into(),
         );
     }
-    let name = if dot { "Settings, an update is out" } else { "Settings" };
+    let name = match (dot, main.updates.ready()) {
+        (true, true) => "Settings, an update is ready",
+        (true, false) => "Settings, an update is out",
+        (false, _) => "Settings",
+    };
     Button::new()
         .content(Grid::new().children(inside))
         .style(ButtonStyle::Subtle)
@@ -91,6 +102,19 @@ fn update_rows(main: &Main, context: &ViewContext<Main>) -> Vec<View> {
             context.callback(Message::SetLookByItself),
         )),
     ));
+    let choices: Vec<String> = WhenOut::ALL.iter().map(|when| when.label().to_owned()).collect();
+    let chosen = WhenOut::ALL.iter().position(|when| *when == main.preferences.when_out);
+    let when_out = ComboBox::new()
+        .items_source(choices)
+        .selected_index(chosen)
+        .width(WHEN_OUT_WIDTH)
+        .automation_name("When one is out")
+        .on_selection_changed(context.callback(Message::SetWhenOut));
+    rows.push(row(
+        "When one is out",
+        &["It's never installed by itself, and never stops a running machine without asking."],
+        Some(when_out.into()),
+    ));
     rows
 }
 
@@ -132,8 +156,7 @@ fn status_row(main: &Main, context: &ViewContext<Main>) -> View {
         ),
         Phase::Newer { latest, .. } => {
             let words = format!(
-                "You have {current}. Download the installer and run it: it keeps your machines, and asks each \
-                 running one to shut down first."
+                "You have {current}. It keeps your machines, and asks each running one to shut down first."
             );
             let download = button("Download", context.message(Message::GetUpdate), true)
                 .automation_name(format!("Download Guesthouse {}", latest.version));
@@ -142,19 +165,148 @@ fn status_row(main: &Main, context: &ViewContext<Main>) -> View {
                 buttons.push(button("Not now", context.message(Message::LaterUpdate), false).into());
             }
             buttons.push(notes_link(&latest.version, context));
-            StackPanel::new()
-                .spacing(10.0)
-                .margin(Thickness::new(0.0, 14.0, 0.0, 14.0))
-                .children((
-                    StackPanel::new().spacing(2.0).children((
-                        strong(&format!("Guesthouse {} is out", latest.version)),
-                        caption(&words),
-                    )),
-                    side_by_side(buttons),
-                ))
-                .into()
+            stacked(strong(&format!("Guesthouse {} is out", latest.version)).into(), vec![caption(&words).into()], buttons)
+        }
+        Phase::Downloading { latest, got, total } => {
+            let mb = |bytes: u64| bytes >> 20;
+            let (words, bar) = match total.filter(|total| *total > 0) {
+                Some(total) => (
+                    format!("{} of {} MB", mb(*got), mb(total)),
+                    ProgressBar::new().maximum(total as f64).value((*got).min(total) as f64),
+                ),
+                None => (format!("{} MB so far", mb(*got)), ProgressBar::new().is_indeterminate(true)),
+            };
+            let bar = bar
+                .automation_name(format!("Downloading Guesthouse {}, {words}", latest.version))
+                .margin(Thickness::new(0.0, 6.0, 0.0, 0.0));
+            row_with(
+                &format!("Downloading Guesthouse {}", latest.version),
+                StackPanel::new().children((caption(&words), bar)),
+                None,
+                Some(
+                    button("Cancel", context.message(Message::CancelUpdate), false)
+                        .automation_name("Cancel the download")
+                        .into(),
+                ),
+            )
+        }
+        Phase::Verifying { latest } => row_with(
+            &format!("Checking Guesthouse {}", latest.version),
+            side_by_side((ring(16.0), caption("Against the SHA-256 its release gave, before anything is run."))),
+            None,
+            Some(button("Cancel", context.message(Message::CancelUpdate), false).automation_name("Cancel the check").into()),
+        ),
+        Phase::Ready { latest, note } => ready(main, latest, note.as_ref(), context),
+        Phase::Installing { latest } => row_with(
+            &format!("Installing Guesthouse {}", latest.version),
+            StackPanel::new().spacing(4.0).children((
+                side_by_side((ring(16.0), caption("The installer has started. Windows asks for an administrator first."))),
+                caption(
+                    "Its own pages then take over. Once it has stopped the service, this app closes, and its last \
+                     page opens Guesthouse again.",
+                ),
+            )),
+            None,
+            None,
+        ),
+        Phase::Installed { latest } => row(
+            &format!("Guesthouse {} is installed", latest.version),
+            &["This app is the one from before. Close it, and open Guesthouse again from Start."],
+            None,
+        ),
+        Phase::Failed { latest, failure } => {
+            let again = button("Try again", context.message(Message::GetUpdate), true)
+                .automation_name(format!("Download Guesthouse {} again", latest.version));
+            stacked(
+                strong(&failure.heading(&latest.version)).foreground(ThemeBrush::SystemCritical).into(),
+                vec![caption(&failure.words()).into()],
+                vec![again.into(), notes_link(&latest.version, context)],
+            )
         }
     }
+}
+
+/// A status with its buttons under its words, as the design has it.
+fn stacked(heading: View, lines: Vec<View>, buttons: Vec<View>) -> View {
+    let mut words = vec![heading];
+    words.extend(lines);
+    let mut parts: Vec<View> = vec![StackPanel::new().spacing(2.0).children(words).into()];
+    if !buttons.is_empty() {
+        parts.push(side_by_side(buttons).into());
+    }
+    StackPanel::new().spacing(10.0).margin(Thickness::new(0.0, 14.0, 0.0, 14.0)).children(parts).into()
+}
+
+/// The update downloaded and checked, ready to install: what installing it stops, before Install is
+/// pressed, or why it can't be now, and why the last try didn't install it, if one didn't.
+fn ready(main: &Main, latest: &Latest, note: Option<&Failure>, context: &ViewContext<Main>) -> View {
+    let version = &latest.version;
+    let blocked = main.install_blocked();
+    let running = update::stopped_by_install(main.machines());
+    let mut lines: Vec<View> = Vec::new();
+    let heading: View = match note {
+        Some(failure) => {
+            lines.push(caption(&failure.words()).into());
+            strong(&failure.heading(version)).foreground(ThemeBrush::SystemCritical).into()
+        }
+        None => {
+            lines.push(caption("Checked against its SHA-256.").into());
+            strong(&format!("Guesthouse {version} is ready to install")).into()
+        }
+    };
+    let names: Vec<&str> = running.iter().map(|machine| machine.name.as_str()).collect();
+    // With the service not answering, which machines run, or are being made, can't be known.
+    let unknown = main.status().is_none();
+    let machines = match (&blocked, names.as_slice()) {
+        (Some(why), _) => bad(why),
+        (None, _) if unknown => caption(UNKNOWN_MACHINES),
+        (None, []) => caption("No machine is running."),
+        (None, [one]) => {
+            caption(&format!("Installing stops the service, which asks {one} to shut down first."))
+        }
+        (None, [many @ .., last]) => caption(&format!(
+            "Installing stops the service, which asks {} and {last} to shut down first.",
+            many.join(", ")
+        )),
+    };
+    lines.push(machines.into());
+    lines.push(
+        caption(
+            "Windows asks for an administrator. The installer's own pages then take over, and this app closes; \
+             its last page opens Guesthouse again.",
+        )
+        .into(),
+    );
+    let text = match (note.is_some(), names.is_empty() && !unknown) {
+        (true, _) => "Try again",
+        (false, true) => "Install now",
+        // It asks about them first.
+        (false, false) => "Install now…",
+    };
+    let install = button(text, context.message(Message::Install), true)
+        .automation_name(format!("Install Guesthouse {version} now"))
+        .is_enabled(blocked.is_none());
+    let mut buttons: Vec<View> = vec![install.into()];
+    if main.updates.dot() {
+        buttons.push(
+            button("Later", context.message(Message::LaterUpdate), false)
+                .automation_name("Install later")
+                .into(),
+        );
+    }
+    buttons.push(notes_link(version, context));
+    let status = stacked(heading, lines, buttons);
+    if names.is_empty() && !unknown || blocked.is_some() || note.is_some() {
+        return status;
+    }
+    // Machines that installing stops: the design's caution, as the person is about to stop them.
+    Border::new()
+        .background(ThemeBrush::SystemCautionBackground)
+        .corner_radius(8.0)
+        .padding(Thickness::new(14.0, 0.0, 14.0, 0.0))
+        .margin(Thickness::new(-8.0, 8.0, -8.0, 8.0))
+        .content(status)
+        .into()
 }
 
 /// The link to `version`'s release notes.

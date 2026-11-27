@@ -41,18 +41,43 @@ impl Theme {
     }
 }
 
+/// What the app does when a look finds a newer Guesthouse. It never installs one by itself.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WhenOut {
+    /// Download it and check it, then ask before installing.
+    #[default]
+    Download,
+    /// Only say so.
+    Tell,
+}
+
+impl WhenOut {
+    pub const ALL: [WhenOut; 2] = [WhenOut::Download, WhenOut::Tell];
+
+    /// Its words in the list.
+    pub fn label(self) -> &'static str {
+        match self {
+            WhenOut::Download => "Download it, then ask before installing",
+            WhenOut::Tell => "Tell me",
+        }
+    }
+}
+
 /// The app's settings.
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Preferences {
     /// Look for a newer Guesthouse when the app starts, and once a day while it's open.
     pub look_by_itself: bool,
+    /// What's done when a look finds one.
+    pub when_out: WhenOut,
     pub theme: Theme,
 }
 
 impl Default for Preferences {
     fn default() -> Self {
-        Preferences { look_by_itself: true, theme: Theme::System }
+        Preferences { look_by_itself: true, when_out: WhenOut::Download, theme: Theme::System }
     }
 }
 
@@ -67,6 +92,9 @@ impl Preferences {
         // A field at a time, so one this app can't read leaves the others as they were written.
         if let Some(on) = fields.get("look_by_itself").and_then(serde_json::Value::as_bool) {
             preferences.look_by_itself = on;
+        }
+        if let Some(Ok(when_out)) = fields.get("when_out").map(WhenOut::deserialize) {
+            preferences.when_out = when_out;
         }
         if let Some(Ok(theme)) = fields.get("theme").map(Theme::deserialize) {
             preferences.theme = theme;
@@ -102,18 +130,28 @@ mod tests {
         assert_eq!(Preferences::parse("[1, 2]"), Preferences::default());
         let default = Preferences::default();
         assert!(default.look_by_itself, "looking is on until it's turned off");
+        assert_eq!(default.when_out, WhenOut::Download, "and a newer one is downloaded, never installed");
         assert_eq!(default.theme, Theme::System);
     }
 
     #[test]
     fn what_a_file_says_is_kept_and_what_it_doesnt_know_is_the_default() {
-        let read = Preferences::parse(r#"{"look_by_itself": false, "theme": "dark"}"#);
-        assert_eq!(read, Preferences { look_by_itself: false, theme: Theme::Dark });
-        // A newer app's theme, or a field of the wrong kind, leaves the rest as written.
-        let read = Preferences::parse(r#"{"look_by_itself": false, "theme": "sepia", "later": 3}"#);
-        assert_eq!(read, Preferences { look_by_itself: false, theme: Theme::System });
+        let read = Preferences::parse(r#"{"look_by_itself": false, "when_out": "tell", "theme": "dark"}"#);
+        assert_eq!(read, Preferences { look_by_itself: false, when_out: WhenOut::Tell, theme: Theme::Dark });
+        // A newer app's choice, or a field of the wrong kind, leaves the rest as written. The design's
+        // third choice, installing by itself, is one this app never takes.
+        let read = Preferences::parse(
+            r#"{"look_by_itself": false, "when_out": "install", "theme": "sepia", "later": 3}"#,
+        );
+        assert_eq!(
+            read,
+            Preferences { look_by_itself: false, when_out: WhenOut::Download, theme: Theme::System }
+        );
         let read = Preferences::parse(r#"{"look_by_itself": "no", "theme": "light"}"#);
-        assert_eq!(read, Preferences { look_by_itself: true, theme: Theme::Light });
+        assert_eq!(
+            read,
+            Preferences { look_by_itself: true, when_out: WhenOut::Download, theme: Theme::Light }
+        );
     }
 
     #[test]
@@ -121,11 +159,12 @@ mod tests {
         let folder = std::env::temp_dir().join(format!("gh-app-settings-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&folder);
         assert_eq!(Preferences::read(&folder), Preferences::default(), "none yet");
-        let chosen = Preferences { look_by_itself: false, theme: Theme::Light };
+        let chosen = Preferences { look_by_itself: false, when_out: WhenOut::Tell, theme: Theme::Light };
         chosen.write(&folder).unwrap();
         assert_eq!(Preferences::read(&folder), chosen);
         let text = std::fs::read_to_string(folder.join(FILE)).unwrap();
         assert!(text.contains(r#""theme": "light""#), "{text}");
+        assert!(text.contains(r#""when_out": "tell""#), "{text}");
         assert!(!folder.join(format!("{FILE}.new")).exists(), "the step's own file is renamed over it");
         std::fs::remove_dir_all(&folder).unwrap();
     }
@@ -134,5 +173,7 @@ mod tests {
     fn each_theme_has_its_words() {
         let labels: Vec<&str> = Theme::ALL.iter().map(|theme| theme.label()).collect();
         assert_eq!(labels, ["Windows' setting", "Light", "Dark"]);
+        let labels: Vec<&str> = WhenOut::ALL.iter().map(|when| when.label()).collect();
+        assert_eq!(labels, ["Download it, then ask before installing", "Tell me"]);
     }
 }

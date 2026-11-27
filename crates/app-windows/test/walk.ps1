@@ -200,6 +200,59 @@ $after = (Get-ItemProperty -Path $run -Name Guesthouse -ErrorAction SilentlyCont
 Check ($before -eq $after) "and Windows' Run key is as it was, as a preview writes nothing"
 Stop-Preview $p
 
+# Updating from inside the app, with the preview's fake: it downloads nothing, its check finds the
+# SHA-256 the latest file gave, and its installer ends having done nothing, as a cancelled one does.
+$v = Next-Version
+$p = Start-Preview $Exe updates-out
+Check (Has "When one is out") "Settings has what's done when one is out"
+Check (Press "Download Guesthouse $v") "Download can be pressed"
+Check (Has "Install Guesthouse $v now") "it downloads, is checked, and is ready to install"
+Check (-not (Find "Install Guesthouse $v now").Current.IsEnabled) "but not while a machine is being made"
+Check (Has "office is being made. Install once it's done: the installer stops the service, which would leave it half made.") "which is said"
+Stop-Preview $p
+
+$p = Start-Preview $Exe updates-downloading
+Check (Has "Cancel the download") "a download has Cancel"
+Check (Press "Cancel the download") "Cancel can be pressed"
+Check (Has "Download Guesthouse $v") "and it's back to Download"
+Stop-Preview $p
+
+$p = Start-Preview $Exe updates-mismatch
+Check (Has "It didn't match its SHA-256, so it was deleted. Nothing was installed.") "a download that didn't match says so"
+Check (Press "Download Guesthouse $v again") "Try again can be pressed"
+Check (Has "Install Guesthouse $v now") "and a download that matches is ready"
+Stop-Preview $p
+
+$p = Start-Preview $Exe updates-ready-running
+Check (Has "Installing stops the service, which asks win11 and build-box to shut down first.") "what installing stops is said before Install"
+Check (Press "Install Guesthouse $v now") "Install can be pressed"
+Check (Has "Shut them down and install") "it asks first, as machines are running"
+Check (Has "Later") "with Later"
+Check (Press "Later") "Later can be pressed"
+Check (Has "Install Guesthouse $v now") "and nothing was installed"
+Check (Press "Install Guesthouse $v now") "Install again"
+Check (Press "Shut them down and install") "Shut them down and install can be pressed"
+Check (Has "Guesthouse $v wasn't installed") "the fake installer ends with nothing done, and it says so"
+Check (Has "Windows' prompt was answered No, or the installer was closed before it installed.") "with why"
+Check (Press "Back") "Back from Settings"
+Check (Has "Settings, an update is ready") "the gear says an update is ready"
+Stop-Preview $p
+
+# With the service not answering, what an install stops can't be known, so it always asks.
+$p = Start-Preview $Exe updates-ready-away
+Check (Has "The service isn't answering, so the app can't tell which machines are running, or whether one is being made. Installing stops the service, which shuts down any that are running.") "a ready update says it can't tell what installing stops"
+Check (Press "Install Guesthouse $v now") "Install can be pressed with the service not answering"
+Check (Has "Stop the service and install") "and it asks first"
+Check (Press "Later") "Later can be pressed"
+Check (Has "Install Guesthouse $v now") "and nothing was installed"
+Stop-Preview $p
+
+$p = Start-Preview $Exe updates-installing
+Check (Has "Installing Guesthouse $v") "an install going on says so"
+Check (-not (Has "Install Guesthouse $v now")) "with no Install"
+Check (-not (Find "Look for updates now")) "and nothing to look for meanwhile"
+Stop-Preview $p
+
 # A build of the repo isn't offered updates.
 $p = Start-Preview $Exe updates-repo
 Check (Has "This is a build of the repo") "a build of the repo says so"

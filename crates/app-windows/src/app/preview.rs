@@ -16,9 +16,16 @@
 //! service can't be reached). `update` is Home with a newer Guesthouse out, the dot on the gear, and
 //! the app's Settings page is `app-settings`, with how the updates stand as `updates-newest` (the
 //! same), `updates-looking`, `updates-out`, `updates-unreached` and `updates-repo` (a build of the
-//! repo). A preview counts as installed, reads and writes none of the person's settings, and never
-//! reaches the file drop: Look now finds what its state did. Nothing is sent to the service,
-//! whatever is pressed.
+//! repo), and an update's own: `updates-downloading`, `updates-download-failed`,
+//! `updates-verifying`, `updates-mismatch`, `updates-ready`, `updates-ready-running` (machines that
+//! an install would stop), `updates-ask` (the question about them), `updates-ready-away` and
+//! `updates-ask-away` (the same while the service isn't answering), `updates-blocked` (a machine
+//! being made), `updates-installing`, `updates-declined`, `updates-launch-failed` and
+//! `updates-installed`. A preview counts as installed, reads and writes none of the person's
+//! settings, and never reaches the file drop, downloads or runs anything: its updater is
+//! `update::Fake`, whose look finds what its state did, whose download and check go well at once,
+//! and whose installer ends having done nothing. Nothing is sent to the service, whatever is
+//! pressed.
 
 use guesthouse_control::client::Unreached;
 use guesthouse_control::{
@@ -29,9 +36,10 @@ use windows_reactor::WindowTheme;
 use super::{Account, Form, Kind, Line, Main, Making, Page, Ready, ReportStage, Section};
 use crate::bridge::Status;
 use crate::log::Log;
+use crate::preferences::WhenOut;
 use crate::remote_view::{Ask, Viewing};
 use crate::report::Prepared;
-use crate::update::{self, Fake, Fetched, Updates, release_file};
+use crate::update::{self, DownloadError, Fake, Fetched, Updates, release_file};
 use guesthouse_control::ShareInfo;
 use guesthouse_control::report::Summary;
 use guesthouse_remote_view_core::share::{CloseReason, DeviceInfo, Pending, Permissions, ShareState};
@@ -52,7 +60,7 @@ pub fn stage(main: &mut Main) {
     main.live = false;
     // As an installed app, which looks for updates, though it never reaches the file drop.
     main.installed = true;
-    main.updater = Arc::new(Fake { fetched: Fetched::Unreached });
+    main.updater = Arc::new(Fake::finding(Fetched::Unreached));
     main.updates = Updates::new(true, guesthouse_control::WINDOWS_VERSION);
     main.theme = match std::env::var(THEME).as_deref() {
         Ok("light") => WindowTheme::Light,
@@ -146,6 +154,10 @@ pub fn stage(main: &mut Main) {
             main.page = Page::AppSettings;
             updates(main, Some(Fetched::Unreached));
         }
+        staged if staged.starts_with("updates-") && STAGED.contains(&staged) => {
+            main.page = Page::AppSettings;
+            stage_update(main, staged);
+        }
         "updates-repo" => {
             main.page = Page::AppSettings;
             main.installed = false;
@@ -209,12 +221,98 @@ pub fn stage(main: &mut Main) {
 fn updates(main: &mut Main, fetched: Option<Fetched>) {
     main.installed = true;
     main.updates = Updates::new(true, guesthouse_control::WINDOWS_VERSION);
-    main.updater = Arc::new(Fake { fetched: fetched.clone().unwrap_or(Fetched::Unreached) });
+    main.updater = Arc::new(Fake::finding(fetched.clone().unwrap_or(Fetched::Unreached)));
     let [update::Effect::Fetch { attempt }] = main.updates.step(update::Input::Look, NOW)[..] else {
         return;
     };
     if let Some(fetched) = fetched {
         main.updates.step(update::Input::Looked { attempt, fetched }, NOW);
+    }
+    // From here on, as the settings say.
+    main.updates.download_by_itself = main.preferences.when_out == WhenOut::Download;
+}
+
+/// The update's states past finding one, which [`stage_update`] goes to.
+const STAGED: [&str; 14] = [
+    "updates-downloading",
+    "updates-download-failed",
+    "updates-verifying",
+    "updates-mismatch",
+    "updates-ready",
+    "updates-ready-running",
+    "updates-ask",
+    "updates-ready-away",
+    "updates-ask-away",
+    "updates-blocked",
+    "updates-installing",
+    "updates-declined",
+    "updates-launch-failed",
+    "updates-installed",
+];
+
+/// Takes a newer Guesthouse that's out as far as `state` says, as the app would get there, step by
+/// step, with what each step would have done left undone. Its machines are as each state needs:
+/// none running when it's ready, two running when an install would stop them, and one being made
+/// when an install has to wait.
+fn stage_update(main: &mut Main, state: &str) {
+    let running = matches!(state, "updates-ready-running" | "updates-ask");
+    if let Ok(status) = &mut main.seen {
+        for machine in &mut status.machines {
+            machine.state = match machine.name.as_str() {
+                "win11" | "build-box" if running => State::Running,
+                "office" if state == "updates-blocked" => State::Installing,
+                _ => State::Off,
+            };
+        }
+    }
+    updates(main, Some(Fetched::Text(release_file(&next_version()))));
+    main.install_ask = matches!(state, "updates-ask" | "updates-ask-away");
+    if state.ends_with("-away") {
+        // A service of another version, say, which doesn't answer: what an update puts right.
+        main.seen = Err(Unreached::NoService.words().to_owned());
+    }
+    let mut go = |input| main.updates.step(input, NOW);
+    let [update::Effect::Download { attempt, ref latest }] = go(update::Input::Download)[..] else { return };
+    let sha = latest.sha256.clone();
+    let size = 68 << 20;
+    match state {
+        "updates-downloading" => {
+            go(update::Input::Progress { attempt, got: 30 << 20, total: Some(size) });
+            return;
+        }
+        "updates-download-failed" => {
+            go(update::Input::Downloaded { attempt, result: Err(DownloadError::Unreached) });
+            return;
+        }
+        _ => {}
+    }
+    go(update::Input::Downloaded { attempt, result: Ok(()) });
+    match state {
+        "updates-verifying" => return,
+        "updates-mismatch" => {
+            go(update::Input::Hashed { attempt, result: Ok("0".repeat(64)) });
+            return;
+        }
+        _ => {}
+    }
+    go(update::Input::Hashed { attempt, result: Ok(sha) });
+    let install = match state {
+        "updates-installing" => None,
+        "updates-declined" => Some(Ok(update::INSTALLER_CANCELLED)),
+        "updates-launch-failed" => Some(Err("The system cannot find the file specified".to_owned())),
+        "updates-installed" => Some(Ok(update::INSTALLER_DONE)),
+        _ => return,
+    };
+    let [update::Effect::Launch { attempt, .. }] = go(update::Input::Install)[..] else { return };
+    match install {
+        None => {}
+        Some(Ok(code)) => {
+            go(update::Input::Launched { attempt, result: Ok(()) });
+            go(update::Input::InstallerEnded { attempt, code });
+        }
+        Some(Err(why)) => {
+            go(update::Input::Launched { attempt, result: Err(why) });
+        }
     }
 }
 

@@ -11,6 +11,7 @@ use std::net::IpAddr;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
@@ -25,10 +26,10 @@ use windows_reactor::*;
 use crate::bridge::{self, Ended, Job, Looking, Seen, Watch, Window};
 use crate::console::{self, Console};
 use crate::log::Log;
-use crate::preferences::{Preferences, Theme};
+use crate::preferences::{Preferences, Theme, WhenOut};
 use crate::remote_view::{Ask, Facts, Viewing};
 use crate::report::{self, Asked, Prepared};
-use crate::update::{self, Fetched, Updater, Updates};
+use crate::update::{self, DownloadError, Fetched, Updater, Updates};
 use guesthouse_control::ShareInfo;
 use guesthouse_remote_view_core::share::ShareState;
 
@@ -568,6 +569,12 @@ pub struct Main {
     updater: Arc<dyn Updater>,
     /// The timer that looks again a day after the last look by itself.
     look_timer: Option<ComponentTimer>,
+    /// Stops the download that's going on, if one is.
+    download_stop: Option<Arc<AtomicBool>>,
+    /// Whether the person is being asked to confirm an install that stops the running machines.
+    pub install_ask: bool,
+    /// The installer has been started and wants the app gone, so the window is to close.
+    closing: bool,
     /// The app's own settings.
     pub preferences: Preferences,
     /// Whether the app opens when the person signs in, as Windows' Run key says.
@@ -750,8 +757,26 @@ pub enum Message {
     LookDaily,
     /// What the look numbered here found.
     Looked(u64, Fetched),
-    /// Open the newer one's installer in the browser.
+    /// What's done when a look finds a newer one, by its place in `WhenOut::ALL`.
+    SetWhenOut(Option<usize>),
+    /// Download the newer one, or try again.
     GetUpdate,
+    /// Stop the download, or its check.
+    CancelUpdate,
+    /// How far the download numbered here has got: bytes, of how many if the file drop said.
+    UpdateProgress(u64, u64, Option<u64>),
+    /// How the download numbered here ended.
+    Downloaded(u64, Result<(), DownloadError>),
+    /// The SHA-256 the check of the download numbered here found, or why it couldn't.
+    Hashed(u64, Result<String, String>),
+    /// Install the one that's ready, asking first if it stops running machines.
+    Install,
+    /// The answer to the question about the machines an install stops.
+    InstallAnswered(ContentDialogResult),
+    /// The installer of the install numbered here started, or didn't.
+    Launched(u64, Result<(), String>),
+    /// The installer of the install numbered here ended with this code.
+    InstallerEnded(u64, i32),
     /// Put the update aside until the app next starts.
     LaterUpdate,
     /// Open a version's release notes.
@@ -1246,6 +1271,10 @@ impl Main {
     fn take_status(&mut self, seen: Seen) {
         let was_away = self.seen.is_err();
         self.seen = seen;
+        // The installer stops the service before it ends the app, so the app goes first.
+        if !was_away && self.seen.is_err() {
+            self.updates_step(update::Input::ServiceGone);
+        }
         let Ok(status) = &self.seen else { return };
         let names: Vec<String> = status.machines.iter().map(|machine| machine.name.clone()).collect();
         self.end_stopped_console();
@@ -1456,12 +1485,54 @@ impl Main {
     fn updates_step(&mut self, input: update::Input) {
         let now = now_ms() / 1000;
         for effect in self.updates.step(input, now) {
+            let (updater, window) = (self.updater.clone(), self.window.clone());
             match effect {
-                update::Effect::Fetch { attempt } => {
-                    bridge::look_for_update(self.updater.clone(), attempt, self.window.clone());
+                update::Effect::Fetch { attempt } => bridge::look_for_update(updater, attempt, window),
+                update::Effect::Download { attempt, latest } => {
+                    let stop = Arc::new(AtomicBool::new(false));
+                    self.download_stop = Some(stop.clone());
+                    bridge::download_update(updater, attempt, latest, stop, window);
                 }
+                update::Effect::StopDownload => {
+                    if let Some(stop) = self.download_stop.take() {
+                        stop.store(true, Ordering::SeqCst);
+                    }
+                }
+                update::Effect::Hash { attempt } => bridge::hash_update(updater, attempt, window),
+                update::Effect::Discard => bridge::discard_update(updater),
+                update::Effect::Launch { attempt, .. } => bridge::launch_update(updater, attempt, window),
+                update::Effect::Close => self.closing = true,
             }
         }
+    }
+
+    /// The machines, as the service last said, or none while it can't be asked.
+    pub fn machines(&self) -> &[Machine] {
+        self.status().map(|status| status.machines.as_slice()).unwrap_or_default()
+    }
+
+    /// Why the update that's ready can't be installed now, if it can't.
+    pub fn install_blocked(&self) -> Option<String> {
+        update::install_blocked(self.machines(), self.busy())
+    }
+
+    /// Installs the update that's ready, if nothing holds it back. Running machines are asked about
+    /// first, unless `asked`, as the installer stops the service, which shuts them down.
+    fn install(&mut self, asked: bool) {
+        if !self.updates.ready() {
+            return;
+        }
+        if let Some(why) = self.install_blocked() {
+            self.tell(why, true);
+            return;
+        }
+        // With the service not answering, what it would stop can't be known, so it's always asked.
+        let stops = self.status().is_none() || !update::stopped_by_install(self.machines()).is_empty();
+        if !asked && stops {
+            self.install_ask = true;
+            return;
+        }
+        self.updates_step(update::Input::Install);
     }
 
     /// Whether the app looks for a newer Guesthouse by itself: the settings say to, and
@@ -1480,6 +1551,7 @@ impl Main {
         }
         self.preferences = preferences;
         self.theme = window_theme(self.preferences.theme);
+        self.updates.download_by_itself = self.preferences.when_out == WhenOut::Download;
         if !self.live {
             return;
         }
@@ -1604,8 +1676,13 @@ impl Component for Main {
             deleting: None,
             bridge_ask: false,
             updates: Updates::new(installed, guesthouse_control::WINDOWS_VERSION),
-            updater: Arc::new(crate::system::Network),
+            updater: Arc::new(crate::system::Network::new(
+                crate::preferences::folder().filter(|_| live && installed).as_deref(),
+            )),
             look_timer: None,
+            download_stop: None,
+            install_ask: false,
+            closing: false,
             theme: window_theme(preferences.theme),
             preferences,
             opens_at_sign_in: live && crate::system::opens_at_sign_in(),
@@ -1627,6 +1704,7 @@ impl Component for Main {
             looking: None,
             looking_id: 0,
         };
+        main.updates.download_by_itself = main.preferences.when_out == WhenOut::Download;
         // A day from now, and a day from each look after, it looks again if it's to.
         main.look_timer = Some(context.set_timeout(LOOK_EVERY, Message::LookDaily));
         #[cfg(feature = "preview")]
@@ -1954,10 +2032,32 @@ impl Component for Main {
             Message::Looked(attempt, fetched) => {
                 self.updates_step(update::Input::Looked { attempt, fetched })
             }
-            Message::GetUpdate => {
-                if let Some(link) = self.updates.newer().map(|latest| latest.installer.clone()) {
-                    self.open_page(&link);
+            Message::SetWhenOut(Some(index)) => {
+                if let Some(when_out) = WhenOut::ALL.get(index).copied() {
+                    self.prefer(|preferences| preferences.when_out = when_out);
                 }
+            }
+            Message::SetWhenOut(None) => {}
+            Message::GetUpdate => self.updates_step(update::Input::Download),
+            Message::CancelUpdate => self.updates_step(update::Input::Cancel),
+            Message::UpdateProgress(attempt, got, total) => {
+                self.updates_step(update::Input::Progress { attempt, got, total })
+            }
+            Message::Downloaded(attempt, result) => {
+                self.updates_step(update::Input::Downloaded { attempt, result })
+            }
+            Message::Hashed(attempt, result) => self.updates_step(update::Input::Hashed { attempt, result }),
+            Message::Install => self.install(false),
+            Message::InstallAnswered(result) => {
+                if std::mem::take(&mut self.install_ask) && result == ContentDialogResult::Primary {
+                    self.install(true);
+                }
+            }
+            Message::Launched(attempt, result) => {
+                self.updates_step(update::Input::Launched { attempt, result })
+            }
+            Message::InstallerEnded(attempt, code) => {
+                self.updates_step(update::Input::InstallerEnded { attempt, code })
             }
             Message::LaterUpdate => self.updates_step(update::Input::PutAside),
             Message::ReleaseNotes(version) => {
@@ -1994,6 +2094,10 @@ impl Component for Main {
                     self.ask_remote_view(Ask::Revoke(fingerprint));
                 }
             }
+        }
+        if self.closing {
+            self.closing = false;
+            let _ = context.close_window();
         }
         self.follow_remote_view();
         let opened =

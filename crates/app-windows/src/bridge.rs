@@ -16,6 +16,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use guesthouse_control::client::{self, Unreached};
+use guesthouse_control::updates::Latest;
 use guesthouse_control::{
     Answer, Bridging, CardInfo, Event, Machine, MachineSettings, NewMachine, Request, ShareInfo,
 };
@@ -24,7 +25,7 @@ use windows_reactor::ComponentCompletion;
 use crate::app::Message;
 use crate::pace::{Batch, Changes};
 use crate::remote_view::{self, Ask};
-use crate::update::Updater;
+use crate::update::{DownloadError, Updater};
 
 /// How often the service is asked how things stand.
 const EVERY: Duration = Duration::from_secs(2);
@@ -155,6 +156,81 @@ pub fn look_for_update(updater: Arc<dyn Updater>, attempt: u64, window: Window) 
     let _ = thread::Builder::new().name("update".into()).spawn(move || {
         let _ = window.tell(Message::Looked(attempt, updater.fetch()));
     });
+}
+
+/// How often, at most, the window is told how far a download has got. It's told only when the
+/// number it shows changes, too.
+const PROGRESS_APART: Duration = Duration::from_millis(500);
+
+/// Downloads an update's installer through `updater` on a thread of its own, as download
+/// `attempt`, telling the window how far it's got, now and then, and how it ended. Setting `stop`
+/// stops it.
+pub fn download_update(
+    updater: Arc<dyn Updater>,
+    attempt: u64,
+    latest: Latest,
+    stop: Arc<AtomicBool>,
+    window: Window,
+) {
+    let failed = window.clone();
+    let spawned = thread::Builder::new().name("update download".into()).spawn(move || {
+        let mut told = Changes::new();
+        let mut last: Option<Instant> = None;
+        let mut progress = |got: u64, total: Option<u64>| {
+            // In whole MB, as it's shown.
+            let shown = (got >> 20, total.map(|total| total >> 20));
+            let due = last.is_none_or(|last| last.elapsed() >= PROGRESS_APART);
+            if due && told.news(shown).is_some() {
+                last = Some(Instant::now());
+                let _ = window.tell(Message::UpdateProgress(attempt, got, total));
+            }
+        };
+        let ended = updater.download(&latest, attempt, &mut progress, &stop);
+        let _ = window.tell(Message::Downloaded(attempt, ended));
+    });
+    if let Err(error) = spawned {
+        let _ = failed.tell(Message::Downloaded(attempt, Err(DownloadError::Other(error.to_string()))));
+    }
+}
+
+/// Checks download `attempt` against its SHA-256 on a thread of its own, as reading it takes a moment.
+pub fn hash_update(updater: Arc<dyn Updater>, attempt: u64, window: Window) {
+    let failed = window.clone();
+    let spawned = thread::Builder::new().name("update check".into()).spawn(move || {
+        let _ = window.tell(Message::Hashed(attempt, updater.hash(attempt)));
+    });
+    if let Err(error) = spawned {
+        let _ = failed.tell(Message::Hashed(attempt, Err(error.to_string())));
+    }
+}
+
+/// Lets go of what's been downloaded, and deletes it.
+pub fn discard_update(updater: Arc<dyn Updater>) {
+    let _ = thread::Builder::new().name("update discard".into()).spawn(move || updater.discard());
+}
+
+/// Starts install `attempt`'s installer on a thread of its own, which then waits for it, telling
+/// the window that it started and how it ended. First it does what the app does as it goes, as the
+/// installer ends the app once it has stopped the service: it closes a pairing the app left open,
+/// which is nothing to a preview.
+pub fn launch_update(updater: Arc<dyn Updater>, attempt: u64, window: Window) {
+    let failed = window.clone();
+    let spawned = thread::Builder::new().name("update install".into()).spawn(move || {
+        close_pairing_left_open();
+        match updater.launch(attempt) {
+            Err(why) => {
+                let _ = window.tell(Message::Launched(attempt, Err(why)));
+            }
+            Ok(running) => {
+                let _ = window.tell(Message::Launched(attempt, Ok(())));
+                let code = running.wait();
+                let _ = window.tell(Message::InstallerEnded(attempt, code));
+            }
+        }
+    });
+    if let Err(error) = spawned {
+        let _ = failed.tell(Message::Launched(attempt, Err(error.to_string())));
+    }
 }
 
 /// Makes a new machine, sending the window each of its events and then how it ended.
