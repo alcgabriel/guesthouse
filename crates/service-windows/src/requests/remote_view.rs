@@ -218,6 +218,8 @@ impl<W: Work> Service<W> {
             (false, _) => (ShareState::Off, None),
             // On, and shared once the machine runs.
             (true, None) => (ShareState::Starting, None),
+            // Turned on a moment ago, before its keeper has looked.
+            (true, Some(_)) if view.state == ShareState::Off => (ShareState::Starting, None),
             (true, Some(_)) => (view.state, view.reason),
         };
         if let (true, Some(ctl)) = (switch.allow_remote_view, ctl) {

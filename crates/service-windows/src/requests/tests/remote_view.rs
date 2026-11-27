@@ -194,7 +194,8 @@ fn switching_it_on_and_off_while_the_machine_runs_opens_and_closes_it_and_never_
     wait_net(service, |net| net.views.is_empty() && net.rules.is_empty());
     assert_eq!(net(service).calls[2..], ["close_view 7792".to_owned(), format!("delete_rule {RULE}")]);
 
-    share(service, "win", Some(true));
+    let again = info(share(service, "win", Some(true)));
+    assert_ne!(again.state, ShareState::Off, "on, before its keeper has looked, is starting");
     wait_view(service, "win", ShareState::Listening);
     stop(service, "win");
     for asked in service.work.remoteman.asked() {
