@@ -11,47 +11,26 @@ use crate::host_drives::drive_problems;
 use crate::machine::{Kind, Machine};
 use crate::network_settings::{network_start_problems, other_machines};
 use crate::processes::{memory_taken, qemu_pid};
-use crate::screen_gpu::{card_of, setup_card};
+use crate::screen_gpu::setup_card;
 use crate::settings::max_vram_gib_for;
 use crate::setup::amd::amd_start_problems;
 use crate::setup::cards::{card_problem, nvidia_card_problem};
 use crate::setup::intel::intel_start_problems;
 use crate::setup::setup_done;
 use crate::tasks::no_slot_text;
+use guesthouse_start_checks_core::linux_host::{self, MachineFacts, StartFacts, judge};
+pub use guesthouse_start_checks_core::linux_host::{
+    MEMORY_TAKEN, NO_SETUP, NO_TOKEN, SECOND_INSTANCE_REFUSAL, SHARE_REFUSAL, SharedFacts,
+};
 use std::path::Path;
 
-pub const SHARE_REFUSAL: &str = "This folder can't be shared. Choose a folder inside your home that isn't hidden, and \
-                             isn't one Guesthouse keeps its own files in.";
-const ALREADY_RUNNING: &str = "This machine is running.";
-pub const MEMORY_TAKEN: &str =
-    "Another VM on this PC has just taken this slot's memory. Start the machine again.";
-pub const SECOND_INSTANCE_REFUSAL: &str = "A second instance leaves GPU-PV alone.";
-/// The daemon can't start a GPU machine without what setup takes from NVIDIA's installer.
-pub const NO_SETUP: &str =
-    "A GPU machine needs setup first, and it hasn't been run. Run Setup Again from the menu.";
-/// Without it the app can't reach the guest's agent, so the display driver and the rest of what a
-/// start does in Windows would never happen. Only an install makes one, so a machine from before
-/// each had its own must be given the old one.
-pub const NO_TOKEN: &str = "This machine has no guest token, so the app can't reach Windows to finish starting it. \
-                            Choose the token file it was installed with in its settings, under Guest Token.";
-
-/// What several machines share, read once from the PC.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SharedFacts {
-    /// The most RAM this machine can have on this PC now.
-    pub ram_limit: u64,
-    /// How much of the PC's RAM the other VMs' memory already takes, in GiB.
-    pub touched_gib: u64,
-    /// What this machine's card can give it.
-    pub max_vram_gib: u32,
-    pub vcache_cpus: u32,
-    /// Where the NVIDIA card setup chose is, which a machine given no card runs on. Empty if it
-    /// can't be told.
-    pub setup_card: String,
+/// [`SharedFacts`] read from the PC.
+pub trait FromThisPc: Sized {
+    fn read(context: &Context, machine: &Machine) -> Result<Self>;
 }
 
-impl SharedFacts {
-    pub fn read(context: &Context, machine: &Machine) -> Result<Self> {
+impl FromThisPc for SharedFacts {
+    fn read(context: &Context, machine: &Machine) -> Result<Self> {
         Ok(Self {
             ram_limit: ram_limit_for(context, machine)?,
             touched_gib: used_by_others(context, context.slot) / GIB,
@@ -62,62 +41,43 @@ impl SharedFacts {
     }
 }
 
+/// What the checks need of a machine's settings.
+pub fn facts_of(machine: &Machine) -> MachineFacts {
+    MachineFacts {
+        has_gpu: machine.has_gpu(),
+        cores: machine.cores,
+        ram_gib: machine.ram_gib,
+        vram_gib: machine.vram_gib,
+        vcache_pin: machine.vcache_pin,
+        own_card: machine.amd_gpu.clone(),
+    }
+}
+
+fn all_facts(machines: &[Machine]) -> Vec<MachineFacts> {
+    machines.iter().map(facts_of).collect()
+}
+
 /// The machines in `others` with a GPU on the same card as this one, which share that card's memory.
 /// `setup_card` is where setup's NVIDIA card is.
 pub fn card_mates(machine: &Machine, others: &[Machine], setup_card: &str) -> Vec<Machine> {
-    let card = card_of(machine, setup_card);
-    let same_card = |other: &&Machine| other.has_gpu() && card_of(other, setup_card) == card;
+    let this = facts_of(machine);
+    let same_card = |other: &&Machine| linux_host::on_same_card(&this, &facts_of(other), setup_card);
     others.iter().filter(same_card).cloned().collect()
 }
 
 /// What the machines running now leave of the card. One with no cap has all of it.
 pub fn video_memory_left(others: &[Machine], max_vram_gib: u32) -> u32 {
-    let gpu = others.iter().filter(|other| other.has_gpu());
-    let used: u32 = gpu.map(|other| if other.vram_gib > 0 { other.vram_gib } else { max_vram_gib }).sum();
-    max_vram_gib.saturating_sub(used)
+    linux_host::video_memory_left(&all_facts(others), max_vram_gib)
 }
 
-/// What several machines share: the memory that holds them, and the card's for those on the same
-/// card. None of it counts if this one runs alone, so a single VM is told what it always was.
+/// What several machines share: see [`linux_host::shared_problems`].
 pub fn shared_problems(machine: &Machine, others: &[Machine], facts: &SharedFacts) -> Vec<String> {
-    if others.is_empty() {
-        return Vec::new();
-    }
-    let mut found = Vec::new();
-    // The limit already leaves out what they hold, which is all of their RAM once claimed. A machine
-    // still starting may not have claimed its own yet, and that will come out of the same RAM.
-    let reserved: u64 =
-        others.iter().filter(|other| other.has_gpu()).map(|other| u64::from(other.ram_gib)).sum();
-    let untouched = reserved.saturating_sub(facts.touched_gib);
-    if machine.has_gpu() && u64::from(machine.ram_gib) + untouched > facts.ram_limit {
-        found.push("This PC's RAM cannot hold this machine beside the ones running.".to_owned());
-    }
-    let mates = if machine.has_gpu() { card_mates(machine, others, &facts.setup_card) } else { Vec::new() };
-    if !mates.is_empty() {
-        let left = video_memory_left(&mates, facts.max_vram_gib);
-        if left == 0 {
-            found.push(
-                "The running machine has all the video memory. Give it a cap in its settings first."
-                    .to_owned(),
-            );
-        } else if machine.vram_gib > left {
-            found.push(format!("Only {left} GiB of video memory is left beside the machines running."));
-        }
-    }
-    let pinned: u32 = others.iter().filter(|other| other.vcache_pin).map(|other| other.cores).sum();
-    if machine.vcache_pin && pinned + machine.cores > facts.vcache_cpus {
-        found.push("The V-Cache cores are taken by the machines running.".to_owned());
-    }
-    found
+    linux_host::shared_problems(&facts_of(machine), &all_facts(others), facts)
 }
 
-/// The cap a machine starts with: its own, or what `others`, the machines running on its card, leave.
-/// Alone on its card it needs none.
+/// The cap a machine starts with: see [`linux_host::video_cap`].
 pub fn video_cap(machine: &Machine, others: &[Machine], max_vram_gib: u32) -> u32 {
-    match (machine.vram_gib, others.is_empty()) {
-        (0, false) => video_memory_left(others, max_vram_gib),
-        (cap, _) => cap,
-    }
+    linux_host::video_cap(&facts_of(machine), &all_facts(others), max_vram_gib)
 }
 
 /// Why this folder can't be shared. A guest can write to what it's given, so it can't be given the
@@ -149,65 +109,58 @@ fn card_start_problems(context: &Context, machine: &Machine) -> Vec<String> {
     }
 }
 
+/// What this machine's start is judged on, read from this PC in the order the checks were made.
+fn start_facts(context: &Context, machine: &Machine) -> Result<StartFacts> {
+    let settings_problems = machine.problems(max_vram_gib_for(context, machine));
+    let missing = |path: &String| !path.is_empty() && !Path::new(path).exists();
+    let missing_files =
+        [&machine.disk, &machine.vars].into_iter().filter(|path| missing(path)).cloned().collect();
+    let missing_disc = missing(&machine.iso).then(|| machine.iso.clone());
+    let missing_share =
+        (!machine.share.is_empty() && !Path::new(&machine.share).is_dir()).then(|| machine.share.clone());
+    let share_problem = share_problem(context, &machine.share);
+    let no_gpu_part = (machine.kind == Kind::Windows && !gpu_ready(context)).then(|| NO_GPU_PART.to_owned());
+    let reads_card = no_gpu_part.is_none() && machine.has_gpu();
+    let card_problems = if reads_card { card_start_problems(context, machine) } else { Vec::new() };
+    let no_token = reads_card && !machine.token_file(context).exists();
+    let second_instance = machine.has_gpu() && context.second_instance();
+    let pc_cores = physical_cores(&context.cpus);
+    let ram_limit = ram_limit_for(context, machine)?;
+    let vcache_threads = if machine.vcache_pin { host::vcache_cpus(&context.cpus).len() } else { 0 };
+    let others = other_machines(context);
+    let disk_in_use = others.iter().any(|other| other.disk == machine.disk);
+    let drive_problems = drive_problems(context, machine, &others);
+    let slot_taken = qemu_pid(context, None).is_some().then(|| no_slot_text(context));
+    let memory_taken = slot_taken.is_none() && machine.has_gpu() && memory_taken(context, None);
+    let shared = SharedFacts::read(context, machine)?;
+    let network_problems = network_start_problems(context, machine, &others);
+    Ok(StartFacts {
+        machine: facts_of(machine),
+        settings_problems,
+        missing_files,
+        missing_disc,
+        missing_share,
+        share_problem,
+        no_gpu_part,
+        card_problems,
+        no_token,
+        second_instance,
+        pc_cores,
+        ram_limit,
+        vcache_threads,
+        disk_in_use,
+        drive_problems,
+        slot_taken,
+        memory_taken,
+        others: all_facts(&others),
+        shared,
+        network_problems,
+    })
+}
+
 /// Says why this machine can't start on this host now.
 pub fn start_problems(context: &Context, machine: &Machine) -> Result<Vec<String>> {
-    let mut found = machine.problems(max_vram_gib_for(context, machine));
-    for path in [&machine.disk, &machine.vars] {
-        if !path.is_empty() && !Path::new(path).exists() {
-            found.push(format!("{path} is missing."));
-        }
-    }
-    if !machine.iso.is_empty() && !Path::new(&machine.iso).exists() {
-        found.push(format!("{} is missing. Eject it in the settings to boot from the disk.", machine.iso));
-    }
-    if !machine.share.is_empty() && !Path::new(&machine.share).is_dir() {
-        found.push(format!("{} is missing. Choose another shared folder in the settings.", machine.share));
-    }
-    found.extend(share_problem(context, &machine.share));
-    if machine.kind == Kind::Windows && !gpu_ready(context) {
-        found.push(NO_GPU_PART.to_owned());
-    } else if machine.has_gpu() {
-        found.extend(card_start_problems(context, machine));
-        if !machine.token_file(context).exists() {
-            found.push(NO_TOKEN.to_owned());
-        }
-    }
-    if machine.has_gpu() && context.second_instance() {
-        found.push(SECOND_INSTANCE_REFUSAL.to_owned());
-    }
-    let cores = physical_cores(&context.cpus);
-    if machine.cores > cores {
-        found.push(format!("This PC has {cores} cores, so a machine can have that many at most."));
-    }
-    let limit = ram_limit_for(context, machine)?;
-    if u64::from(machine.ram_gib) > limit {
-        found.push(format!("This PC can give a machine {limit} GiB at most right now."));
-    }
-    if machine.vcache_pin {
-        let cpus = host::vcache_cpus(&context.cpus);
-        if cpus.is_empty() {
-            found.push("This CPU has no V-Cache cores to pin to.".to_owned());
-        } else if machine.cores as usize > cpus.len() {
-            found.push(format!(
-                "The V-Cache cores run {} threads, too few for {} cores.",
-                cpus.len(),
-                machine.cores
-            ));
-        }
-    }
-    let others = other_machines(context);
-    if others.iter().any(|other| other.disk == machine.disk) {
-        found.push(ALREADY_RUNNING.to_owned());
-    }
-    found.extend(drive_problems(context, machine, &others));
-    if qemu_pid(context, None).is_some() {
-        found.push(no_slot_text(context));
-    } else if machine.has_gpu() && memory_taken(context, None) {
-        found.push(MEMORY_TAKEN.to_owned());
-    }
-    found.extend(shared_problems(machine, &others, &SharedFacts::read(context, machine)?));
-    found.extend(network_start_problems(context, machine, &others));
-    Ok(found)
+    Ok(judge(&start_facts(context, machine)?))
 }
 
 #[cfg(test)]

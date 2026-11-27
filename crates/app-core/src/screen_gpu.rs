@@ -23,7 +23,7 @@ pub fn machine_card(context: &Context, machine: &Machine) -> String {
 /// The same, with where setup's NVIDIA card is already known. A card of any maker, and a guest that
 /// isn't Windows, has its card in the same place, if it has one.
 pub fn card_of(machine: &Machine, setup_card: &str) -> String {
-    if machine.amd_gpu.is_empty() { setup_card.to_owned() } else { machine.amd_gpu.clone() }
+    guesthouse_start_checks_core::linux_host::card_of(&machine.amd_gpu, setup_card)
 }
 
 /// Where the NVIDIA card setup chose is, or empty if that can't be told.

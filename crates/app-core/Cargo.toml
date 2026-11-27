@@ -80,6 +80,8 @@ guesthouse-serial-words-core.workspace = true
 guesthouse-settings-core.workspace = true
 # The snapshot names, tags and the file beside each, as each host has them.
 guesthouse-snapshot-core.workspace = true
+# Why a machine can't start, judged from facts read here, as each host has it.
+guesthouse-start-checks-core.workspace = true
 # The host card's readings, which the daemon's sensor thread publishes and the overlay shows.
 guesthouse-sensors.workspace = true
 # Local time for the log and for snapshot dates. The standard library has no time zones.
