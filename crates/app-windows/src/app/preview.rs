@@ -188,6 +188,8 @@ fn status() -> Status {
         nested_virtualization: false,
         ssh_port: (system == System::Linux).then_some(2201),
         size_gb: Some(256),
+        folder: std::path::PathBuf::from(r"C:\ProgramData\Guesthouse\machines"),
+        problem: None,
         // The stopped Windows machine has two, so the section has rows to look at.
         snapshots: if name == "win11" {
             vec![
