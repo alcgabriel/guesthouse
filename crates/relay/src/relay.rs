@@ -27,17 +27,27 @@ const THREAD_STACK: usize = 128 * 1024;
 pub struct Config {
     /// The address and port that other devices send to. Port 0 takes any free one.
     pub listen: SocketAddr,
-    /// The loopback port the datagrams go to.
+    /// The guest's port the datagrams go to: a loopback port, or an address of the guest's own.
     pub upstream: SocketAddr,
     /// A device that has sent nothing for this long is dropped, and gets a new socket if it comes back.
     pub idle_timeout: Duration,
     /// The most devices at once. A datagram from one more is dropped.
     pub max_clients: usize,
+    /// Whether a device's socket takes answers only from `upstream` itself, and drops the rest. On by
+    /// default for an upstream off loopback, whose sockets are on every network. Off for loopback, as
+    /// QEMU's forward can answer from another port, and only this PC can reach those sockets.
+    pub only_upstream_answers: bool,
 }
 
 impl Config {
     pub fn new(listen: SocketAddr, upstream: SocketAddr) -> Self {
-        Self { listen, upstream, idle_timeout: DEFAULT_IDLE, max_clients: DEFAULT_MAX_CLIENTS }
+        Self {
+            listen,
+            upstream,
+            idle_timeout: DEFAULT_IDLE,
+            max_clients: DEFAULT_MAX_CLIENTS,
+            only_upstream_answers: !upstream.ip().is_loopback(),
+        }
     }
 }
 
@@ -125,6 +135,8 @@ fn carry_in(shared: &Arc<Shared>) {
                 continue;
             }
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            // Windows says here, as `ConnectionReset`, that an answer to a device that has gone was
+            // refused. The socket still works for every other device.
             Err(_) => {
                 shared.stats.error();
                 continue;

@@ -1,0 +1,10 @@
+A Guesthouse bug report from a Windows host. It goes to the developer, is read by the developer and their automation tools, and is deleted after 30 days.
+The user name, host name and home folder were taken out of its files where they were found. That's a best effort on free-form logs, not a promise.
+
+Files:
+  service.log (1200 bytes)
+  summary.json (80 bytes)
+  manifest.txt
+
+Not in it:
+  crash dumps: there were none

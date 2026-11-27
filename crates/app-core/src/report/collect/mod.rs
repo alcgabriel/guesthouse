@@ -57,13 +57,8 @@ pub struct Item {
 }
 
 /// Something that would have gone in, and didn't.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Missing {
-    pub name: String,
-    pub reason: String,
-    /// A command the tester could run to get it by hand, if there is one.
-    pub how: Option<String>,
-}
+/// A part that isn't in the report, why, and how to get it by hand, as every host's manifest says.
+pub use guesthouse_report_core::manifest::Missing;
 
 #[derive(Debug, Clone, Default)]
 pub struct Collection {
