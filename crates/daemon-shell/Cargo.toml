@@ -1,0 +1,17 @@
+[package]
+name = "guesthouse-daemon-shell"
+description = "The shell around a host's per-machine daemon that is no one host's: its log lines to standard error, so each host's daemon builds on one copy."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+# The logger writes to standard error by its descriptor and reads a log file back where it lies, as
+# only a Unix system has them. On Windows the crate is empty.
+[target.'cfg(unix)'.dependencies]
+# The facade the daemon logs through, which the logger serves.
+log = "0.4"
+
+[lints]
+workspace = true

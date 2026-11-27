@@ -17,7 +17,9 @@ pub mod gpu_note;
 pub mod guest_memory;
 pub mod handover;
 pub mod jail;
-pub mod logger;
+/// The log lines, which moved to `guesthouse-daemon-shell` as they were and are still here by this
+/// name.
+pub use guesthouse_daemon_shell::logger;
 pub mod memory_files;
 pub mod router;
 pub mod server;

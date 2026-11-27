@@ -41,7 +41,9 @@ guesthouse-transport.workspace = true
 # The sensors' snapshot file, which the jail has to name, and the file the guest's video memory goes
 # in for the app.
 guesthouse-sensors.workspace = true
-# The facade, for the logger in logger.rs to serve.
+# The log lines to standard error, which `logger` re-exports.
+guesthouse-daemon-shell.workspace = true
+# The facade the daemon logs through, which the shell's logger serves.
 log = "0.4"
 # The app writes what setup found as JSON, and this reads it.
 serde_json = { version = "1", optional = true }

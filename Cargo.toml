@@ -20,6 +20,7 @@ default-members = [
     "crates/control",
     "crates/core",
     "crates/daemon",
+    "crates/daemon-shell",
     "crates/frame-socket",
     "crates/guest-names",
     "crates/guest-scripts",
@@ -63,6 +64,7 @@ guesthouse-backend-intel = { path = "crates/backend-intel" }
 guesthouse-backend-nvidia = { path = "crates/backend-nvidia" }
 guesthouse-core = { path = "crates/core" }
 guesthouse-daemon = { path = "crates/daemon" }
+guesthouse-daemon-shell = { path = "crates/daemon-shell" }
 guesthouse-app-core = { path = "crates/app-core" }
 guesthouse-frame-socket = { path = "crates/frame-socket" }
 guesthouse-sensors = { path = "crates/sensors" }
