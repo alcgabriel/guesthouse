@@ -1,0 +1,19 @@
+{
+  "source": "app",
+  "file": "/opt/guesthouse/recipes/windows-clean-box.toml",
+  "recipe": {
+    "name": "Clean box",
+    "description": "A small Windows to try something out in. Nothing is added to it.",
+    "guest": "windows",
+    "settings": {
+      "cores": 4,
+      "ram_gib": 8,
+      "disk_gib": 80,
+      "vram_gib": null
+    },
+    "steps": {
+      "packages": [],
+      "script": null
+    }
+  }
+}

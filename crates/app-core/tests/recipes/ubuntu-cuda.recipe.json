@@ -1,0 +1,26 @@
+{
+  "source": "app",
+  "file": "/opt/guesthouse/recipes/ubuntu-cuda.toml",
+  "recipe": {
+    "name": "CUDA",
+    "description": "Ubuntu with a compiler, Python and the CUDA toolkit from Ubuntu's archive.",
+    "guest": "ubuntu",
+    "settings": {
+      "cores": 8,
+      "ram_gib": 16,
+      "disk_gib": 120,
+      "vram_gib": null
+    },
+    "steps": {
+      "packages": [
+        "build-essential",
+        "cmake",
+        "git",
+        "python3-pip",
+        "python3-venv",
+        "nvidia-cuda-toolkit"
+      ],
+      "script": null
+    }
+  }
+}

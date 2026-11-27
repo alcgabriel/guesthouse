@@ -1,0 +1,5 @@
+{
+  "state": "failed",
+  "step": "Running the recipe's PowerShell script",
+  "why": "said \"no\""
+}

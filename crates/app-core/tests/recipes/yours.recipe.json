@@ -1,0 +1,20 @@
+{
+  "source": "yours",
+  "file": "/srv/recipes/mine.toml",
+  "recipe": {
+    "name": "Box",
+    "description": "A box.",
+    "guest": "windows",
+    "settings": {
+      "cores": null,
+      "ram_gib": null,
+      "disk_gib": null,
+      "vram_gib": null
+    },
+    "steps": {
+      "packages": [],
+      "script": "x"
+    },
+    "lean": true
+  }
+}
