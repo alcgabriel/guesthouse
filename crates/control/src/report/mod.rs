@@ -16,7 +16,6 @@
 pub mod answer;
 pub mod clock;
 pub mod issue;
-pub mod kind;
 pub mod manifest;
 pub mod parts;
 pub mod scrub;
@@ -26,7 +25,7 @@ pub mod summary;
 pub mod trim;
 
 // The pieces every host shares, under the names they had here.
-pub use guesthouse_report_core::contract;
+pub use guesthouse_report_core::{contract, kind};
 
 pub use answer::read_answer;
 pub use contract::{KEPT_DAYS, MOST_REPORT_BYTES, NEW_ISSUE, report_address};
