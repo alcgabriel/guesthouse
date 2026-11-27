@@ -925,6 +925,7 @@ dependencies = [
  "guesthouse-basics",
  "guesthouse-card-check",
  "guesthouse-carry-core",
+ "guesthouse-catalog-core",
  "guesthouse-daemon",
  "guesthouse-jail",
  "guesthouse-relay",
@@ -1033,6 +1034,10 @@ dependencies = [
  "serde_json",
  "sha2",
 ]
+
+[[package]]
+name = "guesthouse-catalog-core"
+version = "0.11.0"
 
 [[package]]
 name = "guesthouse-clock-helper"

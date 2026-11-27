@@ -14,6 +14,7 @@ default-members = [
     "crates/backend-standin",
     "crates/basics",
     "crates/carry",
+    "crates/catalog",
     "crates/clock-helper",
     "crates/control",
     "crates/core",
@@ -71,6 +72,7 @@ guesthouse-report-core = { path = "crates/report" }
 guesthouse-basics = { path = "crates/basics" }
 guesthouse-account-core = { path = "crates/account" }
 guesthouse-carry-core = { path = "crates/carry" }
+guesthouse-catalog-core = { path = "crates/catalog" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
