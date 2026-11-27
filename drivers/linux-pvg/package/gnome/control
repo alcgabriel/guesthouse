@@ -1,0 +1,13 @@
+Package: guesthouse-gnome
+Version: @VERSION@
+Architecture: all
+Maintainer: Guesthouse contributors <144541403+s3k000@users.noreply.github.com>
+Conflicts: guesthouse-plasma
+Depends: guesthouse-desktop (= @VERSION@), gdm3, ubuntu-session, ubuntu-desktop-minimal, dconf-cli, ptyxis, gnome-text-editor, gnome-control-center, fonts-ubuntu, yaru-theme-gtk, yaru-theme-icon
+Section: gnome
+Priority: optional
+Description: Guesthouse: Ubuntu's GNOME desktop on the Mac's graphics device
+ GNOME Shell (Ubuntu's session) in place of weston, through our Mesa (Zink on
+ KosmicKrisp), signed in at boot by GDM as the account the install made, at
+ the scale the Mac app gives and with a German keyboard. Removing this package
+ gives the weston desktop back.

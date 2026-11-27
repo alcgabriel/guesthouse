@@ -1,0 +1,12 @@
+# Guesthouse: before GDM, the pvg card and GNOME's scale from the Mac app.
+[Unit]
+Description=Guesthouse GNOME: the pvg card and the scale before GDM
+Before=gdm.service display-manager.service
+After=systemd-udev-settle.service systemd-modules-load.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/guesthouse/gnome-prepare
+
+[Install]
+WantedBy=graphical.target

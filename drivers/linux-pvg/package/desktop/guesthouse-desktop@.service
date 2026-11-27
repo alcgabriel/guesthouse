@@ -1,0 +1,36 @@
+# Guesthouse: the desktop, weston on the Mac's graphics device, for the
+# account the install made (the instance's name). Started at every boot;
+# guesthouse-desktop's postinst enables it for that account.
+[Unit]
+Description=Guesthouse desktop: weston on the pvg device for %i
+After=systemd-user-sessions.service systemd-logind.service plymouth-quit-wait.service
+Conflicts=getty@tty7.service
+After=getty@tty7.service
+StartLimitIntervalSec=120
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=%i
+PAMName=guesthouse-desktop
+WorkingDirectory=~
+TTYPath=/dev/tty7
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty7
+UtmpMode=user
+Environment=XDG_SESSION_TYPE=wayland XDG_SESSION_CLASS=user
+# As root: the pvg card, the scale from the host, the renderer.
+ExecStartPre=+/usr/libexec/guesthouse/desktop-prepare
+ExecStart=/usr/libexec/guesthouse/weston-session
+# As root: "guesthouse: first start ok" on the serial port once weston is up.
+ExecStartPost=+/usr/libexec/guesthouse/first-start %i
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

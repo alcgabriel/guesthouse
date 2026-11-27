@@ -1,0 +1,17 @@
+#!/bin/sh
+# Back to weston: GDM off, weston's unit on again.
+set -e
+case $1 in
+remove | deconfigure)
+	account=$(head -1 /etc/guesthouse/desktop-user 2>/dev/null || true)
+	rm -f /etc/guesthouse/desktop
+	[ -f /etc/gdm3/custom.conf ] &&
+		sed -i -e '/^AutomaticLoginEnable *=/d' -e '/^AutomaticLogin *=/d' /etc/gdm3/custom.conf
+	systemctl disable gdm3.service guesthouse-gnome-prepare.service || true
+	if [ -n "$account" ]; then
+		systemctl disable "guesthouse-gnome-up@$account.service" || true
+		systemctl enable "guesthouse-desktop@$account.service" || true
+	fi
+	rm -rf /etc/dconf/db/guesthouse.d/00-scale
+	;;
+esac

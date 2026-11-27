@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+case $1 in
+remove | deconfigure)
+	account=$(head -1 /etc/guesthouse/desktop-user 2>/dev/null || true)
+	[ -n "$account" ] && systemctl disable "guesthouse-desktop@$account.service" || true
+	;;
+esac

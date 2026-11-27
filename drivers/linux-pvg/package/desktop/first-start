@@ -1,0 +1,52 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Usage: first-start ACCOUNT. As root, after weston, GNOME or Plasma has been started for the
+# account: waits up to 120 s for its Wayland socket, then says on the
+# serial port "guesthouse: first start ok", once after each install of the
+# driver package (install.sh removes the mark), and what renderer weston
+# (or GNOME Shell, or KWin) took, and the keyboard layouts it and the console
+# have. Never fails the unit.
+account=$1
+mark=/var/lib/guesthouse/first-start-ok
+uid=$(id -u "$account" 2>/dev/null) || exit 0
+socket=/run/user/$uid/wayland-0
+serial() { echo "guesthouse: $*" > /dev/ttyAMA0 2>/dev/null; echo "guesthouse: $*"; }
+i=0
+while [ ! -S "$socket" ] && [ $i -lt 600 ]; do sleep 0.2; i=$((i + 1)); done
+if [ ! -S "$socket" ]; then
+	echo "guesthouse: weston has no socket after 120 s"
+	exit 0
+fi
+# The renderer weston names in its log, through the journal; for GNOME
+# Shell and KWin, whose logs name none, the Mesa they have loaded.
+sleep 1
+for name in gnome-shell kwin_wayland; do
+	shell=$(pgrep -u "$account" -x $name | head -1)
+	[ -n "$shell" ] && break
+done
+if [ -n "$shell" ]; then
+	if grep -q /opt/pvg-mesa/lib/libgallium "/proc/$shell/maps" 2>/dev/null; then
+		renderer="our Mesa in $name"
+	else
+		renderer="not our Mesa in $name"
+	fi
+else
+	renderer=$(journalctl -b -q -o cat _COMM=weston 2>/dev/null |
+		sed -n 's/^.*GL renderer: *//p; s/^.*Using \(Pixman\|pixman\) renderer.*/pixman/p' | tail -1)
+fi
+if [ ! -e "$mark" ]; then
+	mkdir -p /var/lib/guesthouse
+	serial "first start ok"
+	touch "$mark"
+fi
+# The layout the desktop was given (from the Mac's, by its prepare script), and the console's.
+[ -n "$shell" ] || name=weston
+case $name in
+gnome-shell) keyboard=$(sed -n "s/^sources=\[('xkb', '\(.*\)')\]/\1/p" /etc/dconf/db/guesthouse.d/00-keyboard 2>/dev/null) ;;
+kwin_wayland) keyboard=$(sed -n 's/^LayoutList=//p' /etc/xdg/kxkbrc 2>/dev/null) ;;
+*) keyboard=$(sed -n 's/^keymap_layout=//p' /run/guesthouse/weston.ini 2>/dev/null) ;;
+esac
+console=$(sed -n 's/^XKBLAYOUT=//p' /etc/default/keyboard 2>/dev/null | tr -d '"')
+serial "desktop up for $account, renderer ${renderer:-unknown}, keyboard ${keyboard:-unknown}, console ${console:-unknown}"
+exit 0

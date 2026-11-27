@@ -1,0 +1,13 @@
+Package: guesthouse-plasma
+Version: @VERSION@
+Architecture: all
+Maintainer: Guesthouse contributors <144541403+s3k000@users.noreply.github.com>
+Depends: guesthouse-desktop (= @VERSION@), sddm, kde-plasma-desktop, plasma-workspace, konsole, dolphin, kwrite, systemsettings, kscreen, python3
+Conflicts: guesthouse-gnome
+Section: kde
+Priority: optional
+Description: Guesthouse: KDE Plasma on the Mac's graphics device
+ Plasma (KWin on Wayland) in place of weston, through our Mesa (Zink on
+ KosmicKrisp), signed in at boot by SDDM as the account the install made, at
+ the scale the Mac app gives and with a German keyboard. Removing this package
+ gives the weston desktop back.
