@@ -241,9 +241,10 @@ fn installer_boot(folder: &Path, settings: &Settings) -> Option<InstallerBoot> {
 pub const SCREEN_MODE_FILE: &str = "screen-mode";
 
 /// The modes of a machine whose file names none. Windows' are run.sh's, the smallest first, as
-/// they always were. A Linux guest's desktop comes up in the first: the size its screen window
-/// last had, then the others largest first, so it starts at a size worth showing before the
-/// window, if any, gives its own.
+/// they always were. A Linux guest's desktop comes up in the size its screen window last had,
+/// with only the modes no larger behind it: a guest's driver or compositor may take the largest
+/// whatever the order, as pvg-host's own window knows. With no size kept, run.sh's largest
+/// first, so it starts at a size worth showing before the window, if any, gives its own.
 fn default_modes(folder: &Path, kind: &str) -> Vec<String> {
     let mut modes: Vec<String> = DEFAULT_MODES.iter().map(|mode| mode.to_string()).collect();
     if kind != LINUX {
@@ -252,11 +253,22 @@ fn default_modes(folder: &Path, kind: &str) -> Vec<String> {
     modes.reverse();
     let last = fs::read_to_string(folder.join(SCREEN_MODE_FILE)).unwrap_or_default();
     let last = last.trim();
-    if is_mode(last) {
-        modes.retain(|mode| mode != last);
+    if let Some((width, height)) = mode_size(last) {
+        modes.retain(|mode| {
+            mode_size(mode).is_some_and(|(w, h)| w <= width && h <= height) && mode != last
+        });
         modes.insert(0, last.to_string());
     }
     modes
+}
+
+/// The width and height of `text` when it is a mode a guest can be given.
+fn mode_size(text: &str) -> Option<(u32, u32)> {
+    is_mode(text).then(|| {
+        let (size, _) = text.split_once('@').unwrap_or_default();
+        let (width, height) = size.split_once('x').unwrap_or_default();
+        (width.parse().unwrap_or(0), height.parse().unwrap_or(0))
+    })
 }
 
 /// Whether `text` is a mode a guest can be given: `WxH@R`, at least 320 by 200 and at most what
@@ -642,15 +654,17 @@ mod tests {
                 "640x480@60"
             ]
         );
-        // One of the list moves to the front, once.
+        // Behind a smaller one only what is no larger, once: the guest may take the largest.
         remember_screen_mode(&folder, "linux", "1280x800@60").unwrap();
         assert_eq!(
             modes(&machines),
-            ["1280x800@60", "1920x1080@60", "1024x768@60", "640x480@60"]
+            ["1280x800@60", "1024x768@60", "640x480@60"]
         );
+        remember_screen_mode(&folder, "linux", "1600x700@60").unwrap();
+        assert_eq!(modes(&machines), ["1600x700@60", "640x480@60"]);
         // What is no mode is neither written nor read.
         remember_screen_mode(&folder, "linux", "banana").unwrap();
-        assert_eq!(modes(&machines)[0], "1280x800@60");
+        assert_eq!(modes(&machines)[0], "1600x700@60");
         fs::write(folder.join(SCREEN_MODE_FILE), "99999x1@60\n").unwrap();
         assert_eq!(modes(&machines)[0], "1920x1080@60");
     }
