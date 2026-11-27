@@ -10,6 +10,10 @@
 //! A session is locked only for a moment, never while the guest is asked something, so a screen
 //! can always be shown what was last read.
 //!
+//! A host that keeps pairing's time itself and says what happens drives its machine's pairing with
+//! [`Driver::host_says`] and [`Driver::host_event`] instead, which read nothing and run no clock; such
+//! a pairing is never given to [`Driver::step`], whose readings are for a host that answers `status`.
+//!
 //! A step ends. Pairing sends a command again only when a reading still shows what the command was
 //! to change, so a guest whose status never shows a command taken, or a stale reading, would have
 //! it sent for ever. A step sends the same commands at most [`SAME_COMMANDS_PER_STEP`] times, once
@@ -21,6 +25,7 @@
 //! may or may not have run, so it is never sent again blind: the next step reads the host first.
 
 use crate::ctl::{self, Ack, Words, parse_ack};
+use crate::events::PairingEvent;
 use crate::pairing::{Event, HostWide, Millis, Pairing};
 use crate::policy::Policy;
 use crate::share::{ShareInfo, ShareState};
@@ -46,6 +51,14 @@ pub const ROUNDS_PER_STEP: usize = 16;
 /// or may not have run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Unanswered(pub String);
+
+/// A command did not reach a host that is told words and answers with events, with why: it has no
+/// way to say them, or it was not there to take them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotDelivered(pub String);
+
+/// What is said when the host is told something for a pairing that is read from its status.
+pub const NOT_HOST_TIMED: &str = "This machine's pairing is read from its host's status, not told.";
 
 /// What is said when a step would act while the guest has not answered since a command that may
 /// or may not have run.
@@ -82,6 +95,15 @@ pub trait Guest {
 
     /// Writes one line in the host's log.
     fn log(&self, line: &str);
+
+    /// Gives one command to a host that is told words and answers with events (a host that keeps
+    /// pairing's time itself, see [`Driver::host_says`]), and says only whether it was given. The
+    /// effect comes back as one of the host's events, not as an answer. Words the host has no way to
+    /// say are [`NotDelivered`], with why. A host that answers instead has this from [`Guest::ctl`],
+    /// with the answer dropped.
+    fn send(&self, words: &Words) -> Result<(), NotDelivered> {
+        self.ctl(words).map(|_| ()).map_err(|why| NotDelivered(why.0))
+    }
 
     /// What an earlier run wrote down of [`Pairing::held`]. A host with nowhere to keep it gives
     /// nothing. It is asked with the sessions locked, so it must not touch them.
@@ -340,6 +362,63 @@ impl Driver<'_> {
         self.step(StepEvent::Read);
     }
 
+    /// A fresh [`Pairing::host_timed`] for this run, with what the host kept of an earlier one.
+    pub fn fresh_host_timed(&self) -> Pairing {
+        Pairing::host_timed(self.policy.clone()).step(0, Event::Started { held: self.guest.held() }).pairing
+    }
+
+    /// For a host that keeps pairing's time itself and says what happens: feeds it what the host
+    /// said, at the driver's `now`, and gives the host the commands that follow. Nothing is read
+    /// and no clock runs for the pairing. A machine with no pairing yet gets a host-timed one. Gives
+    /// why it was not taken: only for a pairing that is read from the host's status.
+    ///
+    /// Feed the events in the order the host said them. When the host's process ends, feed
+    /// `PairingClosed { reason: Other }`, and call [`Driver::host_started`] for the next one.
+    pub fn host_says(&self, said: &PairingEvent) -> Option<String> {
+        self.host_step(|pairing, now| pairing.host_says(now, said))
+    }
+
+    /// For a host-timed pairing: a person's event (open, accept, decline, stop, the switch off,
+    /// quitting), its commands given to the host with [`Guest::send`]. [`Event::Reading`] and
+    /// [`Event::Tick`] change nothing for it. Gives why it was refused, as [`Driver::step`] does.
+    pub fn host_event(&self, event: Event) -> Option<String> {
+        self.host_step(|pairing, now| pairing.step(now, event))
+    }
+
+    /// The host that keeps pairing's time started (again): whatever it had open is gone with the
+    /// process that had it, and a fresh host-timed pairing takes its place.
+    pub fn host_started(&self) {
+        let fresh = self.fresh_host_timed();
+        let held = fresh.held();
+        self.sessions.with(self.machine, |session| session.pairing = Some(fresh));
+        self.guest.keep_held(held);
+    }
+
+    /// What a screen shows now, from the machine's session (see [`Session::shown`]).
+    pub fn shown(&self, state: ShareState, port: Option<u16>, reason: Option<String>) -> ShareInfo {
+        self.sessions
+            .with(self.machine, |session| session.shown(self.machine, self.policy, state, port, reason))
+    }
+
+    fn host_step(&self, step: impl FnOnce(&Pairing, Millis) -> crate::pairing::Step) -> Option<String> {
+        let pairing = self.sessions.with(self.machine, |session| {
+            session.pairing.get_or_insert_with(|| self.fresh_host_timed()).clone()
+        });
+        if !pairing.is_host_timed() {
+            return Some(NOT_HOST_TIMED.to_string());
+        }
+        let step = step(&pairing, (self.now)());
+        self.sessions.with(self.machine, |session| session.pairing = Some(step.pairing.clone()));
+        self.guest.keep_held(step.pairing.held());
+        for words in &step.commands {
+            // The state follows what the host says next, not whether a command went.
+            if let Err(why) = self.guest.send(words) {
+                self.guest.log(&format!("{}: {}", words.join(" "), why.0));
+            }
+        }
+        step.refused
+    }
+
     /// How soon to read again, while pairing is open or a device waits.
     pub fn poll_ms(&self) -> Option<Millis> {
         let all = self.sessions.all.lock().unwrap_or_else(PoisonError::into_inner);
@@ -349,3 +428,5 @@ impl Driver<'_> {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_host;

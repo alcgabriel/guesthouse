@@ -23,12 +23,31 @@
 //!   The host takes the features it offers when a device connects, not when it is let in, so this
 //!   has to start with the opening and not with the device's arrival.
 //!
+//! A host that keeps pairing's time itself, closes it itself and says what happened (pairing
+//! opened until a time, a device waits, a device paired, pairing closed and why) has a pairing of
+//! its own kind, [`Pairing::host_timed`]. It is fed what the host said with [`Pairing::host_says`],
+//! and the person's events as above; readings are not needed. Its rules:
+//! - It starts closed, as nothing is known to be open, and needs no reading before opening.
+//! - Opening sends `pair on SECONDS` ([`ctl::pair_open_for`]) so the host knows the time, and again
+//!   for a new time while open. Until the host says its own end, the end shown is the one asked for.
+//! - Time never closes it, and no reading is asked for: the host says when it closed. [`Event::Tick`]
+//!   does nothing, and it is not polled.
+//! - What the host says wins. Pairing opened ends a device's wait, a device that waits ends an
+//!   opening, a device paired closes it as `paired`, and pairing closed closes it for that reason.
+//! - Said again, the same thing changes nothing more: an opening gets the end said last, a device
+//!   that waits the seconds said last, and a pairing closed or paired already stays as it is. A
+//!   pairing closed that follows a device paired stays `paired`, whatever reason it gives.
+//! - Said out of order, a device paired after pairing closed for another reason makes it `paired`,
+//!   and pairing closed with nothing open is kept as the reason only when none is known yet.
+//! - [`Event::Started`] keeps it host-timed and closed, for a host that started again.
+//!
 //! Nothing here can be rebuilt from a reading alone except what a reading shows: a device waiting,
 //! pairing left open, the devices. What was held (see [`Pairing::held`]) and a device let in whose
 //! limits were not yet sent are lost if the program ends there, so a program that wants them keeps
 //! `held`.
 
 use crate::ctl::{self, Words};
+use crate::events::PairingEvent;
 use crate::policy::Policy;
 use crate::share::{CloseReason, Pending, pairing_seconds};
 use crate::status::Status;
@@ -141,6 +160,8 @@ enum Phase {
 struct Outcome {
     reason: CloseReason,
     paired: Option<String>,
+    /// The fingerprint of the device that paired.
+    fingerprint: Option<String>,
 }
 
 /// Where pairing stands.
@@ -154,6 +175,8 @@ pub struct Pairing {
     host_wide: (Option<bool>, Option<bool>),
     held: Option<HostWide>,
     outcome: Option<Outcome>,
+    /// The host keeps the time and says what happens (see the module's top).
+    host_timed: bool,
 }
 
 /// What a screen needs of pairing.
@@ -181,7 +204,29 @@ impl Pairing {
             host_wide: (None, None),
             held: None,
             outcome: None,
+            host_timed: false,
         }
+    }
+
+    /// A pairing for a host that keeps pairing's time itself and says what happens, fed with
+    /// [`Pairing::host_says`] (see the module's top). It starts closed.
+    pub fn host_timed(policy: Policy) -> Pairing {
+        Pairing { phase: Phase::Closed, host_timed: true, ..Pairing::new(policy) }
+    }
+
+    /// Whether this is a [`Pairing::host_timed`] one.
+    pub fn is_host_timed(&self) -> bool {
+        self.host_timed
+    }
+
+    /// What follows from what the host said, at time `now`. Nothing here is refused: the host has
+    /// done it already. The commands are what the policy asks once a device is let in, and the
+    /// host-wide switches given back.
+    pub fn host_says(&self, now: Millis, said: &PairingEvent) -> Step {
+        let mut next = self.clone();
+        let mut commands = Vec::new();
+        next.host_said(now, said, &mut commands);
+        Step { pairing: next, commands, read_now: false, refused: None }
     }
 
     pub fn policy(&self) -> &Policy {
@@ -207,6 +252,9 @@ impl Pairing {
     /// How often to read the status now, or `None` when nothing needs it sooner than the program's
     /// own pace.
     pub fn poll_ms(&self) -> Option<Millis> {
+        if self.host_timed {
+            return None;
+        }
         match self.phase {
             Phase::Open(_) | Phase::Waiting(_) | Phase::Accepted(..) => Some(POLL_MS),
             Phase::Unknown | Phase::Closed => None,
@@ -249,6 +297,9 @@ impl Pairing {
             Event::Stop => work.next.stop(&mut work.commands, &mut work.refused),
             Event::Tick => work.next.tick(now, &mut work.read_now),
             Event::SwitchOff | Event::Shutdown => work.next.end(&mut work.commands),
+            Event::Started { held } if self.host_timed => {
+                work.next = Pairing { held, ..Pairing::host_timed(self.policy.clone()) };
+            }
             Event::Started { held } => {
                 work.next = Pairing { held, ..Pairing::new(self.policy.clone()) };
             }
@@ -276,15 +327,19 @@ impl Pairing {
         match &mut self.phase {
             Phase::Unknown => *refused = Some(NOT_READ_YET.to_string()),
             Phase::Waiting(_) | Phase::Accepted(..) => *refused = Some(DEVICE_WAITING.to_string()),
-            // Again while it is open sets a new end, with nothing sent: it is open already.
+            // Again while it is open sets a new end, with nothing sent: it is open already. A host
+            // that keeps the time is told the new one.
             Phase::Open(opening) => {
                 *opening =
-                    Opening { left_ms: limit, counted_to: now, expired: false, quiet: 0, ..opening.clone() }
+                    Opening { left_ms: limit, counted_to: now, expired: false, quiet: 0, ..opening.clone() };
+                if self.host_timed {
+                    commands.push(ctl::pair_open_for(seconds));
+                }
             }
             Phase::Closed => {
                 self.outcome = None;
                 self.hold(commands);
-                commands.push(ctl::pair_open());
+                commands.push(if self.host_timed { ctl::pair_open_for(seconds) } else { ctl::pair_open() });
                 self.phase = Phase::Open(Opening {
                     left_ms: limit,
                     counted_to: now,
@@ -350,6 +405,9 @@ impl Pairing {
     }
 
     fn tick(&mut self, now: Millis, read_now: &mut bool) {
+        if self.host_timed {
+            return;
+        }
         let Phase::Open(opening) = &mut self.phase else { return };
         if opening.expired {
             return;
@@ -366,7 +424,7 @@ impl Pairing {
     /// Ends this pairing for `reason`, giving back what was held.
     fn close(&mut self, reason: CloseReason, paired: Option<String>, commands: &mut Commands) {
         self.phase = Phase::Closed;
-        self.outcome = Some(Outcome { reason, paired });
+        self.outcome = Some(Outcome { reason, paired, fingerprint: None });
         self.restore(commands);
     }
 
@@ -410,6 +468,9 @@ impl Pairing {
             commands.extend(self.policy.device_allow(fingerprint, what, false));
         }
         self.close(CloseReason::Paired, Some(name.to_string()), commands);
+        if let Some(outcome) = &mut self.outcome {
+            outcome.fingerprint = Some(fingerprint.to_string());
+        }
     }
 
     /// A waiting device went without appearing: its time was up, or it was turned away.
@@ -518,6 +579,76 @@ impl Pairing {
         self.phase = Phase::Open(opening);
     }
 
+    /// What the host said, for a host-timed pairing (see the module's top).
+    fn host_said(&mut self, now: Millis, said: &PairingEvent, commands: &mut Commands) {
+        match said {
+            PairingEvent::PairingOpen { until_unix_seconds } => {
+                let end = until_unix_seconds.saturating_mul(1000);
+                let left_ms = end.saturating_sub(now);
+                match &mut self.phase {
+                    Phase::Open(opening) => {
+                        *opening = Opening { left_ms, counted_to: now, expired: false, ..opening.clone() }
+                    }
+                    _ => {
+                        if self.held.is_none() {
+                            self.hold(commands);
+                        }
+                        self.outcome = None;
+                        self.phase = Phase::Open(Opening {
+                            left_ms,
+                            counted_to: now,
+                            opened_at: now,
+                            seen_open: true,
+                            quiet: 0,
+                            expired: false,
+                        });
+                    }
+                }
+            }
+            PairingEvent::DeviceWaits { name, fingerprint, code, seconds } => {
+                let pending = Pending {
+                    name: name.clone(),
+                    fingerprint: fingerprint.clone(),
+                    code: code.clone(),
+                    seconds: u64::from(*seconds),
+                };
+                let device = Device { pending, seen_at: now };
+                match &self.phase {
+                    // Accepted already: it stays so, with what the host said last.
+                    Phase::Accepted(before, since) if before.pending.fingerprint == *fingerprint => {
+                        self.phase = Phase::Accepted(device, *since)
+                    }
+                    _ => {
+                        if self.held.is_none() {
+                            self.hold(commands);
+                        }
+                        self.outcome = None;
+                        self.phase = Phase::Waiting(device);
+                    }
+                }
+            }
+            PairingEvent::Paired { fingerprint, name } => {
+                let fingerprint = fingerprint.to_ascii_lowercase();
+                let again = self.outcome.as_ref().is_some_and(|outcome| {
+                    outcome.reason == CloseReason::Paired
+                        && outcome.fingerprint.as_deref() == Some(&fingerprint)
+                });
+                if !again {
+                    self.paired(&fingerprint, name, commands);
+                }
+            }
+            PairingEvent::PairingClosed { reason } => {
+                if self.busy() {
+                    self.close(*reason, None, commands);
+                } else if self.outcome.is_none() {
+                    self.phase = Phase::Closed;
+                    self.outcome = Some(Outcome { reason: *reason, paired: None, fingerprint: None });
+                    self.restore(commands);
+                }
+            }
+        }
+    }
+
     /// A device is waiting that this did not see come: it is answered from here.
     fn adopt(&mut self, now: Millis, pending: &Pending, commands: &mut Commands) {
         if self.held.is_none() {
@@ -530,6 +661,8 @@ impl Pairing {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_host_timed;
 #[cfg(test)]
 mod tests_policy;
 #[cfg(test)]
