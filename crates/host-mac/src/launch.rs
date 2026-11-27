@@ -8,9 +8,10 @@
 //! process's command line and `qemu_args` makes QEMU's for either path, by `Launch::graphics`.
 //! Lines of run.sh that are only for debugging (the `-trace` options) are left out.
 //!
-//! A Linux machine (`kind` `linux`) gets two things more: QEMU's user-mode network with a
-//! virtio card, which its packages come over, and the scale its desktop should draw at, as a firmware file the guest
-//! reads (`SCALE_FILE`). A Windows machine's line is run.sh's, as before.
+//! A Linux machine (`kind` `linux`) gets three things more: QEMU's user-mode network with a
+//! virtio card, which its packages come over; its clock in UTC, as Linux keeps it; and the
+//! scale its desktop should draw at, as a firmware file the guest reads (`SCALE_FILE`). A
+//! Windows machine's line is run.sh's, as before.
 
 use std::path::{Path, PathBuf};
 
@@ -191,7 +192,8 @@ pub fn qemu_args(launch: &Launch) -> Vec<String> {
     } else {
         add(&["-nic", "none"]);
     }
-    add(&["-rtc", "base=localtime"]);
+    // Windows keeps the clock in local time, Linux in UTC.
+    add(&["-rtc", if linux { "base=utc" } else { "base=localtime" }]);
     if linux {
         add(&[
             "-fw_cfg",
@@ -472,7 +474,8 @@ mod tests {
     }
 
     /// A Linux machine's line is the Windows one with the user-mode network and its card in
-    /// place of `-nic none` and the scale file after `-rtc`, on either path; nothing else moves.
+    /// place of `-nic none`, the clock in UTC and the scale file after `-rtc`, on either path;
+    /// nothing else moves.
     #[test]
     fn a_linux_machine_gets_a_network_and_its_scale_and_nothing_else_changes() {
         for (graphics, windows) in [
@@ -498,6 +501,8 @@ mod tests {
             ];
             want.splice(nic..nic + 2, network.map(String::from));
             let rtc = want.iter().position(|arg| arg == "-rtc").unwrap();
+            assert_eq!(want[rtc + 1], "base=localtime");
+            want[rtc + 1] = "base=utc".into();
             let scale = ["-fw_cfg", "name=opt/com.ruxn.guesthouse/scale,string=1"];
             want.splice(rtc + 2..rtc + 2, scale.map(String::from));
             for (index, (got, want)) in got.iter().zip(&want).enumerate() {
