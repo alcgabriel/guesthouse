@@ -74,10 +74,7 @@ fn password_hash(file: &Path) -> Result<String> {
 }
 
 /// The answers, with this machine's account and secrets and the kernel on its ISO.
-pub fn fill_template(template: &str, user: &str, hash: &str, key: &str, kernel_package: &str) -> String {
-    let filled = template.replace("@USER@", user).replace("@PASSWORD_HASH@", hash).replace("@SSH_KEY@", key);
-    filled.replace("@KERNEL_PACKAGE@", kernel_package)
-}
+pub use guesthouse_answers_core::linux_host::ubuntu::fill_template;
 
 fn make_payload(sources: &Path, folder: &Path) -> Result<PathBuf> {
     let payload = folder.join("payload");

@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// The app's, and the report words it shares with the other hosts.
-const SOURCES: [&str; 3] = ["src", "../app/src", "../report/src"];
+const SOURCES: [&str; 4] = ["src", "../app/src", "../report/src", "../answers/src"];
 /// Holds the format of `pci.ids`, which has two spaces in it on purpose.
 const NOT_FOR_READING: &str = "cards.rs";
 const TESTS_START: &str = "#[cfg(test)]";

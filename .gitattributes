@@ -6,3 +6,8 @@ crates/app-core/tests/report-golden/** -text
 crates/control/tests/report-golden/** -text
 crates/app-core/tests/answers-golden/** -text
 crates/host-windows/tests/answers-golden/** -text
+# The Linux host's answer-file templates and zone table, which the shared answers crate holds as text, keep
+# their line endings on any checkout.
+guest/autounattend.xml text eol=lf
+linux/setup/seed/** text eol=lf
+crates/answers/data/** text eol=lf
