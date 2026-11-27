@@ -12,6 +12,7 @@
 
 mod nv_files;
 mod nv_store;
+mod screen;
 
 use std::fs;
 use std::path::{Path, PathBuf};
