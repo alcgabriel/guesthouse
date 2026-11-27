@@ -4,13 +4,34 @@ This is the Mac app: `mac/` is the SwiftUI app, `crates/host-mac/` its Rust core
 
 It is a preview, and some of it isn't here yet. Here is what the app needs that this repo doesn't hold:
 
-- `guesthouse-pvg-host`, the graphics process, and the library it uses to talk to the guest's driver. They come in their own pull requests.
-- A QEMU with the `pvg-fwd` device, from a patch that comes with the graphics process.
 - A Windows guest driver and its package, signed for testing. The package isn't published, so an install stops at its driver step and offers to go on without it.
 
-The app finds all three through its Settings, an environment variable (`GUESTHOUSE_QEMU`, `GUESTHOUSE_PVG_QEMU`, `GUESTHOUSE_PVG_HOST`, `GUESTHOUSE_RMHOST`), or inside its own bundle.
+The graphics process and the QEMU it needs are here now: `crates/pvg-host`, `crates/pvg-sys` and `qemu/mac/`, below. They aren't in the app yet. The app finds them, and QEMU and rmhost, through its Settings, an environment variable (`GUESTHOUSE_QEMU`, `GUESTHOUSE_PVG_QEMU`, `GUESTHOUSE_PVG_HOST`, `GUESTHOUSE_RMHOST`), or inside its own bundle.
 
-The graphics process uses three classes of Apple's ParavirtualizedGraphics framework that Apple doesn't declare, as QEMU's patch that lists them does. A macOS update can break them. Guesthouse isn't affiliated with Apple, and the app isn't distributed through the App Store.
+The graphics process uses three classes of Apple's ParavirtualizedGraphics framework that Apple doesn't declare: `PGMemoryMapDescriptor`, `PGIOSurfaceHostDeviceDescriptor` and `PGIOSurfaceHostDevice`, declared as QEMU's patch that lists them declares them. It also calls `reset` on the last, which no header or patch names. None of that is a public interface, so a macOS update can break it. Guesthouse isn't affiliated with Apple, and the app isn't distributed through the App Store.
+
+## How the pieces fit
+
+Four programs run for one machine.
+
+- The app, `mac/`, shows the machines and their screens. It doesn't run a machine itself.
+- The agent, `mac/Agent` on the core in `crates/host-mac`, owns the running machines, so they carry on when the app quits. It starts QEMU and the graphics process for each machine and talks to both over sockets.
+- `guesthouse-pvg-host`, the graphics process in `crates/pvg-host`, one per machine. It holds the machine's graphics device, which is macOS's own, from the ParavirtualizedGraphics framework. That device was written for Apple's own guest driver and trusts it in places: a few things a guest can say end the process the device is in. So nothing the guest says reaches the device before the guard in `crates/pvg-sys` has read it: every register write, and every command in the guest's rings. If the guard refuses something, the device never sees it. If the device dies anyway, it's this process that goes, not QEMU or the agent. It hands the guest's picture to the app as IOSurfaces, through `rmframes`, with no copy on the way.
+- QEMU, with the `pvg-fwd` device from `qemu/mac/`. The machine's RAM is shared memory. `pvg-fwd` shows the guest a PCI device and forwards its register reads and writes over a socket to the graphics process, which maps the same RAM. The interrupts come back the same way.
+
+The guard knows one macOS build at a time. The device's registers and commands aren't published, so `crates/pvg-sys/src/profile.rs` holds what was seen on each build it knows, and on a build it doesn't know the graphics process won't start. Today that's macOS 27.2.1 (26B131) only. A new macOS build needs a look at the device and a profile before machines on it have a screen.
+
+To build the two programs for the app:
+
+```sh
+brew install glib pixman ninja pkgconf
+sh qemu/mac/build.sh
+sh mac/build-pvg-host.sh
+```
+
+That leaves QEMU, the libraries it needs and the graphics process in `target/mac-helpers/helpers/`, and QEMU's firmware and licences in `target/mac-helpers/qemu/`. [qemu/mac/README.md](../qemu/mac/README.md) says what the patches are and what isn't done yet.
+
+The graphics process and the guard are s3k000's work.
 
 See `mac/README.md` for how to build it.
 
