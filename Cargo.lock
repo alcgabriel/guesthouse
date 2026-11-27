@@ -917,6 +917,7 @@ version = "0.11.0"
 dependencies = [
  "guesthouse-backend-intel",
  "guesthouse-backend-nvidia",
+ "guesthouse-basics",
  "guesthouse-card-check",
  "guesthouse-daemon",
  "guesthouse-jail",
@@ -999,6 +1000,14 @@ version = "0.11.0"
 dependencies = [
  "guesthouse-backend",
  "guesthouse-messages",
+]
+
+[[package]]
+name = "guesthouse-basics"
+version = "0.11.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -22,6 +22,7 @@ They're in `crates/`, listed here from the bottom up. Each depends only on crate
 
 | Crate | Its job |
 |---|---|
+| `basics` | Small pieces every host shares that belong to no one subject, each a value in and a value out or a plain file, moved from a host as they were and still reachable at their old paths there. Its package is `guesthouse-basics`. |
 | `transport` | The byte stream from QEMU: frames, packet kinds, guest page ranges. |
 | `messages` | What the guest's messages look like, and how to write the answers. No state, no decisions. |
 | `sensors` | The host card's newest readings, each process's part of an NVIDIA card, and each guest's video memory by its daemon's books, in small files any process of the user can read. |
@@ -267,6 +268,8 @@ So most of what sits above the OS exists once per host. Machine files, settings 
 These crates are shared. `guesthouse-jail` is built on by the Linux daemon, `app-core` and `host-windows`. `guesthouse-remote-view-core` (`crates/remote-view`) is the first piece with no OS or hypervisor calls that the Linux and Windows hosts both build on: a guest's screen through remoteman, with the state types, remoteman's control words and status parsing, pairing as a state machine and the driver that runs it against a guest through a `Guest` trait, the switch and the wording. `guesthouse-relay` is the network side of the same view, built for both, with the guest's port as any address: QEMU's loopback forward on Linux, the guest's own address on Windows. The Linux host's app and the Windows service run the same pairing driver over a `Guest` of their own: the Linux agent, and on Windows the guest's serial port. Its names and shapes were taken from the macOS host's design so all three agree, and the macOS host is to build on the crate too rather than keep its own copy.
 
 `guesthouse-report-core` (`crates/report`) is another: bug reports, which the Linux and Windows hosts each had a copy of. The report server's contract, the kinds of problem, the summary and its header, the curl arguments and the reading of the answer, the manifest, the names of a report's own files and what to say before a thin report is sent are now one copy both build on, and the Windows host's scrubber, file cutting and UTC clock moved there unchanged. The rest is still each host's: what it gathers and how it packs and sends, the Linux host's scrubber and log cutting, and the sizes each starts a file at. Where the hosts still differ, each host's way is kept, behind a name or a value of its own: the Linux host's issue link also carries the tester's words and a few lines of the app's log, and the Windows host's only the facts that sort a report, and the two scrubbers take out different things. Golden copies in `app-core/tests/report-golden` and `control/tests/report-golden`, made before the move, show both hosts' reports unchanged.
+
+Small pieces that belong to no one subject go in `guesthouse-basics` (`crates/basics`), so a host takes them without the rest of a subject's crate.
 
 The direction is one core for every host:
 

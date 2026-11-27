@@ -11,6 +11,7 @@ default-members = [
     "crates/backend-intel",
     "crates/backend-nvidia",
     "crates/backend-standin",
+    "crates/basics",
     "crates/clock-helper",
     "crates/control",
     "crates/core",
@@ -65,6 +66,7 @@ guesthouse-relay = { path = "crates/relay" }
 guesthouse-host-windows = { path = "crates/host-windows" }
 guesthouse-remote-view-core = { path = "crates/remote-view" }
 guesthouse-report-core = { path = "crates/report" }
+guesthouse-basics = { path = "crates/basics" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
