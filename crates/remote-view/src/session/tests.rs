@@ -18,6 +18,10 @@ struct Fake {
     held: Cell<Option<HostWide>>,
     /// Every `held` kept, with how many commands had gone out when it was.
     kept: RefCell<Vec<(Option<HostWide>, usize)>>,
+    /// Commands the host says `ok` to and doesn't do, this many times, by their words joined.
+    ignored: RefCell<Vec<(&'static str, usize)>>,
+    /// Lines whose answer is lost on the way, once each: the command still runs when `ran`.
+    lost: RefCell<Vec<(&'static str, bool)>>,
 }
 
 impl Fake {
@@ -49,17 +53,29 @@ impl Fake {
 }
 
 impl Guest for Fake {
-    fn ctl(&self, words: &Words) -> String {
+    fn ctl(&self, words: &Words) -> Result<String, Unanswered> {
         let line = words.join(" ");
         self.asked.borrow_mut().push(line.clone());
+        let lost = self.lost.borrow().iter().position(|(lost, _)| *lost == line);
+        let lost = lost.map(|at| self.lost.borrow_mut().remove(at).1);
+        if lost == Some(false) {
+            return Err(Unanswered("no answer".into()));
+        }
         if line == "status" {
-            return self.status.borrow().clone();
+            return Ok(self.status.borrow().clone());
         }
         let answer = self.answers.iter().find(|(asked, _)| *asked == line).map(|(_, said)| *said);
-        if answer.is_none() {
-            self.obey(words);
+        let mut ignored = self.ignored.borrow_mut();
+        let ignore = ignored.iter_mut().find(|(asked, times)| *asked == line && *times > 0);
+        match (answer, ignore) {
+            (Some(_), _) => {}
+            (None, Some((_, times))) => *times -= 1,
+            (None, None) => self.obey(words),
         }
-        answer.unwrap_or("ok").to_string()
+        if lost.is_some() {
+            return Err(Unanswered("the answer was cut short".into()));
+        }
+        Ok(answer.unwrap_or("ok").to_string())
     }
 
     fn log(&self, line: &str) {
@@ -80,7 +96,7 @@ impl Guest for Fake {
 struct Forgetful(Fake);
 
 impl Guest for Forgetful {
-    fn ctl(&self, words: &Words) -> String {
+    fn ctl(&self, words: &Words) -> Result<String, Unanswered> {
         self.0.ctl(words)
     }
 
@@ -270,4 +286,157 @@ fn sessions_are_kept_by_machine_and_forgotten_when_removed() {
     assert_eq!(machines, ["one", "two"]);
     sessions.remove("one");
     assert!(!sessions.with("one", |session| session.busy));
+}
+
+/// The hang this bound is for: a host that says `ok` to `pair off` and keeps saying pairing is
+/// open. The step ends, having sent it no more than allowed, says so, and the give-back that went
+/// out is not owed again.
+#[test]
+fn a_guest_that_never_shows_a_command_taken_ends_the_step_within_the_bound() {
+    let open = r#"{"pairing":true,"clipboard":false,"files":false,"devices":[]}"#;
+    let (sessions, policy) = (Sessions::default(), Policy::linux());
+    let guest = Fake { ignored: RefCell::new(vec![("pair off", usize::MAX)]), ..Fake::saying(open) };
+    guest.held.set(Some(HostWide { clipboard: true, files: true }));
+    let clock = || 10_000;
+    let driver = driver(&sessions, &policy, &guest, &clock);
+    sessions.with("win", |session| session.pairing = Some(driver.fresh_pairing()));
+    let why = driver.step(StepEvent::Read).expect("the step says why it stopped");
+    assert!(why.starts_with("The guest did not take pair off."), "{why}");
+    let offs = guest.sent().iter().filter(|line| *line == "pair off").count();
+    // Once with the give-back, then on its own once and once more.
+    assert_eq!(offs, 1 + SAME_COMMANDS_PER_STEP, "{:?}", guest.sent());
+    assert_eq!(guest.held.get(), None, "the give-back went out");
+    assert!(guest.logged.borrow().contains(&why));
+    // The next reading asks again, and is bounded again.
+    assert!(driver.step(StepEvent::Read).is_some());
+}
+
+#[test]
+fn a_guest_that_shows_it_on_the_second_reading_ends_the_step_well() {
+    let open = r#"{"pairing":true,"clipboard":true,"files":true,"devices":[]}"#;
+    let (sessions, policy) = (Sessions::default(), Policy::linux());
+    let guest = Fake { ignored: RefCell::new(vec![("pair off", 1)]), ..Fake::saying(open) };
+    let clock = || 10_000;
+    let driver = driver(&sessions, &policy, &guest, &clock);
+    sessions.with("win", |session| session.pairing = Some(driver.fresh_pairing()));
+    assert_eq!(driver.step(StepEvent::Read), None);
+    assert_eq!(guest.sent(), ["pair off", "pair off"]);
+    assert!(guest.logged.borrow().is_empty());
+}
+
+/// The answer to `allow files off` is lost: the clipboard went off and the files may have. The step
+/// stops before `pair on`, both are owed back, and the next step reads before it acts.
+#[test]
+fn an_unanswered_command_stops_the_step_and_keeps_owing_what_may_be_off() {
+    let (sessions, policy) = (Sessions::default(), Policy::linux());
+    let guest = Fake { lost: RefCell::new(vec![("allow files off", true)]), ..Fake::saying(IDLE) };
+    let clock = || 1_000_000;
+    let driver = driver(&sessions, &policy, &guest, &clock);
+    let why = driver.open_pairing(120).expect("the step says why it stopped");
+    assert!(why.starts_with("The guest did not answer allow files off: the answer was cut short."), "{why}");
+    assert_eq!(guest.sent(), ["allow clipboard off", "allow files off"], "pair on never went");
+    let both = Some(HostWide { clipboard: true, files: true });
+    assert_eq!(guest.held.get(), both);
+    assert!(!sessions.with("win", |session| session.pairing.as_ref().unwrap().view().open));
+    assert!(sessions.with("win", |session| session.unsure));
+
+    // The next step reads first, so it opens on what the host says now.
+    let asked = guest.asked().len();
+    assert_eq!(driver.step(StepEvent::Plain(Event::Open { seconds: 120 })), None);
+    assert_eq!(guest.asked()[asked], "status");
+    assert_eq!(guest.sent().last().map(String::as_str), Some("pair on"));
+    assert!(!sessions.with("win", |session| session.unsure));
+    assert_eq!(guest.held.get(), both, "still owed, and given back when pairing closes");
+    driver.step(StepEvent::Plain(Event::Stop));
+    assert_eq!(guest.held.get(), None);
+    assert_eq!(guest.sent()[guest.sent().len() - 3..], ["pair off", "allow clipboard on", "allow files on"]);
+}
+
+/// A give-back whose answer is lost is owed still, and written down as owed.
+#[test]
+fn what_is_held_is_kept_across_a_step_that_stops_short() {
+    let (sessions, policy) = (Sessions::default(), Policy::linux());
+    let guest = Fake::saying(IDLE);
+    let clock = || 1_000_000;
+    let driver = driver(&sessions, &policy, &guest, &clock);
+    driver.open_pairing(120);
+    let both = Some(HostWide { clipboard: true, files: true });
+    assert_eq!(guest.held.get(), both);
+    guest.lost.borrow_mut().push(("allow clipboard on", false));
+    let why = driver.step(StepEvent::Plain(Event::Stop)).unwrap();
+    assert!(why.starts_with("The guest did not answer allow clipboard on: no answer."), "{why}");
+    assert_eq!(guest.held.get(), both, "nothing given back is forgotten");
+    assert_eq!(guest.kept.borrow().last().unwrap().0, both);
+}
+
+#[test]
+fn nothing_is_sent_while_the_guest_still_does_not_answer() {
+    let (sessions, policy) = (Sessions::default(), Policy::linux());
+    let guest = Fake { lost: RefCell::new(vec![("pair on", false)]), ..Fake::saying(IDLE) };
+    let clock = || 1_000_000;
+    let driver = driver(&sessions, &policy, &guest, &clock);
+    assert!(driver.open_pairing(120).is_some());
+    guest.lost.borrow_mut().push(("status", false));
+    let sent = guest.sent().len();
+    assert_eq!(driver.step(StepEvent::Plain(Event::Open { seconds: 120 })).as_deref(), Some(STILL_UNSURE));
+    assert_eq!(guest.sent().len(), sent, "{:?}", guest.sent());
+}
+
+#[test]
+fn a_device_command_that_is_not_answered_says_so_and_the_next_step_reads_first() {
+    let (sessions, policy) = (Sessions::default(), Policy::linux());
+    let guest = Fake { lost: RefCell::new(vec![("drop", false)]), ..Fake::saying(IDLE) };
+    let clock = || 1;
+    let driver = driver(&sessions, &policy, &guest, &clock);
+    let why = driver.device(&ctl::device_drop()).unwrap_err();
+    assert!(why.starts_with("The guest did not answer drop: no answer."), "{why}");
+    assert_eq!(guest.asked(), ["drop"]);
+    assert!(sessions.with("win", |session| session.unsure));
+}
+
+/// A status that names a new device at every reading, with one waiting at every other, so that
+/// each round asks for something new: the step still ends, within the rounds a step may send.
+#[test]
+fn a_status_that_names_a_new_device_at_every_reading_still_ends() {
+    struct Restless {
+        readings: Cell<u32>,
+        sent: Cell<usize>,
+    }
+    impl Guest for Restless {
+        fn ctl(&self, words: &Words) -> Result<String, Unanswered> {
+            if words.join(" ") != "status" {
+                self.sent.set(self.sent.get() + 1);
+                return Ok("ok".into());
+            }
+            let n = self.readings.get();
+            self.readings.set(n + 1);
+            let devices: Vec<String> = (0..=n)
+                .map(|i| format!(r#"{{"fingerprint":"{:064x}","name":"d{i}"}}"#, u64::from(i) + 1))
+                .collect();
+            let pending = if n.is_multiple_of(2) {
+                format!(
+                    r#","pending":{{"name":"p","fingerprint":"{:064x}","code":"1","seconds":60}}"#,
+                    1000 + n
+                )
+            } else {
+                String::new()
+            };
+            Ok(format!(
+                r#"{{"pairing":false,"clipboard":true,"files":true,"devices":[{}]{pending}}}"#,
+                devices.join(",")
+            ))
+        }
+        fn log(&self, _line: &str) {}
+    }
+    let (sessions, policy) = (Sessions::default(), Policy::linux());
+    let guest = Restless { readings: Cell::new(0), sent: Cell::new(0) };
+    let clock = || 1_000_000;
+    let driver = driver(&sessions, &policy, &guest, &clock);
+    for event in [StepEvent::Read, StepEvent::Plain(Event::Open { seconds: 120 }), StepEvent::Read] {
+        let before = guest.readings.get();
+        driver.step(event);
+        let read = guest.readings.get() - before;
+        assert!(read as usize <= ROUNDS_PER_STEP + 1, "{read} readings in one step");
+    }
+    assert!(guest.sent.get() > 0);
 }
