@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //! Input through the same C functions the screen window calls, into a stand-in for QEMU's
 //! QMP socket that greets, answers every line and records what it got.
+#![cfg(target_os = "macos")]
 
 use guesthouse_core::*;
 use serde_json::{Value, json};

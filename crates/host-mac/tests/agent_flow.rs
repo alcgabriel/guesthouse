@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //! The agent starting, watching and stopping machines, with `fake_qemu` standing in for QEMU.
+#![cfg(target_os = "macos")]
 
 use guesthouse_core::agent::{Agent, Config};
 use guesthouse_core::protocol::{MachineState, Response};

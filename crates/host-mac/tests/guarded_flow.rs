@@ -3,6 +3,7 @@
 //! which connects to its socket as QEMU's `pvg-fwd` does. Covers the start order, a graphics
 //! process that ends before its socket or while the machine runs, one that outstays its QEMU,
 //! a new agent finding both again, and a program that is refused before anything starts.
+#![cfg(target_os = "macos")]
 
 use guesthouse_core::agent::{Agent, Config};
 use guesthouse_core::process;

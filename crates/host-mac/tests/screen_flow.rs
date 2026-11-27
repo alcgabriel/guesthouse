@@ -3,6 +3,7 @@
 //! scale the start asked for, and the size the app wants reaches the graphics process as its
 //! mode while the machine runs, through the C function the app calls. QEMU's own device and a
 //! stopped machine are told nothing, and a refusal is said.
+#![cfg(target_os = "macos")]
 
 use guesthouse_core::agent::{Agent, Config};
 use guesthouse_core::guesthouse_string_free;

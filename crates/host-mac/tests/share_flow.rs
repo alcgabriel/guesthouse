@@ -7,6 +7,7 @@
 //! It needs rmhost, testsource and viewcheck, found as the app finds rmhost (the environment
 //! variable GUESTHOUSE_RMHOST, or the lab's build); without them the test says so and passes.
 //! The publisher and rmhost must run in one login session, as they do here.
+#![cfg(target_os = "macos")]
 
 use guesthouse_core::agent::{Agent, Config};
 use guesthouse_core::create::{self, NewMachine};

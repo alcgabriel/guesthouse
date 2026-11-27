@@ -4,6 +4,7 @@
 //! viewer pairs unasked) and `rmhost stats` read, and `viewcheck` is the viewer. Both readers
 //! must get frames over the same seconds. Needs the built rmhost, testsource and viewcheck;
 //! without them it says so loudly and passes.
+#![cfg(target_os = "macos")]
 
 use guesthouse_core::tools::{self, Places, Tool};
 use std::path::Path;

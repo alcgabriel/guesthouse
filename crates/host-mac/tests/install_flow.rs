@@ -2,6 +2,7 @@
 //! Installing a guest through the agent, with the stand-in network and guest (`install::fake`):
 //! no download and no machine. Covers the steps in order, a failure and what is chosen at it,
 //! stopping, and an install found again by a new agent.
+#![cfg(target_os = "macos")]
 
 mod support;
 use guesthouse_core::agent::{Agent, Config, InstallConfig};

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //! The agent's socket is private to this user: its folder is 0700, the socket 0600, and a program
 //! of this user can still talk to it.
+#![cfg(target_os = "macos")]
 
 use guesthouse_core::agent::{Agent, Config, InstallConfig};
 use guesthouse_core::server;

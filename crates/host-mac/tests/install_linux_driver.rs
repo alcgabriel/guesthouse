@@ -3,6 +3,7 @@
 //! guest (`install::fake`): a stand-in package whose `install.sh` only says its line, which the
 //! stand-in guest says as the driver's service would run it. Both ends: the driver installed and
 //! the first start, and the driver refused with Try Again and Open Without the Driver.
+#![cfg(target_os = "macos")]
 
 mod support;
 use guesthouse_core::agent::{Agent, Config, InstallConfig};

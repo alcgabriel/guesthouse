@@ -2,6 +2,7 @@
 //! The Rust core of Guesthouse's Mac app. Swift reaches it through the C functions below,
 //! declared in `include/guesthouse_core.h`. Answers cross as JSON text, so the interface stays a
 //! handful of functions while what they carry grows.
+#![cfg(target_os = "macos")]
 
 pub mod agent;
 pub mod agent_api;
