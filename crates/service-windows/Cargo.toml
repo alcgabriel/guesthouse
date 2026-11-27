@@ -12,6 +12,8 @@ name = "guesthouse-service"
 path = "src/main.rs"
 
 [dependencies]
+# How a machine's state is said in a refusal.
+guesthouse-state-core.workspace = true
 # The requests it answers, and the answers.
 guesthouse-control.workspace = true
 # The work itself: making a machine's disks and running it.

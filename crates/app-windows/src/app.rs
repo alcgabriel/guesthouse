@@ -188,15 +188,8 @@ fn push(lines: &mut Vec<Line>, line: Line) {
     lines.push(line);
 }
 
-pub fn state_words(state: State) -> &'static str {
-    match state {
-        State::Preparing => "Being made",
-        State::Starting => "Starting",
-        State::Running => "Running",
-        State::Stopping => "Shutting down",
-        State::Stopped => "Stopped",
-    }
-}
+/// A machine's state in the app's words.
+pub use guesthouse_state_core::windows_host::app_words as state_words;
 
 #[cfg(test)]
 mod state_words_tests;
