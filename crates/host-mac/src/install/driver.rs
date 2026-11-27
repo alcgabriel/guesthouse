@@ -31,8 +31,8 @@
 //! **A Linux guest's package** (`LINUX`) is published the same way, under
 //! `guesthouse-linux-driver-latest.json`: `install.sh`, the `.deb` files it installs, and the
 //! manifest, which goes to the guest with them so the guest knows the version it installed. Its
-//! files and their words on the serial port are the driver's own README's (`tools/pvg-ubuntu` of
-//! the contributor's repo); `ubuntu` has the guest's side of it.
+//! files and their words on the serial port are in `drivers/linux-pvg/README.md`; `ubuntu` has the
+//! guest's side of it.
 
 use super::fetch::{self, FetchError, Outcome, Request, Transport};
 use serde::Deserialize;

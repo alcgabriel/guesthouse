@@ -5,6 +5,7 @@ This is the Mac app: `mac/` is the SwiftUI app, `crates/host-mac/` its Rust core
 It is a preview, and some of it isn't here yet. Here is what the app needs that this repo doesn't hold:
 
 - A Windows guest driver and its package, signed for testing. The package isn't published, so an install stops at its driver step and offers to go on without it.
+- The Ubuntu guest's driver package. The driver and what makes the package are in `drivers/linux-pvg/`, but the package needs our Mesa branch, which isn't public yet, and it isn't published. An Ubuntu install stops at its driver step too and offers to go on without it.
 
 The graphics process and the QEMU it needs are here now: `crates/pvg-host`, `crates/pvg-sys` and `qemu/mac/`, below. They aren't in the app yet. The app finds them, and QEMU and rmhost, through its Settings, an environment variable (`GUESTHOUSE_QEMU`, `GUESTHOUSE_PVG_QEMU`, `GUESTHOUSE_PVG_HOST`, `GUESTHOUSE_RMHOST`), or inside its own bundle.
 
