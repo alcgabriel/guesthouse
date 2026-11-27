@@ -198,6 +198,9 @@ pub fn state_words(state: State) -> &'static str {
     }
 }
 
+#[cfg(test)]
+mod state_words_tests;
+
 /// The guest's sign-in, asked for when the person wants it and forgotten when another machine is
 /// chosen.
 #[derive(Clone, PartialEq, Eq)]

@@ -1462,6 +1462,10 @@ fn words(state: State) -> &'static str {
     }
 }
 
+#[cfg(test)]
+#[path = "requests/state_words_tests.rs"]
+mod state_words_tests;
+
 /// A Linux guest's installer, as `prepare` records it, is the ISO the user named. Each boot lets
 /// the machine's own account open every disk it's given, which changes the file's permissions, and
 /// the service mustn't do that to a user's file, so the machine is given a copy in its folder.
