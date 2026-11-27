@@ -710,6 +710,19 @@ mod tests {
         assert_eq!(pin.sha256, "15ed3cef0097fcddf90497997834d1511f35cbcba0279e90a4cb0dc1e1c2f37e");
     }
 
+    /// Every field of the installer this host fetches and checks, whole, so where the pin is kept can
+    /// change without the installer's name, address or SHA-256 changing by a byte.
+    #[test]
+    fn the_pin_is_the_installer_it_always_was() {
+        let pin = Pin {
+            version: "0.1.9".into(),
+            url: "https://files.ruxn.com/p/remoteman/remoteman-host-setup-0.1.9.exe".into(),
+            file: "remoteman-host-setup-0.1.9.exe".into(),
+            sha256: "15ed3cef0097fcddf90497997834d1511f35cbcba0279e90a4cb0dc1e1c2f37e".into(),
+        };
+        assert_eq!(super::pin(), pin);
+    }
+
     /// What a guest is asked, and answers from a table: the first answer whose key the script holds.
     fn guest<'a>(
         answers: &'a [(&'a str, &'a str)],
