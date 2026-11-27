@@ -6,6 +6,10 @@ use super::contract::KEPT_DAYS;
 
 /// The manifest's own name inside the bundle.
 pub const MANIFEST_FILE: &str = "manifest.txt";
+/// The tester's own words, as their host scrubs them.
+pub const DESCRIPTION_FILE: &str = "description.txt";
+/// The facts that sort the report, as `summary.json`.
+pub const SUMMARY_FILE: &str = "summary.json";
 
 /// A part that isn't in a report, and why.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,6 +91,14 @@ mod tests {
             &[("crash dumps".to_owned(), "there were none".to_owned())],
         );
         assert!(text.ends_with("\nNot in it:\n  crash dumps: there were none\n"));
+    }
+
+    #[test]
+    fn every_host_names_a_reports_own_files_the_same() {
+        assert_eq!(
+            [MANIFEST_FILE, DESCRIPTION_FILE, SUMMARY_FILE],
+            ["manifest.txt", "description.txt", "summary.json"]
+        );
     }
 
     #[test]

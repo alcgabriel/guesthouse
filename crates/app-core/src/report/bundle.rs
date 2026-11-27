@@ -10,7 +10,7 @@ use super::scrub::Scrubber;
 use super::summary::{self, Summary};
 use super::trim::trim;
 use crate::failure::{Failure, Result};
-use guesthouse_report_core::manifest::{MANIFEST_FILE, manifest_from};
+use guesthouse_report_core::manifest::{DESCRIPTION_FILE, MANIFEST_FILE, SUMMARY_FILE, manifest_from};
 use jiff::ZonedDateTime;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,8 +24,6 @@ const NAME_START: &str = "guesthouse-report-";
 const FIRST_MOST_FILE_BYTES: usize = 16 << 20;
 /// A bundle that's still too big tries again with every log at half the room, this many times.
 const SHRINK_ROUNDS: u32 = 6;
-const DESCRIPTION_FILE: &str = "description.txt";
-const SUMMARY_FILE: &str = "summary.json";
 
 /// A written report.
 #[derive(Debug, Clone)]

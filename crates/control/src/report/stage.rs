@@ -10,10 +10,8 @@ use super::summary::{self, Summary};
 use super::trim::keep_end;
 use crate::System;
 
-/// The tester's own words, scrubbed.
-pub const DESCRIPTION_FILE: &str = "description.txt";
-/// The facts that sort the report, as `summary.json`.
-pub const SUMMARY_FILE: &str = "summary.json";
+/// The tester's own words, scrubbed, and the facts that sort the report, named as every host names them.
+pub use guesthouse_report_core::manifest::{DESCRIPTION_FILE, SUMMARY_FILE};
 /// The most of one file a report takes at first. A report that is too big to send is made again
 /// with half as much of each file.
 pub const FIRST_LIMIT: usize = 4 * 1024 * 1024;
