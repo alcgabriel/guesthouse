@@ -1590,6 +1590,8 @@ mod tests {
             snapshots: Vec::new(),
             working: None,
             address: None,
+            remote_view: false,
+            remote_port: None,
         }
     }
 

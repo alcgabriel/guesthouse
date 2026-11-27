@@ -16,6 +16,7 @@ pub mod screen;
 pub mod updates;
 
 pub use events::{Event, State};
+pub use guesthouse_remote_view_core::share::ShareInfo;
 
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, Read, Write};
@@ -77,6 +78,23 @@ pub enum Request {
     /// `ReportPart` lines, or `ReportMissing` if it couldn't be read, then `Done`. The service only
     /// hands them over. The app scrubs, packs and sends them.
     ReportFiles { machine: Option<String> },
+    /// Turns a machine's viewing from other devices on or off (`on`), and answers with `Share`.
+    /// Without `on` it changes nothing and answers the same. It works whether the machine runs or
+    /// not; a running machine opens or closes at once. Turning it off never cuts Guesthouse's own
+    /// window onto the machine. `pairing` opens (or closes) pairing for `pairing_seconds`, the
+    /// shared crate's default when not said; this service refuses it for now.
+    Share {
+        name: String,
+        #[serde(default)]
+        on: Option<bool>,
+        #[serde(default)]
+        pairing: Option<bool>,
+        #[serde(default)]
+        pairing_seconds: Option<u32>,
+    },
+    /// Where a machine's viewing from other devices stands now, answered with `Share`. The app asks
+    /// it every few seconds while it shows it.
+    RemoteView { name: String },
 }
 
 /// What a machine is given at each boot, which can be changed while it's off.
@@ -344,6 +362,12 @@ pub enum Answer {
         viewer_certificate: String,
         viewer_key: String,
     },
+    /// Where a machine's viewing from other devices stands, for `Share` and `RemoteView`. The
+    /// address a device types in is this PC's on its network with `info.port`; the app finds it
+    /// itself with `guesthouse_relay::lan_address`, as the user, since it's the same PC's.
+    Share {
+        info: ShareInfo,
+    },
 }
 
 /// A machine as the service sees it.
@@ -403,6 +427,13 @@ pub struct Machine {
     pub working: Option<String>,
     /// The address the guest last reported, for Remote Desktop or SSH.
     pub address: Option<String>,
+    /// Whether it may be viewed from other devices while it runs. A service from before this says
+    /// nothing, which reads as off.
+    #[serde(default)]
+    pub remote_view: bool,
+    /// Its port on this PC's network for that, which it keeps once given, on or off.
+    #[serde(default)]
+    pub remote_port: Option<u16>,
 }
 
 /// One of a machine's snapshots.
@@ -544,6 +575,68 @@ mod tests {
         .unwrap();
         assert!(made.tpm && made.network && made.shares.is_empty() && made.user.is_empty());
         assert_eq!(made.folder, None, "an older app's machine is kept where machines always were");
+    }
+
+    #[test]
+    fn remote_view_is_asked_for_with_the_other_hosts_words_and_an_older_app_still_reads() {
+        let share: Request =
+            serde_json::from_value(json!({"ask": "share", "name": "win", "on": true})).unwrap();
+        assert_eq!(
+            share,
+            Request::Share { name: "win".into(), on: Some(true), pairing: None, pairing_seconds: None }
+        );
+        let asked: Request = serde_json::from_value(json!({"ask": "share", "name": "win"})).unwrap();
+        assert_eq!(
+            asked,
+            Request::Share { name: "win".into(), on: None, pairing: None, pairing_seconds: None }
+        );
+        assert_eq!(
+            serde_json::to_value(Request::Share {
+                name: "win".into(),
+                on: None,
+                pairing: Some(true),
+                pairing_seconds: Some(120)
+            })
+            .unwrap(),
+            json!({"ask": "share", "name": "win", "on": null, "pairing": true, "pairing_seconds": 120})
+        );
+        assert_eq!(
+            serde_json::to_value(Request::RemoteView { name: "win".into() }).unwrap(),
+            json!({"ask": "remote_view", "name": "win"})
+        );
+        let info = ShareInfo { port: Some(7792), ..ShareInfo::off("win") };
+        let answer = serde_json::to_value(Answer::Share { info: info.clone() }).unwrap();
+        assert_eq!(
+            (&answer["answer"], &answer["info"]["port"], &answer["info"]["state"]),
+            (&json!("share"), &json!(7792), &json!("off"))
+        );
+        assert_eq!(serde_json::from_value::<Answer>(answer).unwrap(), Answer::Share { info });
+    }
+
+    #[test]
+    fn a_machines_remote_view_is_listed_and_an_older_service_says_off() {
+        let older = json!({
+            "name": "win", "system": "windows", "state": "running", "set_up": true, "memory_mb": 8192,
+            "processors": 4, "card": null, "address": "172.29.1.2"
+        });
+        let machine: Machine = serde_json::from_value(older.clone()).unwrap();
+        assert_eq!((machine.remote_view, machine.remote_port), (false, None));
+        let on = Machine { remote_view: true, remote_port: Some(7793), ..machine };
+        let listed = serde_json::to_value(&on).unwrap();
+        assert_eq!((&listed["remote_view"], &listed["remote_port"]), (&json!(true), &json!(7793)));
+        // An app from before these, which reads a machine with only the fields it knows, still reads
+        // the listing.
+        #[derive(Deserialize)]
+        struct Older {
+            name: String,
+            state: State,
+            address: Option<String>,
+        }
+        let read: Older = serde_json::from_value(listed).unwrap();
+        assert_eq!(
+            (read.name.as_str(), read.state, read.address.as_deref()),
+            ("win", State::Running, Some("172.29.1.2"))
+        );
     }
 
     #[test]

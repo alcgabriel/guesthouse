@@ -202,6 +202,9 @@ impl<W: Work> Service<W> {
             Request::Account { name } => self.account(&name),
             Request::Watch { name } => return self.watch(&name, connection),
             Request::ReportFiles { machine } => return self.report_files(machine, connection),
+            Request::Share { .. } | Request::RemoteView { .. } => {
+                Answer::Refused { reason: "This service can't share a machine's screen yet.".into() }
+            }
         };
         let _ = connection.send(&answer);
     }
@@ -315,6 +318,8 @@ impl<W: Work> Service<W> {
                         .collect(),
                     working: entry.busy.clone(),
                     address: entry.settings.address.clone(),
+                    remote_view: false,
+                    remote_port: None,
                 }
             })
             .collect();
