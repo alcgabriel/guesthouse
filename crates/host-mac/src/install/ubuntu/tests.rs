@@ -69,6 +69,7 @@ fn the_installer_runs_with_no_questions_and_says_no_command_on_the_serial_port()
     let (installer, installed) = INSTALLER_COMMAND_LINE.split_once(" --- ").unwrap();
     // The installer prints its late commands on its consoles, and one of them holds the password.
     assert!(!installer.contains("ttyAMA0"));
+    assert!(installer.contains("acpi=nospcr"));
     assert!(installed.contains("console=ttyAMA0,115200"));
 }
 

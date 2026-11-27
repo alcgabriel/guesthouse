@@ -32,11 +32,12 @@ pub const INSTALLER_INITRD: &str = "casper/initrd";
 /// The installer's kernel line. `autoinstall`, because the installer asks before it writes the
 /// disk when it found its answers only on a seed (subiquity's install controller, read
 /// 2026-11-27); `ds=nocloud` for the seed disc. Its console is the screen only: on the serial port
-/// the installer would print each late command, the password's too, into `serial.log`. What
-/// follows `---` the installed system keeps: its console on the serial port as well, so its
-/// starts can be followed in `serial.log`.
+/// the installer would print each late command, the password's too, into `serial.log`, and the
+/// kernel makes the serial port a console of its own from the firmware's ACPI table (SPCR)
+/// unless told not to (`acpi=nospcr`). What follows `---` the installed system keeps: its
+/// console on the serial port as well, so its starts can be followed in `serial.log`.
 pub const INSTALLER_COMMAND_LINE: &str =
-    "autoinstall ds=nocloud console=tty0 --- console=ttyAMA0,115200 console=tty0";
+    "autoinstall ds=nocloud acpi=nospcr console=tty0 --- console=ttyAMA0,115200 console=tty0";
 
 /// What the guest says about the driver and its first start: the same words as Windows'.
 pub use super::windows::marker;
