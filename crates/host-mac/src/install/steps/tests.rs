@@ -58,7 +58,9 @@ impl World {
             downloads: self.root.join("Downloads"),
             password: self.password.clone(),
             driver_dir: driver.then_some(driver_dir),
-            check_space: true,
+            // The room on this Mac is not what these tests are about (one test sets it on, with a
+            // disk no Mac has), so they pass on a full disk too.
+            check_space: false,
             firmware_dirs: vec![self.root.join("firmware")],
         }
     }
@@ -311,6 +313,7 @@ fn a_disk_that_does_not_fit_says_how_much_to_free() {
     let world = World::new("space");
     let mut setup = world.setup(Guest::Ubuntu, false);
     setup.disk_gb = 50_000_000;
+    setup.check_space = true;
     let mut control = Control::default();
     let mut network = Network;
     let mut steps = RealSteps {

@@ -17,7 +17,7 @@ fn the_image_is_the_plain_arm64_server_disc_with_its_published_checksum() {
     );
     assert_eq!(
         image.url,
-        "https://cdimage.ubuntu.com/releases/26.04/release/ubuntu-26.04-live-server-arm64.iso"
+        "https://cdimage.ubuntu.com/ubuntu/releases/26.04/release/ubuntu-26.04-live-server-arm64.iso"
     );
 }
 
@@ -100,4 +100,75 @@ fn the_drivers_service_runs_install_sh_from_the_ruxn_disk_once_a_version() {
     assert!(DRIVER_RUNNER.contains("systemctl --no-block reboot"));
     assert!(DRIVER_RUNNER.contains("systemctl --no-block poweroff"));
     assert!(DRIVER_RUNNER.contains(&format!("{} exit-", "driver failed")));
+}
+
+fn line(sum: char, name: &str) -> String {
+    format!("{} *{name}\n", sum.to_string().repeat(64))
+}
+
+#[test]
+fn the_newest_point_release_in_the_list_is_the_one_taken() {
+    // As the folder lists it: the release and its point releases together, other images and
+    // architectures among them, the first point release's lines after the release's own.
+    let mut sums = String::new();
+    sums += &line('a', "ubuntu-26.04-live-server-arm64.iso");
+    sums += &line('b', "ubuntu-26.04-live-server-arm64+largemem.iso");
+    sums += &line('c', "ubuntu-26.04.1-live-server-arm64+largemem.iso");
+    sums += &line('d', "ubuntu-26.04.1-live-server-arm64.iso");
+    sums += &line('e', "ubuntu-26.04.1-live-server-s390x.iso");
+    sums += &line('f', "ubuntu-26.04.1-desktop-arm64.iso");
+    let image = pick_image(&sums).unwrap();
+    assert_eq!(image.name, "ubuntu-26.04.1-live-server-arm64.iso");
+    assert_eq!(image.sha256, "d".repeat(64));
+    assert!(
+        image
+            .url
+            .ends_with("/release/ubuntu-26.04.1-live-server-arm64.iso")
+    );
+}
+
+#[test]
+fn a_point_release_after_that_is_taken_too_and_the_order_in_the_list_does_not_matter() {
+    let mut sums = String::new();
+    sums += &line('2', "ubuntu-26.04.2-live-server-arm64.iso");
+    sums += &line('1', "ubuntu-26.04.1-live-server-arm64.iso");
+    sums += &line('0', "ubuntu-26.04-live-server-arm64.iso");
+    sums += &line('9', "ubuntu-26.04.10-live-server-arm64.iso");
+    assert_eq!(
+        pick_image(&sums).unwrap().name,
+        "ubuntu-26.04.10-live-server-arm64.iso",
+        "by number, not by text"
+    );
+    let without_ten: String = sums
+        .lines()
+        .filter(|l| !l.contains(".10-"))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    assert_eq!(
+        pick_image(&without_ten).unwrap().name,
+        "ubuntu-26.04.2-live-server-arm64.iso"
+    );
+}
+
+#[test]
+fn a_list_of_only_the_release_with_no_point_release_still_gives_the_release() {
+    assert_eq!(
+        pick_image(&line('a', "ubuntu-26.04-live-server-arm64.iso"))
+            .unwrap()
+            .name,
+        "ubuntu-26.04-live-server-arm64.iso"
+    );
+}
+
+#[test]
+fn names_that_only_look_alike_are_left_out() {
+    for name in [
+        "ubuntu-26.04.-live-server-arm64.iso",
+        "ubuntu-26.04.x-live-server-arm64.iso",
+        "ubuntu-26.04.1.2-live-server-arm64.iso",
+        "ubuntu-26.045-live-server-arm64.iso",
+        "ubuntu-26.04.1-live-server-arm64.iso.zsync",
+    ] {
+        assert!(pick_image(&line('a', name)).is_err(), "{name}");
+    }
 }

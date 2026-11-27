@@ -93,7 +93,7 @@ impl Transport for FakeNetwork {
                 files.join(",")
             ));
         }
-        if !url.starts_with("https://cdimage.ubuntu.com/releases/26.04/release/") {
+        if !url.starts_with("https://cdimage.ubuntu.com/ubuntu/releases/26.04/release/") {
             return Err(FetchError::new(format!(
                 "{url} is not somewhere the stand-in knows."
             )));

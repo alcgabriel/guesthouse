@@ -14,7 +14,7 @@
 //! without it. `notes/mac-app-install.md` has the rest.
 
 /// Ubuntu's release folder for arm64 and its checksum list.
-pub const RELEASE_URL: &str = "https://cdimage.ubuntu.com/releases/26.04/release/";
+pub const RELEASE_URL: &str = "https://cdimage.ubuntu.com/ubuntu/releases/26.04/release/";
 pub const SUMS_FILE: &str = "SHA256SUMS";
 /// The server image's name begins and ends so; the `+largemem` kernel's image shares the ending
 /// and is left out.
@@ -129,26 +129,50 @@ pub struct Image {
     pub url: String,
 }
 
-/// The server image for arm64 named in Ubuntu's checksum list, with the checksum it publishes. A
-/// line is `SHA256 *NAME` (binary) or `SHA256  NAME`.
+/// The server image for arm64 named in Ubuntu's checksum list, with the checksum it publishes: the
+/// newest point release in the list. The folder lists a release and its point releases together
+/// (`ubuntu-26.04-...` and `ubuntu-26.04.1-...`, and a `.2` when it comes), so the highest point
+/// number wins, and the `+largemem` image and every other architecture are left out. A line is
+/// `SHA256 *NAME` (binary) or `SHA256  NAME`.
 pub fn pick_image(sums: &str) -> Result<Image, String> {
+    let mut best: Option<(u32, Image)> = None;
     for line in sums.lines() {
         let Some((sum, name)) = line.split_once(' ') else {
             continue;
         };
         let name = name.trim_start_matches([' ', '*']).trim();
-        if name.starts_with(PREFIX) && name.ends_with(SUFFIX) && !name.contains('+') {
-            if sum.len() == 64 && sum.bytes().all(|b| b.is_ascii_hexdigit()) {
-                return Ok(Image {
+        let Some(point) = point_release(name) else {
+            continue;
+        };
+        if sum.len() != 64 || !sum.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(format!("Ubuntu's checksum for {name} is not a SHA-256."));
+        }
+        if best.as_ref().is_none_or(|(known, _)| point > *known) {
+            best = Some((
+                point,
+                Image {
                     name: name.to_string(),
                     sha256: sum.to_ascii_lowercase(),
                     url: format!("{RELEASE_URL}{name}"),
-                });
-            }
-            return Err(format!("Ubuntu's checksum for {name} is not a SHA-256."));
+                },
+            ));
         }
     }
-    Err("Ubuntu's list of checksums has no arm64 server image in it.".into())
+    best.map(|(_, image)| image)
+        .ok_or_else(|| "Ubuntu's list of checksums has no arm64 server image in it.".into())
+}
+
+/// The point release of a plain arm64 server image's name: 0 for `ubuntu-26.04-live-server-arm64.iso`,
+/// 1 for `ubuntu-26.04.1-...`. Nothing for any other name (another image, another release).
+fn point_release(name: &str) -> Option<u32> {
+    let middle = name.strip_prefix(PREFIX)?.strip_suffix(SUFFIX)?;
+    if middle.is_empty() {
+        return Some(0);
+    }
+    let digits = middle.strip_prefix('.')?;
+    (!digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
+        .then(|| digits.parse().ok())
+        .flatten()
 }
 
 fn yaml(text: &str) -> String {
