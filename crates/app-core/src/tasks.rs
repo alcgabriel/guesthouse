@@ -68,27 +68,8 @@ pub struct TaskRecord {
     pub error: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum State {
-    #[default]
-    Off,
-    Starting,
-    Installing,
-    Running,
-    Stopping,
-}
-
-impl State {
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Off => "Off",
-            Self::Starting => "Starting",
-            Self::Installing => "Installing",
-            Self::Running => "Running",
-            Self::Stopping => "Stopping",
-        }
-    }
-}
+/// Where a machine stands. Every host's states are in `guesthouse_state_core`.
+pub use guesthouse_state_core::linux_host::State;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Status {
