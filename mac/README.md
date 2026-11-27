@@ -149,6 +149,15 @@ $APP/Guesthouse --print-states --shut-down win --quit-after 5                  #
 
 `--start`, `--shut-down` and `--force-off NAME`, `--print-states` and `--quit-after SECONDS` act and report without anyone clicking. `GUESTHOUSE_SHUTDOWN_TIMEOUT_MS` and `GUESTHOUSE_START_TIMEOUT_MS` shorten the agent's timeouts.
 
+## Installing a guest
+
+New Machine, then Windows or Ubuntu, then Install: the agent makes the machine and runs five steps (`core/src/install/`, `notes/mac-app-install.md` has the whole of it): the installer (Windows' the person chooses, Ubuntu's is downloaded from `cdimage.ubuntu.com` and checked against its `SHA256SUMS`), the disk and the firmware, the guest's own installer with our answers on a disc, the graphics driver, and the first start. The state is in the machine's `install.json`, so an install goes on when the agent is started again. From the command line: `Guesthouse --install ubuntu NAME --print-states` (`windows` with `--installer FILE`), `--install-status NAME`, `--install-cancel NAME`.
+
+- **Firmware.** QEMU's `edk2-aarch64-code.fd` and `edk2-aarch64-vars.fd` are copied into the machine from beside the QEMU the install is given (the prefix's `share/qemu`, or `pc-bios` beside the binary for a QEMU run from its build folder), then beside the protected path's QEMU as the app finds it, then the lab's folder. For Ubuntu the graphics device's option ROM, `pvgfb.rom`, is taken from the same folders when one is there (`option_rom`), so the firmware and the installer show on the screen.
+- **Ubuntu with no questions.** Its installer asks before it writes the disk unless its kernel line says `autoinstall`, and its image's menu does not. So the firmware starts the installer's own kernel and initrd, taken off the image into `installer-boot/`, with `autoinstall ds=nocloud console=tty0 --- console=ttyAMA0,115200 console=tty0` (QEMU's `-kernel`, `-initrd`, `-append`; in `machine.json` as `installer_kernel`, `installer_initrd` and `installer_command_line` while it installs). The answers are on a disc labelled `CIDATA`; the guest says `guesthouse-install-finished` on `ttyAMA0` and turns itself off.
+- **The driver.** Windows': `install.ps1` and the signed files at first logon, from a stick labelled `RUXN`. Ubuntu's: a package of `install.sh`, its `.deb` files and `guesthouse-linux-driver-latest.json`, on a disk labelled `RUXN` made by `stick.sh` (`GUESTHOUSE_STICK_SH`, else the lab's); the answers put `guesthouse-driver.service` into the installed system, which installs a version it has not installed yet whenever that disk is there, then restarts into the desktop, or turns the machine off if it failed, so Try Again is a start with the disk again. The guest says `guesthouse: driver installed` or `guesthouse: driver failed CODE`, and `guesthouse: first start ok` once its desktop is up. The package comes from files.ruxn.com by its manifest, like Windows', or from `GUESTHOUSE_DRIVER_DIR` (for Ubuntu only when that folder holds `install.sh`). With none, the step says the driver is not packaged and offers to open Ubuntu without it.
+- **Without a guest.** `GUESTHOUSE_INSTALL_FAKE=1` in the agent's environment runs every step with a stand-in network and guest. With a Linux package named by `GUESTHOUSE_DRIVER_DIR` the stand-in guest says what its `install.sh` says, so a stand-in `install.sh` that only says its line tries both ends.
+
 ## The interface
 
 Built to the five mockups of 2026-11-26 (not kept in the repo), with the system's own controls and colours.
@@ -243,6 +252,8 @@ The agent sets this up for a machine it starts. For a guest started by hand: `wi
 | `core/src/server.rs`, `agent_api.rs` | The agent's Unix socket and the app's end of it; the C functions for both. |
 | `core/src/bin/fake_qemu.rs` | The stand-in for QEMU. |
 | `core/tests/agent_flow.rs` | The agent against the stand-in. |
+| `core/src/install/`, `agent/install.rs` | Installing a guest: the plan, its state, the steps (Ubuntu's in `steps/linux.rs`), the answers, the driver packages; the agent's side (discs, sticks, files off an image). |
+| `core/tests/install_flow.rs`, `install_linux_driver.rs` | Installs through the agent with the stand-ins; the second with a stand-in Linux driver package. |
 | `Agent/` | The agent program: `main.swift` and the XPC server. |
 | `Shared/AgentXPC.swift` | The XPC interface, built into both the app and the agent. |
 | `Launchd/` | The agent's launchd plist. |
