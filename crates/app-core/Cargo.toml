@@ -48,6 +48,8 @@ guesthouse-account-core.workspace = true
 guesthouse-carry-core.workspace = true
 # Where a guest's images come from, and the rule that picks Ubuntu's disc, as data every host can share.
 guesthouse-catalog-core.workspace = true
+# A machine's states and their words, as each host has them.
+guesthouse-state-core.workspace = true
 # Reads a recorded Intel card, for a lab run on a PC without one. It opens nothing.
 guesthouse-backend-intel.workspace = true
 # Only for its slot names, so the app and the daemon can never disagree about what a VM owns.

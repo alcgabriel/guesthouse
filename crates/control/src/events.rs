@@ -18,16 +18,9 @@ pub enum Event {
     State(State),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum State {
-    Preparing,
-    Starting,
-    Running,
-    Stopping,
-    #[default]
-    Stopped,
-}
+/// Where a machine stands, as the service tells the app. Every host's states are in
+/// `guesthouse_state_core`.
+pub use guesthouse_state_core::windows_host::State;
 
 #[cfg(test)]
 mod tests {

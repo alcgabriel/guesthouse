@@ -1526,15 +1526,12 @@ fn no_machine(name: &str) -> Answer {
     Answer::Refused { reason: format!("There is no machine called {name}.") }
 }
 
-fn words(state: State) -> &'static str {
-    match state {
-        State::Preparing => "being made",
-        State::Starting => "starting",
-        State::Running => "running",
-        State::Stopping => "shutting down",
-        State::Stopped => "stopped",
-    }
-}
+/// A machine's state in the service's words.
+use guesthouse_state_core::windows_host::service_words as words;
+
+#[cfg(test)]
+#[path = "requests/state_words_tests.rs"]
+mod state_words_tests;
 
 /// A Linux guest's installer, as `prepare` records it, is the ISO the user named. Each boot lets
 /// the machine's own account open every disk it's given, which changes the file's permissions, and

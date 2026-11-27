@@ -26,6 +26,8 @@ preview = []
 [target.'cfg(windows)'.dependencies]
 # How a machine's and a card's memory are said, with the other hosts' small wording.
 guesthouse-basics.workspace = true
+# How a machine's state is said on its page.
+guesthouse-state-core.workspace = true
 # The words on the service's pipe, and the pipe itself. The only way the app reaches the service.
 guesthouse-control.workspace = true
 windows-reactor = { path = "../../vendor/windows-reactor" }

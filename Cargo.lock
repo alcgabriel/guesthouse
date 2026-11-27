@@ -933,6 +933,7 @@ dependencies = [
  "guesthouse-report-core",
  "guesthouse-sensors",
  "guesthouse-settings-core",
+ "guesthouse-state-core",
  "guesthouse-update-check",
  "jiff",
  "libc",
@@ -953,6 +954,7 @@ dependencies = [
  "guesthouse-control",
  "guesthouse-relay",
  "guesthouse-remote-view-core",
+ "guesthouse-state-core",
  "serde_json",
  "windows-reactor",
  "windows-reactor-setup",
@@ -1056,6 +1058,7 @@ dependencies = [
  "guesthouse-remote-view-core",
  "guesthouse-report-core",
  "guesthouse-settings-core",
+ "guesthouse-state-core",
  "guesthouse-update-check",
  "serde",
  "serde_json",
@@ -1241,6 +1244,7 @@ dependencies = [
  "guesthouse-host-windows",
  "guesthouse-relay",
  "guesthouse-remote-view-core",
+ "guesthouse-state-core",
  "serde",
  "serde_json",
  "windows-sys 0.61.2",
@@ -1249,6 +1253,14 @@ dependencies = [
 [[package]]
 name = "guesthouse-settings-core"
 version = "0.11.0"
+
+[[package]]
+name = "guesthouse-state-core"
+version = "0.11.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "guesthouse-transport"
