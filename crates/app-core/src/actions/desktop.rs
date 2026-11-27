@@ -61,9 +61,7 @@ pub fn boots(context: &Context, slot: Option<Slot>) -> usize {
     count(&data, BOOT_LINE)
 }
 
-pub(super) fn count(data: &[u8], wanted: &[u8]) -> usize {
-    data.windows(wanted.len()).filter(|part| *part == wanted).count()
-}
+pub(super) use guesthouse_serial_words_core::linux_host::count;
 
 /// Whether Windows has restarted since the app last set the rate, which only lasts one boot. A VM
 /// the app never set up has no record here, and is left as it is.

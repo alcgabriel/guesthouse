@@ -495,15 +495,8 @@ pub fn read_line<T: for<'de> Deserialize<'de>>(reader: &mut impl BufRead) -> io:
 /// Writes `value` as one line of JSON, and flushes it so the other end has it at once.
 pub use guesthouse_basics::json_lines::write_line;
 
-/// The IPv4 address in one of a guest's report lines, other than loopback. A Windows guest writes
-/// `address: 172.29.1.2`; an Ubuntu guest writes what `ip -o address` says, such as
-/// `address: 2: eth0    inet 172.29.1.2/20 ...`.
-pub fn address_in(line: &str) -> Option<String> {
-    let rest = line.strip_prefix("guesthouse: address: ").or_else(|| line.strip_prefix("address: "))?;
-    rest.split(|c: char| c.is_whitespace() || c == '/')
-        .find(|word| word.parse::<std::net::Ipv4Addr>().is_ok_and(|address| !address.is_loopback()))
-        .map(str::to_owned)
-}
+/// The IPv4 address in one of a guest's report lines, other than loopback.
+pub use guesthouse_serial_words_core::windows_host::address_in;
 
 /// HCS's ID for machine `name`, which also names its pipes. Every other program's machines are left
 /// alone.

@@ -937,6 +937,7 @@ dependencies = [
  "guesthouse-remote-view-core",
  "guesthouse-report-core",
  "guesthouse-sensors",
+ "guesthouse-serial-words-core",
  "guesthouse-settings-core",
  "guesthouse-state-core",
  "guesthouse-update-check",
@@ -1061,6 +1062,7 @@ dependencies = [
  "guesthouse-basics",
  "guesthouse-remote-view-core",
  "guesthouse-report-core",
+ "guesthouse-serial-words-core",
  "guesthouse-settings-core",
  "guesthouse-state-core",
  "guesthouse-update-check",
@@ -1149,6 +1151,7 @@ dependencies = [
  "guesthouse-hcs",
  "guesthouse-jail",
  "guesthouse-remote-view-core",
+ "guesthouse-serial-words-core",
  "if-addrs",
  "serde",
  "serde_json",
@@ -1238,6 +1241,10 @@ version = "0.11.0"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "guesthouse-serial-words-core"
+version = "0.11.0"
 
 [[package]]
 name = "guesthouse-service"

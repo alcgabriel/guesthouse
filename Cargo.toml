@@ -33,6 +33,7 @@ default-members = [
     "crates/replay",
     "crates/report",
     "crates/sensors",
+    "crates/serial-words",
     "crates/settings",
     "crates/share-windows",
     "crates/state",
@@ -79,6 +80,7 @@ guesthouse-account-core = { path = "crates/account" }
 guesthouse-answers-core = { path = "crates/answers" }
 guesthouse-carry-core = { path = "crates/carry" }
 guesthouse-catalog-core = { path = "crates/catalog" }
+guesthouse-serial-words-core = { path = "crates/serial-words" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

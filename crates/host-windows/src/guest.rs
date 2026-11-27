@@ -7,8 +7,8 @@ pub const REPORT: &str = include_str!("../guest/report.ps1");
 /// The report's file, from the root of the guest's Windows volume, which `boot` reads once the
 /// machine has stopped. `report.ps1` names it as `C:\Guesthouse\report.txt`.
 pub const REPORT_FILE: &str = r"Guesthouse\report.txt";
-/// The report's last line, on either system's serial port.
-pub const REPORT_DONE: &str = "guesthouse: report done";
+/// The report's last line, on either system's serial port, and whether a line from the guest is it.
+pub use guesthouse_serial_words_core::windows_host::{REPORT_DONE, report_done};
 
 /// What `Guesthouse\share.txt` holds when a Windows guest has shares: a line for each, its name, the
 /// port of the host's Plan 9 server it reaches it on, and `rw` or `ro`, as `shared 50001 rw`.
@@ -27,16 +27,9 @@ pub fn share_marker(shares: &[crate::settings::Share]) -> String {
         .collect()
 }
 
-/// What the host writes on a guest's serial port to ask it to shut down. HCS's own request needs
-/// Hyper-V's integration services in the guest, which a machine HCS makes doesn't have, so the guest
-/// listens for this and shuts itself down, as App Sandbox's guest agent does when asked.
-/// `report.ps1` listens for it in Windows and `shutdown.sh` in Ubuntu.
-pub const SHUTDOWN_LINE: &str = "guesthouse: shutdown";
-
-/// Whether a line from the guest is its report's last.
-pub fn report_done(line: &str) -> bool {
-    line.starts_with(REPORT_DONE)
-}
+/// What the host writes on a guest's serial port to ask it to shut down. `report.ps1` listens for it
+/// in Windows and `shutdown.sh` in Ubuntu.
+pub use guesthouse_serial_words_core::windows_host::SHUTDOWN_LINE;
 
 /// Where the report goes, from the root of the guest's Windows volume. `SetupComplete.cmd` names it
 /// as `C:\Guesthouse\report.ps1`.
@@ -122,8 +115,9 @@ mod tests {
 pub mod linux {
     /// The files disk's FAT label, which is also how Ubuntu's installer finds its answer file there.
     pub const LABEL: &str = "CIDATA";
-    /// What the guest says on its serial port when its install is done, as `user-data` writes it.
-    pub const INSTALL_FINISHED: &str = "guesthouse-install-finished";
+    /// What the guest says on its serial port when its install is done, as `user-data` writes it,
+    /// and whether a line from the guest is it.
+    pub use guesthouse_serial_words_core::windows_host::linux::{INSTALL_FINISHED, install_finished};
     /// The guest's GPU files on the files disk, which it mounts at /usr/lib/wsl.
     pub const WSL_LIB: &str = r"wsl\lib";
     pub const WSL_DRIVERS: &str = r"wsl\drivers";
@@ -172,12 +166,6 @@ pub mod linux {
     /// What marks an ISO as Ubuntu's installer: the kernel and initrd the boot menu starts.
     pub const INSTALLER_KERNEL: &str = r"casper\vmlinuz";
     pub const INSTALLER_INITRD: &str = r"casper\initrd";
-
-    /// Whether a line from the guest is the one saying its install is done. Only a line that starts
-    /// with it counts, so the installer showing the command that says it doesn't.
-    pub fn install_finished(line: &str) -> bool {
-        line.starts_with(INSTALL_FINISHED)
-    }
 
     /// The line `install.sh` reads, `user password`, as the shared crate makes it.
     pub use guesthouse_answers_core::windows_host::ubuntu::account;
