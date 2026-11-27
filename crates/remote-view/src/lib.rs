@@ -10,10 +10,10 @@
 //! Beyond that, this is everything about viewing a machine from other devices that needs no
 //! system, no network and no clock of its own, so each host builds on one implementation: the
 //! state a screen shows (`share`), the words remoteman's host takes and how it answers (`ctl`,
-//! `status`), pairing as a state machine (`pairing`, `policy`), what a screen makes of them
-//! (`view`), the trust list across the installer's runs (`trust`), the switch and its port
-//! (`switch`), when the host card's clock is held for a viewer (`stream_clocks`) and the sentences
-//! (`wording`).
+//! `status`), pairing as a state machine (`pairing`, `policy`) and as a driver that runs it against
+//! a guest (`session`), what a screen makes of them (`view`), the trust list across the installer's
+//! runs (`trust`), the switch and its port (`switch`), when the host card's clock is held for a
+//! viewer (`stream_clocks`) and the sentences (`wording`).
 //!
 //! Nothing here calls the system or a hypervisor, so every host can build on it.
 
@@ -22,6 +22,7 @@ pub mod ctl;
 pub mod install;
 pub mod pairing;
 pub mod policy;
+pub mod session;
 pub mod share;
 pub mod status;
 pub mod stream_clocks;
