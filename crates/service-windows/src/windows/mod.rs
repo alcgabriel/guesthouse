@@ -9,13 +9,14 @@ mod scm;
 mod security;
 
 use crate::report_parts::{tail_file, without_refusals};
-use crate::requests::{Service, Work};
+use crate::requests::{Held, Service, Unannounced, ViewSettings, Work, open_relay};
 use crate::store::Store;
 use guesthouse_control::{CardInfo, PIPE};
 use guesthouse_hcs::gpu;
 use guesthouse_hcs::host;
 use guesthouse_hcs::system::ComputeSystem;
 use guesthouse_host_windows::events::Sink;
+use guesthouse_host_windows::guest_ctl::GuestCtl;
 use guesthouse_host_windows::settings::{BootSettings, PrepareSettings};
 use guesthouse_host_windows::windows::network as host_network;
 use guesthouse_host_windows::windows::{self as host_work, boot, prepare};
@@ -49,8 +50,9 @@ impl Work for HostWork {
         settings: &BootSettings,
         sink: Arc<dyn Sink>,
         stop: Arc<AtomicBool>,
+        ctl: GuestCtl,
     ) -> Result<(), String> {
-        boot::boot(settings, sink, stop)
+        boot::boot_with(settings, sink, stop, ctl)
     }
 
     fn cards(&self) -> Vec<CardInfo> {
@@ -116,6 +118,15 @@ impl Work for HostWork {
 
     fn port_free(&self, port: u16) -> bool {
         guesthouse_host_windows::ssh::port_free(port)
+    }
+
+    fn udp_port_free(&self, port: u16) -> bool {
+        guesthouse_relay::udp_port_free(port)
+    }
+
+    /// Nothing announces the machine on the network yet: a device is given the address and port.
+    fn open_view(&self, view: &ViewSettings) -> Result<Held, String> {
+        open_relay(view, Box::new(Unannounced))
     }
 
     fn private_folder(&self, folder: &Path) -> Result<(), String> {

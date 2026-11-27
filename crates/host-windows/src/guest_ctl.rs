@@ -116,6 +116,17 @@ struct Pending {
     result: Option<Result<Answer, CtlError>>,
 }
 
+/// Shows only whether the guest's port is open, as what is in flight is the guest's.
+impl std::fmt::Debug for GuestCtl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = self.lock();
+        f.debug_struct("GuestCtl")
+            .field("open", &state.writer.is_some())
+            .field("ended", &state.ended)
+            .finish()
+    }
+}
+
 impl GuestCtl {
     pub fn new() -> GuestCtl {
         GuestCtl::default()

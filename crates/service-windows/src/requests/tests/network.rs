@@ -19,11 +19,17 @@ pub(super) struct NetState {
     pub hide_rules: bool,
     pub bridging: Bridging,
     pub calls: Vec<String>,
+    /// UDP ports another program listens on.
+    pub busy_udp: Vec<u16>,
+    /// The ports a remote view's relay listens on now.
+    pub views: Vec<u16>,
+    /// A remote view's relay can't listen.
+    pub refuse_view: bool,
 }
 
 #[derive(Default)]
 pub(super) struct FakeNet {
-    pub state: Mutex<NetState>,
+    pub state: Arc<Mutex<NetState>>,
 }
 
 impl FakeNet {
@@ -111,13 +117,13 @@ fn with_forwards(forwards: &[Forward]) -> MachineSettings {
     MachineSettings { forwards: forwards.to_vec(), ..hardware(8192, Card::Default) }
 }
 
-fn net(service: &Arc<Service<Pretend>>) -> std::sync::MutexGuard<'_, NetState> {
+pub(super) fn net(service: &Arc<Service<Pretend>>) -> std::sync::MutexGuard<'_, NetState> {
     service.work.net.state.lock().unwrap()
 }
 
 /// Waits for the double's Windows to be as `ready` says, as the forwards are made on a thread of
 /// their own.
-fn wait_net(service: &Arc<Service<Pretend>>, ready: impl Fn(&NetState) -> bool) {
+pub(super) fn wait_net(service: &Arc<Service<Pretend>>, ready: impl Fn(&NetState) -> bool) {
     for _ in 0..400 {
         if ready(&net(service)) {
             return;
@@ -127,11 +133,11 @@ fn wait_net(service: &Arc<Service<Pretend>>, ready: impl Fn(&NetState) -> bool) 
     panic!("Windows never came to be as expected: {:?}", net(service).calls);
 }
 
-fn log(service: &Arc<Service<Pretend>>, name: &str) -> Vec<Event> {
+pub(super) fn log(service: &Arc<Service<Pretend>>, name: &str) -> Vec<Event> {
     service.machines().watch(name).unwrap().0
 }
 
-fn problems(service: &Arc<Service<Pretend>>, name: &str) -> Vec<String> {
+pub(super) fn problems(service: &Arc<Service<Pretend>>, name: &str) -> Vec<String> {
     log(service, name)
         .into_iter()
         .filter_map(|event| match event {
@@ -141,12 +147,12 @@ fn problems(service: &Arc<Service<Pretend>>, name: &str) -> Vec<String> {
         .collect()
 }
 
-fn start_and_run(service: &Arc<Service<Pretend>>, name: &str) {
+pub(super) fn start_and_run(service: &Arc<Service<Pretend>>, name: &str) {
     assert_eq!(ask(service, Request::Start { name: name.into() }), [Answer::Ok]);
     wait_for(service, name, State::Running);
 }
 
-fn stop(service: &Arc<Service<Pretend>>, name: &str) {
+pub(super) fn stop(service: &Arc<Service<Pretend>>, name: &str) {
     ask(service, Request::Stop { name: name.into() });
     wait_for(service, name, State::Stopped);
 }

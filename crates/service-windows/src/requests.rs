@@ -12,12 +12,14 @@ use guesthouse_control::{
     Request, Share, SnapshotInfo, State, System, forwards_refusal, shares_refusal, valid_edition, valid_user,
 };
 use guesthouse_host_windows::events::Sink;
+use guesthouse_host_windows::guest_ctl::GuestCtl;
 use guesthouse_host_windows::machine::Guest;
 use guesthouse_host_windows::network::Network;
 use guesthouse_host_windows::record::Record;
 use guesthouse_host_windows::settings::{self as host_settings, BootSettings, GpuChoice, PrepareSettings};
 use guesthouse_host_windows::snapshots::{self, Disks};
 use guesthouse_host_windows::ssh;
+use guesthouse_remote_view_core::session::Sessions;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io;
@@ -45,8 +47,15 @@ const UNMAKE_WAIT: Duration = Duration::from_secs(15);
 /// The work done to machines, which only Windows can do.
 pub trait Work: Send + Sync + 'static {
     fn prepare(&self, settings: &PrepareSettings, sink: &dyn Sink) -> Result<(), String>;
-    fn boot(&self, settings: &BootSettings, sink: Arc<dyn Sink>, stop: Arc<AtomicBool>)
-    -> Result<(), String>;
+    /// Runs the machine until it stops. `ctl` is the way to ask remoteman's host in its guest while
+    /// it runs, which the boot gives the guest's serial port.
+    fn boot(
+        &self,
+        settings: &BootSettings,
+        sink: Arc<dyn Sink>,
+        stop: Arc<AtomicBool>,
+        ctl: GuestCtl,
+    ) -> Result<(), String>;
     /// The cards that can be shared with a guest.
     fn cards(&self) -> Vec<CardInfo>;
     /// Stops at once the machine HCS knows by `id`, if there is one.
@@ -67,6 +76,11 @@ pub trait Work: Send + Sync + 'static {
     fn network(&self) -> &dyn Network;
     /// Whether `port` on this PC's loopback can be listened on now.
     fn port_free(&self, port: u16) -> bool;
+    /// Whether a remote view's relay could listen on UDP `port` on every network of this PC now.
+    fn udp_port_free(&self, port: u16) -> bool;
+    /// Opens a machine's remote view on this PC's network, which stays open until what comes back
+    /// is dropped, and has let go of its port once it has been.
+    fn open_view(&self, view: &ViewSettings) -> Result<Held, String>;
     /// Makes `folder`, which must not be there yet, for one machine's disks, so that only the system
     /// and administrators may open it or anything made in it. Its parent is the user's, so nothing
     /// is made but this one folder.
@@ -102,6 +116,8 @@ pub trait Connection {
 /// The folder a check holds open, for as long as it's kept.
 pub use crate::store::Held;
 
+pub use remote_view::{Unannounced, ViewSettings, open_relay};
+
 /// HCS's ID for a machine, which also names its pipes. `boot` stops any machine with its ID that's
 /// still there, so it's never another program's.
 pub use guesthouse_control::vm_id;
@@ -120,9 +136,13 @@ pub struct Service<W: Work> {
     bridging: Mutex<Option<(Instant, Bridging)>>,
     /// Port forwards are made and taken away one machine at a time, as `netsh` is.
     forwarding: Mutex<()>,
-    /// Whether the forwards a stopped service left behind have been looked for. No machine's are
-    /// made before they have, or they'd be taken away with the rest.
+    /// Whether the forwards and remote views' rules a stopped service left behind have been looked
+    /// for. No machine's are made before they have, or they'd be taken away with the rest.
     cleaned: AtomicBool,
+    /// Remote views are turned on one at a time, so two never take the same port.
+    switching: Mutex<()>,
+    /// What was last read of each running machine's remoteman, and its pairing.
+    sessions: Sessions,
 }
 
 impl<W: Work> Service<W> {
@@ -166,6 +186,8 @@ impl<W: Work> Service<W> {
             bridging: Mutex::new(None),
             forwarding: Mutex::new(()),
             cleaned: AtomicBool::new(false),
+            switching: Mutex::new(()),
+            sessions: Sessions::default(),
         });
         // Port forwards a stopped service left behind are no use to anyone, and hold their ports.
         // Listing the firewall's rules takes seconds, and the service manager is waiting for the
@@ -173,6 +195,7 @@ impl<W: Work> Service<W> {
         let service_again = Arc::clone(&service);
         thread::spawn(move || {
             service_again.clear_leftover_forwards();
+            service_again.clear_leftover_views();
             service_again.cleaned.store(true, Ordering::SeqCst);
         });
         service
@@ -202,9 +225,8 @@ impl<W: Work> Service<W> {
             Request::Account { name } => self.account(&name),
             Request::Watch { name } => return self.watch(&name, connection),
             Request::ReportFiles { machine } => return self.report_files(machine, connection),
-            Request::Share { .. } | Request::RemoteView { .. } => {
-                Answer::Refused { reason: "This service can't share a machine's screen yet.".into() }
-            }
+            Request::Share { name, on, pairing, .. } => self.share(&name, on, pairing),
+            Request::RemoteView { name } => self.remote_view(&name),
         };
         let _ = connection.send(&answer);
     }
@@ -318,8 +340,8 @@ impl<W: Work> Service<W> {
                         .collect(),
                     working: entry.busy.clone(),
                     address: entry.settings.address.clone(),
-                    remote_view: false,
-                    remote_port: None,
+                    remote_view: entry.remote_view.allow_remote_view,
+                    remote_port: entry.remote_view.remote_port,
                 }
             })
             .collect();
@@ -573,6 +595,7 @@ impl<W: Work> Service<W> {
             return refused;
         }
         let stop = Arc::new(AtomicBool::new(false));
+        let ctl = GuestCtl::new();
         {
             let mut entries = self.machines.lock();
             let entry = entries.get_mut(&name).expect("found just now");
@@ -580,6 +603,7 @@ impl<W: Work> Service<W> {
                 return Answer::Refused { reason: format!("{name} is {}.", busy_words(entry)) };
             }
             entry.stop = Some(Arc::clone(&stop));
+            entry.ctl = Some(ctl.clone());
             entry.state = State::Starting;
             // What the guest said last run isn't where its forwards lead until it says it again.
             entry.run_address = None;
@@ -643,20 +667,29 @@ impl<W: Work> Service<W> {
                 ),
             );
         }
+        // What an earlier run read of its remoteman is not this run's.
+        self.sessions.remove(&name);
         let service = Arc::clone(self);
         thread::spawn(move || {
             let sink = service.machines.sink(&name);
-            // The forwards are kept while the machine runs and taken away before it counts as stopped.
+            // The forwards and the remote view are kept while the machine runs and taken away before
+            // it counts as stopped.
             let over = Arc::new(AtomicBool::new(false));
             let forwarder = {
                 let (service, name, over) = (Arc::clone(&service), name.clone(), Arc::clone(&over));
                 thread::spawn(move || service.keep_forwards(&name, &over))
             };
-            if let Err(error) = service.work.boot(&settings, Arc::clone(&sink), stop) {
+            let viewer = {
+                let (service, name, over) = (Arc::clone(&service), name.clone(), Arc::clone(&over));
+                thread::spawn(move || service.keep_remote_view(&name, &over))
+            };
+            if let Err(error) = service.work.boot(&settings, Arc::clone(&sink), stop, ctl) {
                 sink.problem(error);
             }
             over.store(true, Ordering::SeqCst);
             let _ = forwarder.join();
+            let _ = viewer.join();
+            service.view_stopped(&name);
             drop(held);
             let mut entries = service.machines.lock();
             if let Some(entry) = entries.get_mut(&name) {
@@ -1606,6 +1639,7 @@ fn size_words(bytes: u64) -> String {
 }
 
 mod forwards;
+mod remote_view;
 
 #[cfg(test)]
 mod tests;

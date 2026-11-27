@@ -1189,6 +1189,8 @@ dependencies = [
  "guesthouse-control",
  "guesthouse-hcs",
  "guesthouse-host-windows",
+ "guesthouse-relay",
+ "guesthouse-remote-view-core",
  "serde",
  "serde_json",
  "windows-sys 0.61.2",

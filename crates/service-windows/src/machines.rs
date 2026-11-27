@@ -8,6 +8,9 @@ use crate::store::{Settings, Store};
 use guesthouse_control::report::clock;
 use guesthouse_control::{Event, State, address_in};
 use guesthouse_host_windows::events::Sink;
+use guesthouse_host_windows::guest_ctl::GuestCtl;
+use guesthouse_remote_view_core::share::ShareState;
+use guesthouse_remote_view_core::switch::{SWITCH_FILE, Switch};
 use std::collections::{BTreeMap, VecDeque};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -35,6 +38,16 @@ pub struct Entry {
     /// The address the guest has reported since this run began, which its forwards lead to. The
     /// settings keep the last run's, which may not be this run's.
     pub run_address: Option<String>,
+    /// Whether other devices may view it while it runs, and its port for that, as kept in its own
+    /// folder beside its settings.
+    pub remote_view: Switch,
+    /// The way to ask remoteman's host in its guest, while it runs.
+    pub ctl: Option<GuestCtl>,
+    /// Where its remote view stands on this PC's network, as its keeper last left it.
+    pub view: ViewStanding,
+    /// Whether the guest's remoteman answered when it was last asked this run, so a change is told
+    /// once.
+    pub view_answered: Option<bool>,
     history: VecDeque<Event>,
     watchers: Vec<SyncSender<Event>>,
 }
@@ -47,6 +60,10 @@ impl Entry {
             stop: None,
             busy: None,
             run_address: None,
+            remote_view: Switch::default(),
+            ctl: None,
+            view: ViewStanding::default(),
+            view_answered: None,
             history: VecDeque::new(),
             watchers: Vec::new(),
         }
@@ -56,6 +73,14 @@ impl Entry {
     pub fn idle(&self) -> bool {
         self.state == State::Stopped && self.stop.is_none() && self.busy.is_none()
     }
+}
+
+/// Where a running machine's remote view stands on this PC's network.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ViewStanding {
+    pub state: ShareState,
+    /// Why it isn't open, when it should be.
+    pub reason: Option<String>,
 }
 
 pub struct Machines {
@@ -68,7 +93,11 @@ impl Machines {
         let entries = store
             .load()
             .into_iter()
-            .map(|(name, settings)| (name, Entry::new(settings, State::Stopped)))
+            .map(|(name, settings)| {
+                let mut entry = Entry::new(settings, State::Stopped);
+                entry.remote_view = read_switch(&store, &name);
+                (name, entry)
+            })
             .collect();
         Arc::new(Machines { store, entries: Mutex::new(entries) })
     }
@@ -139,6 +168,25 @@ impl Machines {
     pub fn sink(self: &Arc<Self>, name: &str) -> Arc<dyn Sink> {
         Arc::new(Told { machines: Arc::clone(self), name: name.to_owned() })
     }
+}
+
+/// A machine's remote view switch, from the file in its folder.
+pub fn read_switch(store: &Store, name: &str) -> Switch {
+    Switch::read(fs::read_to_string(store.folder(name).join(SWITCH_FILE)).ok().as_deref())
+}
+
+/// Keeps a machine's remote view switch in the file in its folder, or takes the file away when the
+/// switch is as a machine that never had it.
+pub fn write_switch(store: &Store, name: &str, switch: &Switch) -> Result<(), String> {
+    let file = store.folder(name).join(SWITCH_FILE);
+    let written = match switch.text() {
+        Some(text) => fs::write(&file, text),
+        None => fs::remove_file(&file).or_else(|error| match error.kind() {
+            std::io::ErrorKind::NotFound => Ok(()),
+            _ => Err(error),
+        }),
+    };
+    written.map_err(|error| format!("{}: {error}", file.display()))
 }
 
 /// Adds `event` to the machine's events file as a line, and begins the file afresh when it has

@@ -1,4 +1,6 @@
 use super::*;
+use guesthouse_host_windows::guest_ctl::LineWriter;
+use guesthouse_remote_view_core::ctl_wire::{answer_lines, read_request};
 use std::path::PathBuf;
 use std::sync::mpsc::{Sender, channel};
 
@@ -19,6 +21,43 @@ struct Pretend {
     /// The bytes free wherever a machine is moved to. Plenty, unless it says.
     free_space: Option<u64>,
     disks: FileDisks,
+    /// remoteman's host in the guest, at the far end of its serial port.
+    remoteman: Arc<Remoteman>,
+}
+
+/// remoteman's host in a pretend Windows guest: it keeps the words of each `ctl` request that
+/// reaches it, answers `status` with `status`, and everything else with `ok`.
+#[derive(Default)]
+struct Remoteman {
+    status: Mutex<String>,
+    asked: Mutex<Vec<String>>,
+}
+
+impl Remoteman {
+    fn asked(&self) -> Vec<String> {
+        self.asked.lock().unwrap().clone()
+    }
+}
+
+/// The guest's serial port, as `ctl` writes to it: each request is answered at once, through the
+/// handle, as the reader of the port would.
+struct Port {
+    remoteman: Arc<Remoteman>,
+    ctl: GuestCtl,
+}
+
+impl LineWriter for Port {
+    fn write_line(&self, line: &[u8]) -> io::Result<()> {
+        let line = String::from_utf8_lossy(line).trim_end().to_owned();
+        let Some(Ok((id, words))) = read_request(&line) else { return Ok(()) };
+        self.remoteman.asked.lock().unwrap().push(words.join(" "));
+        let said =
+            if words == ["status"] { self.remoteman.status.lock().unwrap().clone() } else { "ok".into() };
+        for part in answer_lines(id, 0, said.as_bytes()).unwrap() {
+            self.ctl.take_line(&part);
+        }
+        Ok(())
+    }
 }
 
 impl Work for Pretend {
@@ -44,9 +83,11 @@ impl Work for Pretend {
         settings: &BootSettings,
         sink: Arc<dyn Sink>,
         stop: Arc<AtomicBool>,
+        ctl: GuestCtl,
     ) -> Result<(), String> {
         self.booted.lock().unwrap().push(settings.clone());
         sink.state(State::Running);
+        ctl.attach(Arc::new(Port { remoteman: Arc::clone(&self.remoteman), ctl: ctl.clone() }), true);
         if !self.silent.load(Ordering::SeqCst) {
             sink.event(Event::Guest("guesthouse: address: 172.29.1.2".into()));
         }
@@ -102,8 +143,37 @@ impl Work for Pretend {
         !self.busy_ports.lock().unwrap().contains(&port)
     }
 
+    fn udp_port_free(&self, port: u16) -> bool {
+        !self.net.state.lock().unwrap().busy_udp.contains(&port)
+    }
+
+    /// A relay that's only an entry in the double's calls, made as it opens and as it closes.
+    fn open_view(&self, view: &ViewSettings) -> Result<Held, String> {
+        let mut state = self.net.state.lock().unwrap();
+        state.calls.push(format!("open_view {} {}", view.port, view.upstream));
+        if state.refuse_view {
+            return Err("the port is taken".into());
+        }
+        state.views.push(view.port);
+        Ok(Box::new(Relay { net: Arc::clone(&self.net.state), port: view.port }))
+    }
+
     fn free_space(&self, _: &Path) -> Result<u64, String> {
         Ok(self.free_space.unwrap_or(u64::MAX))
+    }
+}
+
+/// A pretend relay, which says in the double's calls when it closes.
+struct Relay {
+    net: Arc<Mutex<network::NetState>>,
+    port: u16,
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        let mut state = self.net.lock().unwrap();
+        state.calls.push(format!("close_view {}", self.port));
+        state.views.retain(|port| *port != self.port);
     }
 }
 
@@ -1015,6 +1085,7 @@ fn a_file_that_is_a_link_is_not_followed() {
 
 mod network;
 mod places;
+mod remote_view;
 use network::FakeNet;
 #[test]
 fn nested_virtualization_is_off_until_asked_for_and_reaches_the_next_boot() {

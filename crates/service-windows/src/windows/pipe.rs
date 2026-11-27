@@ -453,7 +453,13 @@ mod tests {
         fn prepare(&self, _: &PrepareSettings, _: &dyn Sink) -> Result<(), String> {
             Err("not here".into())
         }
-        fn boot(&self, _: &BootSettings, _: Arc<dyn Sink>, _: Arc<AtomicBool>) -> Result<(), String> {
+        fn boot(
+            &self,
+            _: &BootSettings,
+            _: Arc<dyn Sink>,
+            _: Arc<AtomicBool>,
+            _: guesthouse_host_windows::guest_ctl::GuestCtl,
+        ) -> Result<(), String> {
             Err("not here".into())
         }
         fn cards(&self) -> Vec<CardInfo> {
@@ -480,6 +486,12 @@ mod tests {
         }
         fn port_free(&self, _: u16) -> bool {
             false
+        }
+        fn udp_port_free(&self, _: u16) -> bool {
+            false
+        }
+        fn open_view(&self, _: &crate::requests::ViewSettings) -> Result<crate::requests::Held, String> {
+            Err("not here".into())
         }
         fn free_space(&self, _: &Path) -> Result<u64, String> {
             Err("not here".into())
