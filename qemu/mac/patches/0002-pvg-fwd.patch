@@ -1,0 +1,527 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: s3k000 <144541403+s3k000@users.noreply.github.com>
+Date: Fri, 27 Nov 2026 13:16:20 -0800
+Subject: hw/display: add pvg-fwd, which forwards apple-gfx-pci to another
+ process
+
+pvg-fwd shows the guest the PCI function apple-gfx-pci shows, with the
+same IDs and BARs, but holds no device of its own. Register reads and
+writes go over a socket to the process that has the device, and the
+interrupts it raises come back the same way. That process reads and
+writes the guest's memory itself: it is handed the file behind each
+range of RAM over the socket, so the machine's RAM has to be a shared
+memory backend.
+
+  -object memory-backend-shm,id=ram,size=4G -M virt,memory-backend=ram
+  -device pvg-fwd,socket=/path/to/the/process/s/socket
+
+On a macOS host the other process is Guesthouse's graphics process,
+guesthouse-pvg-host, which keeps the framework's device behind a guard.
+---
+ hw/display/Kconfig      |   5 +
+ hw/display/meson.build  |   4 +
+ hw/display/pvg-fwd.c    | 449 ++++++++++++++++++++++++++++++++++++++++
+ hw/display/trace-events |   6 +
+ 4 files changed, 464 insertions(+)
+ create mode 100644 hw/display/pvg-fwd.c
+
+diff --git a/hw/display/Kconfig b/hw/display/Kconfig
+index 060274b..2033f04 100644
+--- a/hw/display/Kconfig
++++ b/hw/display/Kconfig
+@@ -63,6 +63,11 @@ config VMWARE_VGA
+     depends on PCI
+     select VGA
+ 
++config PVG_FWD
++    bool
++    default y if PCI_DEVICES
++    depends on PCI
++
+ config BOCHS_DISPLAY
+     bool
+     default y if PCI_DEVICES
+diff --git a/hw/display/meson.build b/hw/display/meson.build
+index d8b4e12..becc5c0 100644
+--- a/hw/display/meson.build
++++ b/hw/display/meson.build
+@@ -23,6 +23,10 @@ system_ss.add(when: 'CONFIG_VGA_ISA', if_true: files('vga-isa.c'))
+ system_ss.add(when: 'CONFIG_VGA_MMIO', if_true: files('vga-mmio.c'))
+ system_ss.add(when: 'CONFIG_VMWARE_VGA', if_true: files('vmware_vga.c'))
+ system_ss.add(when: 'CONFIG_BOCHS_DISPLAY', if_true: files('bochs-display.c'))
++# It hands the guest's memory on as files over a unix socket.
++if host_os != 'windows'
++  system_ss.add(when: 'CONFIG_PVG_FWD', if_true: files('pvg-fwd.c'))
++endif
+ 
+ system_ss.add(when: 'CONFIG_EXYNOS4', if_true: files('exynos4210_fimd.c'))
+ system_ss.add(when: 'CONFIG_FRAMEBUFFER', if_true: files('framebuffer.c'))
+diff --git a/hw/display/pvg-fwd.c b/hw/display/pvg-fwd.c
+new file mode 100644
+index 0000000..ad874be
+--- /dev/null
++++ b/hw/display/pvg-fwd.c
+@@ -0,0 +1,449 @@
++/*
++ * Forwards the registers of a paravirtualized graphics device to the
++ * process that has the device.
++ *
++ * On a macOS host the device is Apple's ParavirtualizedGraphics framework's,
++ * and it lives in a Guesthouse process of its own. This is what the guest
++ * sees of it: a PCI function with the IDs and BARs of apple-gfx-pci, whose
++ * register reads and writes go over a socket and whose interrupts come back
++ * over it. Nothing here knows what a register means.
++ *
++ * The other process reads and writes the guest's memory itself. It is handed
++ * the file behind each range of RAM over the socket, so the machine's RAM
++ * has to be a shared memory backend:
++ *
++ *   -object memory-backend-shm,id=ram,size=4G -M virt,memory-backend=ram
++ *   -device pvg-fwd,socket=/path/to/the/process/s/socket
++ *
++ * SPDX-License-Identifier: GPL-2.0-or-later
++ */
++
++#include "qemu/osdep.h"
++#include "qapi/error.h"
++#include "qemu/error-report.h"
++#include "qemu/main-loop.h"
++#include "qemu/module.h"
++#include "qemu/thread.h"
++#include "qemu/units.h"
++#include "hw/pci/pci_device.h"
++#include "hw/pci/msi.h"
++#include "hw/core/qdev-properties.h"
++#include "io/channel-socket.h"
++#include "system/address-spaces.h"
++#include "system/memory.h"
++#include "system/ramblock.h"
++#include "trace.h"
++
++#define TYPE_PVG_FWD "pvg-fwd"
++OBJECT_DECLARE_SIMPLE_TYPE(PvgFwdState, PVG_FWD)
++
++/* What a macOS guest's driver, and any other, finds the device by. */
++#define PVG_FWD_VENDOR_ID       0x106b
++#define PVG_FWD_DEVICE_ID       0xeeee
++
++/* BAR 0 is the graphics device's registers, BAR 2 the surface mapper's. */
++#define PVG_FWD_BAR_DEVICE      0
++#define PVG_FWD_BAR_MAPPER      2
++/* MSI vector 0 is the graphics device's, vector 1 the surface mapper's. */
++#define PVG_FWD_VECTORS         2
++#define PVG_FWD_MOST_BAR_BYTES  (16 * MiB)
++
++/*
++ * The words on the socket. Every message is four little-endian numbers; a
++ * range of guest memory comes with its file as ancillary data.
++ */
++#define PVG_FWD_PROTOCOL        1
++
++enum {
++    /* To the process. */
++    PVG_FWD_HELLO     = 1,      /* arg: the protocol; a: how many ranges */
++    PVG_FWD_RANGE     = 2,      /* a: guest address; b: length; c: file offset */
++    PVG_FWD_READ      = 3,      /* arg: BAR and size; a: offset */
++    PVG_FWD_WRITE     = 4,      /* arg: BAR and size; a: offset; b: value */
++    PVG_FWD_RESET     = 5,
++    /* From the process. */
++    PVG_FWD_REPLY     = 0x80,   /* b: the value read */
++    PVG_FWD_INTERRUPT = 0x81,   /* arg: the vector */
++    PVG_FWD_READY     = 0x82,   /* a, b: the two BARs' sizes */
++};
++
++typedef struct PvgFwdMessage {
++    uint32_t kind;
++    uint32_t arg;
++    uint64_t a;
++    uint64_t b;
++    uint64_t c;
++} PvgFwdMessage;
++
++QEMU_BUILD_BUG_ON(sizeof(PvgFwdMessage) != 32);
++
++struct PvgFwdState {
++    PCIDevice parent_obj;
++
++    char *socket_path;
++    QIOChannelSocket *ioc;
++    MemoryRegion device_regs;
++    MemoryRegion mapper_regs;
++    QemuThread reader;
++
++    /* The reply to the one call under way. Calls are made under the BQL. */
++    QemuMutex lock;
++    QemuCond replied;
++    bool have_reply;
++    uint64_t reply;
++    /* The process has gone, and the device with it. */
++    bool gone;
++};
++
++typedef struct PvgFwdBar {
++    PvgFwdState *state;
++    uint32_t bar;
++} PvgFwdBar;
++
++static void pvg_fwd_to_wire(PvgFwdMessage *msg)
++{
++    msg->kind = cpu_to_le32(msg->kind);
++    msg->arg = cpu_to_le32(msg->arg);
++    msg->a = cpu_to_le64(msg->a);
++    msg->b = cpu_to_le64(msg->b);
++    msg->c = cpu_to_le64(msg->c);
++}
++
++static void pvg_fwd_from_wire(PvgFwdMessage *msg)
++{
++    msg->kind = le32_to_cpu(msg->kind);
++    msg->arg = le32_to_cpu(msg->arg);
++    msg->a = le64_to_cpu(msg->a);
++    msg->b = le64_to_cpu(msg->b);
++    msg->c = le64_to_cpu(msg->c);
++}
++
++static void pvg_fwd_lost(PvgFwdState *s, Error *err)
++{
++    qemu_mutex_lock(&s->lock);
++    if (!s->gone) {
++        qatomic_set(&s->gone, true);
++        if (err) {
++            error_reportf_err(err, "pvg-fwd: the graphics process is gone: ");
++        } else {
++            error_report("pvg-fwd: the graphics process is gone");
++        }
++        qemu_cond_broadcast(&s->replied);
++    } else {
++        error_free(err);
++    }
++    qemu_mutex_unlock(&s->lock);
++}
++
++/*
++ * Sends one message and waits for its reply. Without the process a read is
++ * zero and a write is lost, which leaves the guest a dead device and no more.
++ */
++static uint64_t pvg_fwd_call(PvgFwdState *s, PvgFwdMessage msg)
++{
++    Error *err = NULL;
++    uint64_t value = 0;
++
++    assert(bql_locked());
++    if (qatomic_read(&s->gone)) {
++        return 0;
++    }
++    pvg_fwd_to_wire(&msg);
++    if (qio_channel_write_all(QIO_CHANNEL(s->ioc), (const char *)&msg,
++                              sizeof(msg), &err) < 0) {
++        pvg_fwd_lost(s, err);
++        return 0;
++    }
++
++    qemu_mutex_lock(&s->lock);
++    while (!s->have_reply && !s->gone) {
++        qemu_cond_wait(&s->replied, &s->lock);
++    }
++    if (s->have_reply) {
++        value = s->reply;
++        s->have_reply = false;
++    }
++    qemu_mutex_unlock(&s->lock);
++    return value;
++}
++
++typedef struct PvgFwdInterrupt {
++    PCIDevice *device;
++    uint32_t vector;
++} PvgFwdInterrupt;
++
++static void pvg_fwd_raise(void *opaque)
++{
++    PvgFwdInterrupt *job = opaque;
++
++    if (msi_enabled(job->device) && job->vector < PVG_FWD_VECTORS) {
++        msi_notify(job->device, job->vector);
++    }
++    g_free(job);
++}
++
++/* Reads what the process sends: replies for the caller, and interrupts. */
++static void *pvg_fwd_reader(void *opaque)
++{
++    PvgFwdState *s = opaque;
++    PvgFwdMessage msg;
++    Error *err = NULL;
++
++    while (qio_channel_read_all(QIO_CHANNEL(s->ioc), (char *)&msg,
++                                sizeof(msg), &err) == 0) {
++        pvg_fwd_from_wire(&msg);
++        if (msg.kind == PVG_FWD_REPLY) {
++            qemu_mutex_lock(&s->lock);
++            s->reply = msg.b;
++            s->have_reply = true;
++            qemu_cond_broadcast(&s->replied);
++            qemu_mutex_unlock(&s->lock);
++        } else if (msg.kind == PVG_FWD_INTERRUPT) {
++            PvgFwdInterrupt *job = g_new0(PvgFwdInterrupt, 1);
++
++            trace_pvg_fwd_interrupt(msg.arg);
++            job->device = PCI_DEVICE(s);
++            job->vector = msg.arg;
++            aio_bh_schedule_oneshot(qemu_get_aio_context(), pvg_fwd_raise,
++                                    job);
++        }
++    }
++    pvg_fwd_lost(s, err);
++    return NULL;
++}
++
++static uint32_t pvg_fwd_access(const PvgFwdBar *bar, unsigned size)
++{
++    return bar->bar | size << 8;
++}
++
++static uint64_t pvg_fwd_read(void *opaque, hwaddr offset, unsigned size)
++{
++    PvgFwdBar *bar = opaque;
++    PvgFwdMessage msg = {
++        .kind = PVG_FWD_READ,
++        .arg = pvg_fwd_access(bar, size),
++        .a = offset,
++    };
++    uint64_t value = pvg_fwd_call(bar->state, msg);
++
++    trace_pvg_fwd_read(bar->bar, offset, size, value);
++    return value;
++}
++
++static void pvg_fwd_write(void *opaque, hwaddr offset, uint64_t value,
++                          unsigned size)
++{
++    PvgFwdBar *bar = opaque;
++    PvgFwdMessage msg = {
++        .kind = PVG_FWD_WRITE,
++        .arg = pvg_fwd_access(bar, size),
++        .a = offset,
++        .b = value,
++    };
++
++    trace_pvg_fwd_write(bar->bar, offset, size, value);
++    pvg_fwd_call(bar->state, msg);
++}
++
++/* The graphics device's registers are 32 bits, the mapper's 64. */
++static const MemoryRegionOps pvg_fwd_device_ops = {
++    .read = pvg_fwd_read,
++    .write = pvg_fwd_write,
++    .endianness = DEVICE_LITTLE_ENDIAN,
++    .valid = {
++        .min_access_size = 4,
++        .max_access_size = 8,
++    },
++    .impl = {
++        .min_access_size = 4,
++        .max_access_size = 4,
++    },
++};
++
++static const MemoryRegionOps pvg_fwd_mapper_ops = {
++    .read = pvg_fwd_read,
++    .write = pvg_fwd_write,
++    .endianness = DEVICE_LITTLE_ENDIAN,
++    .valid = {
++        .min_access_size = 4,
++        .max_access_size = 8,
++    },
++    .impl = {
++        .min_access_size = 4,
++        .max_access_size = 8,
++    },
++};
++
++typedef struct PvgFwdRanges {
++    PvgFwdState *state;
++    /* NULL to count the ranges, set to send them. */
++    Error **errp;
++    unsigned count;
++    bool failed;
++} PvgFwdRanges;
++
++/* One range of guest RAM that has a file behind it which others can map. */
++static bool pvg_fwd_range(Int128 start, Int128 len, const MemoryRegion *mr,
++                          hwaddr offset_in_region, void *opaque)
++{
++    PvgFwdRanges *ranges = opaque;
++    PvgFwdMessage msg = {
++        .kind = PVG_FWD_RANGE,
++        .a = int128_get64(start),
++        .b = int128_get64(len),
++    };
++    struct iovec iov = { .iov_base = &msg, .iov_len = sizeof(msg) };
++    int fd;
++
++    if (!memory_region_is_ram(mr) || memory_region_is_rom(mr) ||
++        !qemu_ram_is_shared(mr->ram_block)) {
++        return false;
++    }
++    fd = memory_region_get_fd(mr);
++    if (fd < 0) {
++        return false;
++    }
++    ranges->count++;
++    if (!ranges->errp) {
++        return false;
++    }
++
++    msg.c = offset_in_region + qemu_ram_get_fd_offset(mr->ram_block);
++    pvg_fwd_to_wire(&msg);
++    if (qio_channel_writev_full_all(QIO_CHANNEL(ranges->state->ioc), &iov, 1,
++                                    &fd, 1, 0, ranges->errp) < 0) {
++        ranges->failed = true;
++        return true;
++    }
++    return false;
++}
++
++/* Tells the process of the guest's RAM and learns how large the BARs are. */
++static bool pvg_fwd_greet(PvgFwdState *s, PvgFwdMessage *ready, Error **errp)
++{
++    FlatView *fv = address_space_to_flatview(&address_space_memory);
++    PvgFwdRanges ranges = { .state = s };
++    PvgFwdMessage hello = { .kind = PVG_FWD_HELLO, .arg = PVG_FWD_PROTOCOL };
++    QIOChannel *ioc = QIO_CHANNEL(s->ioc);
++
++    flatview_for_each_range(fv, pvg_fwd_range, &ranges);
++    if (ranges.count == 0) {
++        error_setg(errp, "the guest's RAM has no shared file behind it: give "
++                   "the machine a memory-backend-shm, or a "
++                   "memory-backend-file with share=on");
++        return false;
++    }
++    hello.a = ranges.count;
++    pvg_fwd_to_wire(&hello);
++    if (qio_channel_write_all(ioc, (const char *)&hello, sizeof(hello),
++                              errp) < 0) {
++        return false;
++    }
++    ranges.count = 0;
++    ranges.errp = errp;
++    flatview_for_each_range(fv, pvg_fwd_range, &ranges);
++    if (ranges.failed) {
++        return false;
++    }
++
++    if (qio_channel_read_all(ioc, (char *)ready, sizeof(*ready), errp) < 0) {
++        return false;
++    }
++    pvg_fwd_from_wire(ready);
++    if (ready->kind != PVG_FWD_READY ||
++        !is_power_of_2(ready->a) || ready->a > PVG_FWD_MOST_BAR_BYTES ||
++        !is_power_of_2(ready->b) || ready->b > PVG_FWD_MOST_BAR_BYTES) {
++        error_setg(errp, "the graphics process made no device");
++        return false;
++    }
++    return true;
++}
++
++static void pvg_fwd_realize(PCIDevice *dev, Error **errp)
++{
++    PvgFwdState *s = PVG_FWD(dev);
++    SocketAddress address = { .type = SOCKET_ADDRESS_TYPE_UNIX };
++    PvgFwdBar *device_bar = g_new0(PvgFwdBar, 1);
++    PvgFwdBar *mapper_bar = g_new0(PvgFwdBar, 1);
++    PvgFwdMessage ready;
++
++    if (!s->socket_path) {
++        error_setg(errp, "'socket' names the graphics process's socket");
++        return;
++    }
++    qemu_mutex_init(&s->lock);
++    qemu_cond_init(&s->replied);
++    address.u.q_unix.path = s->socket_path;
++    s->ioc = qio_channel_socket_new();
++    if (qio_channel_socket_connect_sync(s->ioc, &address, errp) < 0 ||
++        !pvg_fwd_greet(s, &ready, errp)) {
++        return;
++    }
++
++    device_bar->state = mapper_bar->state = s;
++    device_bar->bar = PVG_FWD_BAR_DEVICE;
++    mapper_bar->bar = PVG_FWD_BAR_MAPPER;
++    memory_region_init_io(&s->device_regs, OBJECT(dev), &pvg_fwd_device_ops,
++                          device_bar, TYPE_PVG_FWD "-device", ready.a);
++    memory_region_init_io(&s->mapper_regs, OBJECT(dev), &pvg_fwd_mapper_ops,
++                          mapper_bar, TYPE_PVG_FWD "-mapper", ready.b);
++    pci_register_bar(dev, PVG_FWD_BAR_DEVICE, PCI_BASE_ADDRESS_SPACE_MEMORY,
++                     &s->device_regs);
++    pci_register_bar(dev, PVG_FWD_BAR_MAPPER, PCI_BASE_ADDRESS_SPACE_MEMORY,
++                     &s->mapper_regs);
++    if (msi_init(dev, 0, PVG_FWD_VECTORS, true, false, errp) != 0) {
++        return;
++    }
++
++    qemu_thread_create(&s->reader, TYPE_PVG_FWD, pvg_fwd_reader, s,
++                       QEMU_THREAD_DETACHED);
++}
++
++static void pvg_fwd_reset(Object *obj, ResetType type)
++{
++    PvgFwdState *s = PVG_FWD(obj);
++    PvgFwdMessage msg = { .kind = PVG_FWD_RESET };
++
++    if (s->ioc) {
++        trace_pvg_fwd_reset();
++        pvg_fwd_call(s, msg);
++    }
++}
++
++static const Property pvg_fwd_properties[] = {
++    DEFINE_PROP_STRING("socket", PvgFwdState, socket_path),
++};
++
++static void pvg_fwd_class_init(ObjectClass *klass, const void *data)
++{
++    DeviceClass *dc = DEVICE_CLASS(klass);
++    PCIDeviceClass *pci = PCI_DEVICE_CLASS(klass);
++    ResettableClass *rc = RESETTABLE_CLASS(klass);
++
++    rc->phases.hold = pvg_fwd_reset;
++    dc->desc = "Paravirtualized graphics, forwarded to the process that has "
++               "the device";
++    dc->hotpluggable = false;
++    set_bit(DEVICE_CATEGORY_DISPLAY, dc->categories);
++    device_class_set_props(dc, pvg_fwd_properties);
++
++    pci->vendor_id = PVG_FWD_VENDOR_ID;
++    pci->device_id = PVG_FWD_DEVICE_ID;
++    pci->class_id = PCI_CLASS_DISPLAY_OTHER;
++    pci->realize = pvg_fwd_realize;
++}
++
++static const TypeInfo pvg_fwd_types[] = {
++    {
++        .name          = TYPE_PVG_FWD,
++        .parent        = TYPE_PCI_DEVICE,
++        .instance_size = sizeof(PvgFwdState),
++        .class_init    = pvg_fwd_class_init,
++        .interfaces    = (const InterfaceInfo[]) {
++            { INTERFACE_PCIE_DEVICE },
++            { },
++        },
++    }
++};
++DEFINE_TYPES(pvg_fwd_types)
+diff --git a/hw/display/trace-events b/hw/display/trace-events
+index 223a085..ea15759 100644
+--- a/hw/display/trace-events
++++ b/hw/display/trace-events
+@@ -227,3 +227,9 @@ apple_gfx_iosfc_unmap_memory(void *a, void *b, void *c, void *d, void *e, void *
+ apple_gfx_iosfc_unmap_memory_region(void* mem, void *region) "unmapping @ %p from memory region %p"
+ apple_gfx_iosfc_raise_irq(uint32_t vector) "vector=0x%x"
+ 
++# pvg-fwd.c
++pvg_fwd_read(uint32_t bar, uint64_t offset, unsigned size, uint64_t value) "bar=%u offset=0x%"PRIx64" size=%u value=0x%"PRIx64
++pvg_fwd_write(uint32_t bar, uint64_t offset, unsigned size, uint64_t value) "bar=%u offset=0x%"PRIx64" size=%u value=0x%"PRIx64
++pvg_fwd_interrupt(uint32_t vector) "vector=%u"
++pvg_fwd_reset(void) ""
++
