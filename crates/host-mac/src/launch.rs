@@ -128,25 +128,15 @@ pub struct Launch {
 
 /// Why a socket cannot live at one of `sockets`, if one is too long for a socket address.
 pub fn socket_problem(sockets: &[&Path]) -> Option<String> {
-    sockets
-        .iter()
-        .find(|socket| socket.as_os_str().len() > MAX_SOCKET_PATH)
-        .map(|socket| {
-            format!(
-                "{} is too long for a socket; give the machine's folder a shorter name",
-                socket.display()
-            )
-        })
+    sockets.iter().find(|socket| socket.as_os_str().len() > MAX_SOCKET_PATH).map(|socket| {
+        format!("{} is too long for a socket; give the machine's folder a shorter name", socket.display())
+    })
 }
 
 impl Launch {
     /// Why this cannot be started as it stands, if it cannot.
     pub fn problem(&self) -> Option<String> {
-        let mut sockets = vec![
-            &self.control_socket,
-            &self.input_socket,
-            &self.remote_socket,
-        ];
+        let mut sockets = vec![&self.control_socket, &self.input_socket, &self.remote_socket];
         if self.graphics == Graphics::Guarded {
             sockets.extend([&self.host_socket, &self.host_control]);
         }
@@ -177,34 +167,16 @@ pub fn qemu_args(launch: &Launch) -> Vec<String> {
         // Shared guest memory, which the graphics process maps too. run.sh puts these first,
         // before its own plain `-M virt`, which QEMU merges with this one.
         add(&["-M", "virt,memory-backend=ram"]);
-        add(&[
-            "-object",
-            &format!("memory-backend-shm,id=ram,size={}M", launch.memory_mb),
-        ]);
+        add(&["-object", &format!("memory-backend-shm,id=ram,size={}M", launch.memory_mb)]);
     }
     add(&["-M", "virt", "-accel", "hvf", "-cpu", "host"]);
     add(&["-m", &launch.memory_mb.to_string()]);
     add(&["-smp", &launch.cores.to_string()]);
-    add(&[
-        "-drive",
-        &format!(
-            "if=pflash,format=raw,readonly=on,file={}",
-            path(&launch.firmware_code)
-        ),
-    ]);
-    add(&[
-        "-drive",
-        &format!("if=pflash,format=raw,file={}", path(&launch.firmware_vars)),
-    ]);
+    add(&["-drive", &format!("if=pflash,format=raw,readonly=on,file={}", path(&launch.firmware_code))]);
+    add(&["-drive", &format!("if=pflash,format=raw,file={}", path(&launch.firmware_vars))]);
     add(&["-display", "none"]);
-    add(&[
-        "-qmp",
-        &format!("unix:{},server,nowait", path(&launch.control_socket)),
-    ]);
-    add(&[
-        "-serial",
-        &format!("file:{}", path(&launch.run_dir.join("serial.log"))),
-    ]);
+    add(&["-qmp", &format!("unix:{},server,nowait", path(&launch.control_socket))]);
+    add(&["-serial", &format!("file:{}", path(&launch.run_dir.join("serial.log")))]);
     // Only a Linux machine has a network, and its scale as a file for the guest to read.
     let linux = launch.kind == LINUX;
     if linux {
@@ -215,82 +187,43 @@ pub fn qemu_args(launch: &Launch) -> Vec<String> {
     // Windows keeps the clock in local time, Linux in UTC.
     add(&["-rtc", if linux { "base=utc" } else { "base=localtime" }]);
     if linux {
-        add(&[
-            "-fw_cfg",
-            &format!("name={SCALE_FILE},string={}", launch.scale),
-        ]);
+        add(&["-fw_cfg", &format!("name={SCALE_FILE},string={}", launch.scale)]);
         if let Some(keyboard) = &launch.keyboard {
-            add(&[
-                "-fw_cfg",
-                &format!("name={KEYBOARD_FILE},string={keyboard}"),
-            ]);
+            add(&["-fw_cfg", &format!("name={KEYBOARD_FILE},string={keyboard}")]);
         }
     }
-    add(&[
-        "-device",
-        "qemu-xhci,id=xhci",
-        "-device",
-        "usb-kbd",
-        "-device",
-        "usb-tablet",
-    ]);
-    add(&[
-        "-drive",
-        &format!(
-            "if=none,id=hd,format=raw,file={},discard=unmap",
-            path(&launch.disk)
-        ),
-    ]);
+    add(&["-device", "qemu-xhci,id=xhci", "-device", "usb-kbd", "-device", "usb-tablet"]);
+    add(&["-drive", &format!("if=none,id=hd,format=raw,file={},discard=unmap", path(&launch.disk))]);
     add(&["-device", "nvme,drive=hd,serial=win0,bootindex=1"]);
     // No ramfb: Windows draws into the PV device's own framebuffer.
     // The installer boots first, as run.sh's WIN_ISO does; the answers are a second disc.
     if let Some(installer) = &launch.installer {
         add(&[
             "-drive",
-            &format!(
-                "if=none,id=cd,format=raw,media=cdrom,readonly=on,file={}",
-                path(installer)
-            ),
+            &format!("if=none,id=cd,format=raw,media=cdrom,readonly=on,file={}", path(installer)),
         ]);
         add(&["-device", "usb-storage,drive=cd,bootindex=0"]);
     }
     // The firmware starts a kernel it is handed before it looks at any disk.
     if let Some(boot) = &launch.installer_boot {
-        add(&[
-            "-kernel",
-            &path(&boot.kernel),
-            "-initrd",
-            &path(&boot.initrd),
-        ]);
+        add(&["-kernel", &path(&boot.kernel), "-initrd", &path(&boot.initrd)]);
         add(&["-append", &boot.command_line]);
     }
     if let Some(answers) = &launch.answer_disc {
         add(&[
             "-drive",
-            &format!(
-                "if=none,id=answers,format=raw,media=cdrom,readonly=on,file={}",
-                path(answers)
-            ),
+            &format!("if=none,id=answers,format=raw,media=cdrom,readonly=on,file={}", path(answers)),
         ]);
         add(&["-device", "usb-storage,drive=answers"]);
     }
     if let Some(stick) = &launch.stick {
-        add(&[
-            "-drive",
-            &format!("if=none,id=stick,format=raw,file={}", path(stick)),
-        ]);
+        add(&["-drive", &format!("if=none,id=stick,format=raw,file={}", path(stick))]);
         add(&["-device", "usb-storage,drive=stick,removable=on"]);
     }
-    add(&[
-        "-qmp",
-        &format!("unix:{},server,nowait", path(&launch.input_socket)),
-    ]);
+    add(&["-qmp", &format!("unix:{},server,nowait", path(&launch.input_socket))]);
     // Always there, so the screen can be shared with a machine that is already running. With
     // nobody connected it costs nothing.
-    add(&[
-        "-qmp",
-        &format!("unix:{},server,nowait", path(&launch.remote_socket)),
-    ]);
+    add(&["-qmp", &format!("unix:{},server,nowait", path(&launch.remote_socket))]);
     match launch.graphics {
         Graphics::Qemu => add(&["-device", &graphics_device(launch)]),
         Graphics::Guarded => add(&["-device", &forwarding_device(launch)]),
@@ -327,10 +260,8 @@ fn forwarding_device(launch: &Launch) -> String {
 fn graphics_device(launch: &Launch) -> String {
     let text = |value: &str| serde_json::to_string(value).expect("a string is JSON");
     let modes: Vec<String> = launch.modes.iter().map(|mode| text(mode)).collect();
-    let mut device = format!(
-        r#"{{"driver":"apple-gfx-pci","id":"pvg","display-modes":[{}]"#,
-        modes.join(",")
-    );
+    let mut device =
+        format!(r#"{{"driver":"apple-gfx-pci","id":"pvg","display-modes":[{}]"#, modes.join(","));
     if let Some(rom) = &launch.option_rom {
         device += &format!(r#","romfile":{}"#, text(&rom.display().to_string()));
     }
@@ -370,10 +301,7 @@ mod tests {
     }
 
     fn guarded() -> Launch {
-        Launch {
-            graphics: Graphics::Guarded,
-            ..launch()
-        }
+        Launch { graphics: Graphics::Guarded, ..launch() }
     }
 
     /// What run.sh passes for `WIN_PVG=host WIN_RMHOST=guesthouse.win WIN_MODES=1024x768@60
@@ -381,21 +309,14 @@ mod tests {
     /// second `-M` to the input sockets, with the shared memory first and `pvg-fwd` last in
     /// place of `apple-gfx-pci`, and the sockets made absolute.
     fn expected_guarded_like_run_sh() -> Vec<String> {
-        let mut want: Vec<String> = expected_like_run_sh()
-            .iter()
-            .map(|a| a.to_string())
-            .collect();
+        let mut want: Vec<String> = expected_like_run_sh().iter().map(|a| a.to_string()).collect();
         want.pop();
         want.push("pvg-fwd,id=pvg,socket=/s/Run/win/host.sock,romfile=/m/win/pvgfb.rom".into());
-        let mut first: Vec<String> = [
-            "-M",
-            "virt,memory-backend=ram",
-            "-object",
-            "memory-backend-shm,id=ram,size=6144M",
-        ]
-        .iter()
-        .map(|a| a.to_string())
-        .collect();
+        let mut first: Vec<String> =
+            ["-M", "virt,memory-backend=ram", "-object", "memory-backend-shm,id=ram,size=6144M"]
+                .iter()
+                .map(|a| a.to_string())
+                .collect();
         first.extend(want);
         first
     }
@@ -409,10 +330,7 @@ mod tests {
         }
         assert_eq!(got.len(), want.len());
         // Nothing of QEMU's own device is left, and no frame export on QEMU.
-        assert!(
-            !got.iter()
-                .any(|a| a.contains("apple-gfx") || a.contains("frame-export"))
-        );
+        assert!(!got.iter().any(|a| a.contains("apple-gfx") || a.contains("frame-export")));
     }
 
     #[test]
@@ -439,10 +357,7 @@ mod tests {
     fn without_an_option_rom_pvg_fwd_has_no_romfile_and_the_graphics_sockets_count_for_length() {
         let mut plain = guarded();
         plain.option_rom = None;
-        assert_eq!(
-            qemu_args(&plain).last().unwrap(),
-            "pvg-fwd,id=pvg,socket=/s/Run/win/host.sock"
-        );
+        assert_eq!(qemu_args(&plain).last().unwrap(), "pvg-fwd,id=pvg,socket=/s/Run/win/host.sock");
         let mut long = guarded();
         long.host_control = PathBuf::from("/x".repeat(60));
         assert!(long.problem().unwrap().contains("too long"));
@@ -516,27 +431,16 @@ mod tests {
     /// nothing else moves.
     #[test]
     fn a_linux_machine_gets_a_network_and_its_scale_and_nothing_else_changes() {
-        for (graphics, windows) in [
-            (Graphics::Qemu, qemu_args(&launch())),
-            (Graphics::Guarded, qemu_args(&guarded())),
-        ] {
-            let linux = Launch {
-                graphics,
-                kind: LINUX.into(),
-                scale: 1,
-                ..launch()
-            };
+        for (graphics, windows) in
+            [(Graphics::Qemu, qemu_args(&launch())), (Graphics::Guarded, qemu_args(&guarded()))]
+        {
+            let linux = Launch { graphics, kind: LINUX.into(), scale: 1, ..launch() };
             let got = qemu_args(&linux);
             let mut want = windows.clone();
             let nic = want.iter().position(|arg| arg == "-nic").unwrap();
             assert_eq!(want[nic + 1], "none");
             assert_eq!(want[nic + 2], "-rtc");
-            let network = [
-                "-netdev",
-                "user,id=net",
-                "-device",
-                "virtio-net-pci,netdev=net,romfile=",
-            ];
+            let network = ["-netdev", "user,id=net", "-device", "virtio-net-pci,netdev=net,romfile="];
             want.splice(nic..nic + 2, network.map(String::from));
             let rtc = want.iter().position(|arg| arg == "-rtc").unwrap();
             assert_eq!(want[rtc + 1], "base=localtime");
@@ -552,53 +456,24 @@ mod tests {
 
     #[test]
     fn a_linux_machine_is_told_the_mac_s_keyboard_after_its_scale_and_other_kinds_are_not() {
-        let linux = Launch {
-            kind: LINUX.into(),
-            keyboard: Some("ch fr".into()),
-            ..guarded()
-        };
+        let linux = Launch { kind: LINUX.into(), keyboard: Some("ch fr".into()), ..guarded() };
         let args = qemu_args(&linux);
-        let scale = args
-            .iter()
-            .position(|arg| arg.contains("guesthouse/scale"))
-            .unwrap();
+        let scale = args.iter().position(|arg| arg.contains("guesthouse/scale")).unwrap();
         assert_eq!(args[scale + 1], "-fw_cfg");
-        assert_eq!(
-            args[scale + 2],
-            "name=opt/com.ruxn.guesthouse/keyboard,string=ch fr"
-        );
-        let windows = Launch {
-            keyboard: Some("de".into()),
-            ..guarded()
-        };
-        assert!(
-            !qemu_args(&windows)
-                .iter()
-                .any(|arg| arg.contains("keyboard"))
-        );
+        assert_eq!(args[scale + 2], "name=opt/com.ruxn.guesthouse/keyboard,string=ch fr");
+        let windows = Launch { keyboard: Some("de".into()), ..guarded() };
+        assert!(!qemu_args(&windows).iter().any(|arg| arg.contains("keyboard")));
     }
 
     #[test]
     fn a_sharp_linux_machine_is_told_2_and_other_kinds_are_told_nothing() {
-        let linux = Launch {
-            kind: LINUX.into(),
-            ..guarded()
-        };
-        assert!(
-            qemu_args(&linux).contains(&"name=opt/com.ruxn.guesthouse/scale,string=2".to_string())
-        );
+        let linux = Launch { kind: LINUX.into(), ..guarded() };
+        assert!(qemu_args(&linux).contains(&"name=opt/com.ruxn.guesthouse/scale,string=2".to_string()));
         for kind in ["windows", "Linux", "other"] {
-            let other = Launch {
-                kind: kind.into(),
-                scale: 1,
-                ..guarded()
-            };
+            let other = Launch { kind: kind.into(), scale: 1, ..guarded() };
             let args = qemu_args(&other);
             assert!(!args.iter().any(|arg| arg == "-fw_cfg"), "{kind}");
-            assert!(
-                args.windows(2).any(|pair| pair == ["-nic", "none"]),
-                "{kind}"
-            );
+            assert!(args.windows(2).any(|pair| pair == ["-nic", "none"]), "{kind}");
         }
     }
 
@@ -608,11 +483,7 @@ mod tests {
         with_stick.stick = Some("/m/win/stick.img".into());
         let got = qemu_args(&with_stick);
         let mut want = expected_like_run_sh();
-        let at = want
-            .iter()
-            .position(|arg| arg.starts_with("unix:/s/Run/win/input"))
-            .unwrap()
-            - 1;
+        let at = want.iter().position(|arg| arg.starts_with("unix:/s/Run/win/input")).unwrap() - 1;
         want.splice(
             at..at,
             [
@@ -634,15 +505,8 @@ mod tests {
         installing.answer_disc = Some("/m/win/answers.iso".into());
         installing.stick = Some("/m/win/stick.img".into());
         let got = qemu_args(&installing);
-        let mut want: Vec<String> = expected_like_run_sh()
-            .iter()
-            .map(|a| a.to_string())
-            .collect();
-        let at = want
-            .iter()
-            .position(|arg| arg.starts_with("unix:/s/Run/win/input"))
-            .unwrap()
-            - 1;
+        let mut want: Vec<String> = expected_like_run_sh().iter().map(|a| a.to_string()).collect();
+        let at = want.iter().position(|arg| arg.starts_with("unix:/s/Run/win/input")).unwrap() - 1;
         let extra = [
             "-drive",
             "if=none,id=cd,format=raw,media=cdrom,readonly=on,file=/m/win/Win11.iso",
@@ -678,11 +542,7 @@ mod tests {
         let mut without = installing.clone();
         without.installer_boot = None;
         let mut want = qemu_args(&without);
-        let at = want
-            .iter()
-            .position(|arg| arg == "usb-storage,drive=cd,bootindex=0")
-            .unwrap()
-            + 1;
+        let at = want.iter().position(|arg| arg == "usb-storage,drive=cd,bootindex=0").unwrap() + 1;
         let extra = [
             "-kernel",
             "/m/u/installer-boot/casper/vmlinuz",
@@ -718,11 +578,7 @@ mod tests {
         let args = qemu_args(&odd);
         let device: serde_json::Value = serde_json::from_str(args.last().unwrap()).unwrap();
         assert_eq!(device["romfile"], "/m/my \"rom\".rom");
-        assert!(
-            args.contains(
-                &"if=none,id=hd,format=raw,file=/m/My Disk.img,discard=unmap".to_string()
-            )
-        );
+        assert!(args.contains(&"if=none,id=hd,format=raw,file=/m/My Disk.img,discard=unmap".to_string()));
     }
 
     #[test]

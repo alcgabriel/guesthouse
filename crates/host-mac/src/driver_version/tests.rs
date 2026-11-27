@@ -58,30 +58,18 @@ fn the_comparison_is_by_number_not_by_text() {
     record_reported(&machine, "0.9.0").unwrap();
     assert_eq!(
         state(&root, &machine),
-        DriverState::Old {
-            reported: "0.9.0".into(),
-            released: "0.10.0".into()
-        }
+        DriverState::Old { reported: "0.9.0".into(), released: "0.10.0".into() }
     );
     record_reported(&machine, "0.10.0").unwrap();
     assert_eq!(state(&root, &machine), DriverState::Current);
     // A machine whose install left the driver out is missing it, when nothing was reported.
     fs::remove_file(machine.join(REPORTED_FILE)).unwrap();
-    assert_eq!(
-        state(&root, &machine),
-        DriverState::Unknown,
-        "no install record, nothing to say"
-    );
+    assert_eq!(state(&root, &machine), DriverState::Unknown, "no install record, nothing to say");
     let mut info = InstallInfo::new("w", &Plan::for_guest(Guest::Windows), Source::Download);
     info.start_step(Step::InstallDriver, 0);
     info.fail(Step::InstallDriver, None, "turned away");
     state::save(&machine, &info).unwrap();
-    assert_eq!(
-        state(&root, &machine),
-        DriverState::Missing {
-            released: "0.10.0".into()
-        }
-    );
+    assert_eq!(state(&root, &machine), DriverState::Missing { released: "0.10.0".into() });
     let _ = fs::remove_dir_all(root);
 }
 
@@ -97,9 +85,6 @@ fn only_a_version_is_kept() {
 #[test]
 fn the_answer_for_the_app_says_the_versions() {
     assert_eq!(answer(&DriverState::Unknown), r#"{"state":"unknown"}"#);
-    let old = answer(&DriverState::Old {
-        reported: "0.9.0".into(),
-        released: "0.10.0".into(),
-    });
+    let old = answer(&DriverState::Old { reported: "0.9.0".into(), released: "0.10.0".into() });
     assert!(old.contains(r#""state":"old""#) && old.contains("0.10.0"));
 }

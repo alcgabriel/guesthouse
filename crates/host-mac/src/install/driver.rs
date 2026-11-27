@@ -7,8 +7,7 @@
 //!
 //! - `install.ps1`: trusts the certificate, turns test signing on and installs the driver from its
 //!   own folder (`pnputil /add-driver ruxnwddm-full.inf /install`), says how it went on the serial
-//!   port, and exits with Windows' error code if it failed. It signs nothing. A draft is in
-//!   `scripts/mac/release/`, with the script that lays the package out.
+//!   port, and exits with Windows' error code if it failed. It signs nothing.
 //! - `ruxnwddm.sys`, `ruxnwddm-full.inf`, `ruxnwddm-full.cat`: the kernel driver, already signed.
 //! - `ruxnumd.dll`, `winemetal.dll`, `ruxndxgi.dll`, `ruxnd3d11.dll`: the user-mode driver and what
 //!   it draws with (the INF's `[SourceDisksFiles]`), already signed in the catalog.
@@ -114,29 +113,20 @@ impl Manifest {
 
     /// The same for any guest's package.
     pub fn parse_for(package: &Package, text: &str) -> Result<Manifest, String> {
-        let manifest: Manifest = serde_json::from_str(text)
-            .map_err(|e| format!("The driver's manifest is not readable: {e}"))?;
+        let manifest: Manifest =
+            serde_json::from_str(text).map_err(|e| format!("The driver's manifest is not readable: {e}"))?;
         for entry in &manifest.files {
             for name in [&entry.name, &entry.package_name] {
                 if name.is_empty() || name.contains(['/', '\\']) || name.starts_with('.') {
-                    return Err(format!(
-                        "The driver's manifest names {name:?}, which is not a file name."
-                    ));
+                    return Err(format!("The driver's manifest names {name:?}, which is not a file name."));
                 }
             }
             if entry.sha256.len() != 64 || !entry.sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
-                return Err(format!(
-                    "The driver's manifest has no SHA-256 for {}.",
-                    entry.name
-                ));
+                return Err(format!("The driver's manifest has no SHA-256 for {}.", entry.name));
             }
         }
         for &needed in package.required {
-            let count = manifest
-                .files
-                .iter()
-                .filter(|e| e.package_name == needed)
-                .count();
+            let count = manifest.files.iter().filter(|e| e.package_name == needed).count();
             if count != 1 {
                 return Err(format!(
                     "The driver's manifest must name {needed} once, and it names it {count} times."
@@ -151,10 +141,7 @@ impl Manifest {
 fn refuse_private_keys<'a>(names: impl Iterator<Item = &'a str>) -> Result<(), String> {
     for name in names {
         let lower = name.to_ascii_lowercase();
-        if PRIVATE_KEY_ENDINGS
-            .iter()
-            .any(|ending| lower.ends_with(ending))
-        {
+        if PRIVATE_KEY_ENDINGS.iter().any(|ending| lower.ends_with(ending)) {
             return Err(format!(
                 "The driver's package has {name}, which looks like a private key. Packages carry the public certificate only."
             ));
@@ -170,10 +157,7 @@ fn folder_of(package: &Package, downloads: &Path, version: &str) -> PathBuf {
 
 /// Fetches the manifest and every file it names into `downloads`, each checked against its
 /// SHA-256, and returns the folder holding the package under its own names.
-pub fn fetch_package(
-    transport: &mut dyn Transport,
-    downloads: &Path,
-) -> Result<PathBuf, FetchError> {
+pub fn fetch_package(transport: &mut dyn Transport, downloads: &Path) -> Result<PathBuf, FetchError> {
     fetch_package_of(&WINDOWS, transport, downloads)
 }
 
@@ -189,17 +173,11 @@ pub fn fetch_package_of(
     let parts = folder.join("parts");
     for entry in &manifest.files {
         let url = format!("{BASE_URL}{}", entry.name);
-        let request = Request {
-            url: &url,
-            folder: &parts,
-            name: &entry.name,
-            sha256: &entry.sha256,
-        };
+        let request = Request { url: &url, folder: &parts, name: &entry.name, sha256: &entry.sha256 };
         match fetch::download(transport, &request, &mut |_, _| true)? {
             Outcome::Done(path) => {
-                fs::copy(&path, folder.join(&entry.package_name)).map_err(|e| {
-                    FetchError::new(format!("Cannot keep {}: {e}", entry.package_name))
-                })?;
+                fs::copy(&path, folder.join(&entry.package_name))
+                    .map_err(|e| FetchError::new(format!("Cannot keep {}: {e}", entry.package_name)))?;
             }
             Outcome::Stopped => return Err(FetchError::new("The driver's download was stopped.")),
         }
@@ -218,19 +196,11 @@ pub fn kept_package(downloads: &Path) -> Option<PathBuf> {
 /// The same for any guest's package.
 pub fn kept_package_of(package: &Package, downloads: &Path) -> Option<PathBuf> {
     let versions = fs::read_dir(downloads.join(package.folder)).ok()?;
-    let mut found: Vec<PathBuf> = versions
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.join(package.manifest).is_file())
-        .collect();
+    let mut found: Vec<PathBuf> =
+        versions.flatten().map(|e| e.path()).filter(|p| p.join(package.manifest).is_file()).collect();
     // By version number (0.3.36 is newer than 0.3.9), not by the folder's text. A folder whose
     // name is not three numbers sorts before every version, so it is only used when it is all there is.
-    found.sort_by_key(|folder| {
-        folder
-            .file_name()
-            .and_then(|n| n.to_str())
-            .and_then(version_numbers)
-    });
+    found.sort_by_key(|folder| folder.file_name().and_then(|n| n.to_str()).and_then(version_numbers));
     found.into_iter().rev().find(|folder| {
         let Ok(text) = fs::read_to_string(folder.join(package.manifest)) else {
             return false;
@@ -250,10 +220,7 @@ fn version_numbers(version: &str) -> Option<[u64; 3]> {
     if !guesthouse_update_check::is_version(version) {
         return None;
     }
-    let mut parts = version
-        .trim()
-        .split('.')
-        .map(|p| p.parse::<u64>().unwrap_or(0));
+    let mut parts = version.trim().split('.').map(|p| p.parse::<u64>().unwrap_or(0));
     Some([parts.next()?, parts.next()?, parts.next()?])
 }
 
@@ -266,31 +233,20 @@ pub fn package_files(folder: &Path) -> Result<Vec<PathBuf>, String> {
 
 /// The same for any guest's package; the manifest is one of them when the guest is given it.
 pub fn package_files_of(package: &Package, folder: &Path) -> Result<Vec<PathBuf>, String> {
-    let entries = fs::read_dir(folder).map_err(|_| {
-        format!(
-            "The driver's files are not at {}. Build them first.",
-            folder.display()
-        )
-    })?;
+    let entries = fs::read_dir(folder)
+        .map_err(|_| format!("The driver's files are not at {}. Build them first.", folder.display()))?;
     let files: Vec<PathBuf> = entries
         .flatten()
         .map(|e| e.path())
         .filter(|p| p.is_file())
-        .filter(|p| {
-            package.manifest_in_guest || p.file_name().is_some_and(|n| n != package.manifest)
-        })
+        .filter(|p| package.manifest_in_guest || p.file_name().is_some_and(|n| n != package.manifest))
         .collect();
-    let names: Vec<String> = files
-        .iter()
-        .filter_map(|f| f.file_name().map(|n| n.to_string_lossy().into_owned()))
-        .collect();
+    let names: Vec<String> =
+        files.iter().filter_map(|f| f.file_name().map(|n| n.to_string_lossy().into_owned())).collect();
     let manifest = package.manifest_in_guest.then_some(package.manifest);
     for &needed in package.required.iter().chain(manifest.iter()) {
         if !names.iter().any(|n| n == needed) {
-            return Err(format!(
-                "The driver's files at {} have no {needed}.",
-                folder.display()
-            ));
+            return Err(format!("The driver's files at {} have no {needed}.", folder.display()));
         }
     }
     refuse_private_keys(names.iter().map(String::as_str))?;

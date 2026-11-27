@@ -53,11 +53,8 @@ impl Agent {
     /// Remembers where the app says rmhost is, for when the machine is up.
     pub(super) fn remember_rmhost(&self, id: &str, path: Option<&str>) {
         if let Some(path) = path.filter(|path| !path.is_empty()) {
-            lock(&self.shared.slots)
-                .entry(id.to_string())
-                .or_default()
-                .share
-                .rmhost = Some(PathBuf::from(path));
+            lock(&self.shared.slots).entry(id.to_string()).or_default().share.rmhost =
+                Some(PathBuf::from(path));
         }
     }
 
@@ -79,10 +76,7 @@ impl Agent {
             return Ok(());
         }
         self.remember_rmhost(id, rmhost);
-        if !matches!(
-            self.share_state(id),
-            Some(ShareState::Starting | ShareState::Listening)
-        ) {
+        if !matches!(self.share_state(id), Some(ShareState::Starting | ShareState::Listening)) {
             self.share_spawn(id)?;
         }
         match pairing {
@@ -94,10 +88,7 @@ impl Agent {
     /// The ops `pair_close`, `pair_accept` and `pair_decline`: the person's event to the shared
     /// pairing, which sends rmhost what follows.
     pub(super) fn pair_event(&self, id: &str, event: PairEvent<'static>) -> Result<(), String> {
-        if !matches!(
-            self.share_state(id),
-            Some(ShareState::Starting | ShareState::Listening)
-        ) {
+        if !matches!(self.share_state(id), Some(ShareState::Starting | ShareState::Listening)) {
             return Err("This machine's screen is not being shared.".into());
         }
         self.pairing_event(id, event)
@@ -110,10 +101,7 @@ impl Agent {
         id: &str,
         words: impl FnOnce(&Policy) -> Result<Words, String>,
     ) -> Result<(), String> {
-        if !matches!(
-            self.share_state(id),
-            Some(ShareState::Starting | ShareState::Listening)
-        ) {
+        if !matches!(self.share_state(id), Some(ShareState::Starting | ShareState::Listening)) {
             return Err("This machine's screen is not being shared.".into());
         }
         self.pairing_device(id, words)
@@ -129,8 +117,7 @@ impl Agent {
             .custom_flags(libc::O_NONBLOCK)
             .open(&pipe)
             .map_err(|e| format!("cannot reach rmhost: {e}"))?;
-        file.write_all(line.as_bytes())
-            .map_err(|e| format!("cannot reach rmhost: {e}"))
+        file.write_all(line.as_bytes()).map_err(|e| format!("cannot reach rmhost: {e}"))
     }
 
     /// A machine is running (it has just come up, or an agent found it running again): shares
@@ -199,21 +186,15 @@ impl Agent {
             remote::set_enabled(&self.shared.config.machines, id, true)?;
             machine = store::find(&self.shared.config.machines, id)?;
         }
-        let launch = machine
-            .launch
-            .clone()
-            .ok_or("this machine cannot be started by the app")?;
-        let port = machine
-            .remote_port
-            .ok_or("no port could be chosen for this machine")?;
+        let launch = machine.launch.clone().ok_or("this machine cannot be started by the app")?;
+        let port = machine.remote_port.ok_or("no port could be chosen for this machine")?;
         let (running, rmhost) = {
             let slots = lock(&self.shared.slots);
             let slot = slots.get(id);
             (
                 slot.is_some_and(|slot| slot.status() == Status::Running),
                 // The program the app named, else the agent's own (`GUESTHOUSE_RMHOST`).
-                slot.and_then(|slot| slot.share.rmhost.clone())
-                    .or_else(|| self.shared.config.rmhost.clone()),
+                slot.and_then(|slot| slot.share.rmhost.clone()).or_else(|| self.shared.config.rmhost.clone()),
             )
         };
         if !running {
@@ -234,10 +215,8 @@ impl Agent {
                 return Err(reason);
             }
         };
-        let pid = process::identify(child.id() as i32).unwrap_or(Pid {
-            pid: child.id() as i32,
-            started: "0.000000".into(),
-        });
+        let pid = process::identify(child.id() as i32)
+            .unwrap_or(Pid { pid: child.id() as i32, started: "0.000000".into() });
         let _ = process::write_file(&run_dir.join(remote::PID_FILE), &pid);
         if let Some(slot) = lock(&self.shared.slots).get_mut(id) {
             slot.share.pid = Some(pid);
@@ -296,13 +275,7 @@ impl Agent {
     }
 
     /// Waits for rmhost, our own child, and tells how it ended.
-    fn watch_rmhost_child(
-        &self,
-        id: &str,
-        generation: u64,
-        mut child: std::process::Child,
-        run_dir: &Path,
-    ) {
+    fn watch_rmhost_child(&self, id: &str, generation: u64, mut child: std::process::Child, run_dir: &Path) {
         let status = child.wait();
         self.share_ended(id, generation, run_dir, status.ok());
     }
@@ -322,9 +295,7 @@ impl Agent {
                     }
                 }
                 seen = text.lines().count();
-                if started.elapsed() > LISTEN_WAIT
-                    && agent.share_state(&id) == Some(ShareState::Starting)
-                {
+                if started.elapsed() > LISTEN_WAIT && agent.share_state(&id) == Some(ShareState::Starting) {
                     agent.fail_share(&id, generation, "rmhost did not start listening.".into());
                     return;
                 }
@@ -392,15 +363,11 @@ impl Agent {
     }
 
     fn share_generation(&self, id: &str) -> u64 {
-        lock(&self.shared.slots)
-            .get(id)
-            .map_or(0, |slot| slot.share.generation)
+        lock(&self.shared.slots).get(id).map_or(0, |slot| slot.share.generation)
     }
 
     pub(super) fn share_state(&self, id: &str) -> Option<ShareState> {
-        lock(&self.shared.slots)
-            .get(id)
-            .and_then(|slot| slot.share.info.as_ref().map(|info| info.state))
+        lock(&self.shared.slots).get(id).and_then(|slot| slot.share.info.as_ref().map(|info| info.state))
     }
 
     /// Stores the share's new state and tells everyone connected if it is a change.
@@ -410,10 +377,7 @@ impl Agent {
         {
             return;
         }
-        eprintln!(
-            "guesthouse-agent: {id}: sharing the screen: {:?}",
-            info.state
-        );
+        eprintln!("guesthouse-agent: {id}: sharing the screen: {:?}", info.state);
         let line = share_event_line(&info);
         slot.share.info = Some(info);
         lock(&self.shared.subscribers).retain(|(_, sender)| sender.send(line.clone()).is_ok());
@@ -428,11 +392,8 @@ impl Agent {
             let _ = fs::remove_file(run_dir.join(remote::PID_FILE));
             return;
         }
-        let mut info = ShareInfo {
-            machine: id.to_string(),
-            state: ShareState::Starting,
-            ..ShareInfo::default()
-        };
+        let mut info =
+            ShareInfo { machine: id.to_string(), state: ShareState::Starting, ..ShareInfo::default() };
         // What it said earlier says where it stands now. Pairing may have been open: it is
         // reported as it was said, and not given a new time.
         let log = fs::read_to_string(run_dir.join(remote::LOG_FILE)).unwrap_or_default();
@@ -453,10 +414,7 @@ impl Agent {
             self.publish_share(id, slot, info);
             generation
         };
-        eprintln!(
-            "guesthouse-agent: {id}: found rmhost running again, pid {}",
-            pid.pid
-        );
+        eprintln!("guesthouse-agent: {id}: found rmhost running again, pid {}", pid.pid);
         let agent = self.clone();
         let (watch_id, dir) = (id.to_string(), run_dir.to_path_buf());
         thread::spawn(move || {
@@ -472,11 +430,7 @@ impl Agent {
 /// What one line from rmhost changes in the share's state.
 fn apply(info: &mut ShareInfo, event: LogEvent) {
     match event {
-        LogEvent::Listening {
-            port,
-            fingerprint,
-            pairing,
-        } => {
+        LogEvent::Listening { port, fingerprint, pairing } => {
             info.state = ShareState::Listening;
             info.port = Some(port);
             info.fingerprint = Some(fingerprint);
@@ -497,15 +451,10 @@ fn apply(info: &mut ShareInfo, event: LogEvent) {
 /// and writing.
 fn open_input_pipe(path: &Path) -> Result<File, String> {
     if !path.exists() {
-        let name = std::ffi::CString::new(path.as_os_str().as_encoded_bytes())
-            .map_err(|e| e.to_string())?;
+        let name = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()).map_err(|e| e.to_string())?;
         // SAFETY: `name` is a nul-terminated path that outlives the call.
         if unsafe { libc::mkfifo(name.as_ptr(), 0o600) } != 0 {
-            return Err(format!(
-                "cannot make {}: {}",
-                path.display(),
-                std::io::Error::last_os_error()
-            ));
+            return Err(format!("cannot make {}: {}", path.display(), std::io::Error::last_os_error()));
         }
     }
     OpenOptions::new()
@@ -518,15 +467,6 @@ fn open_input_pipe(path: &Path) -> Result<File, String> {
 /// The last line rmhost printed that is a message of its own, which says why it ended.
 fn last_words(log: &Path) -> Option<String> {
     let text = fs::read_to_string(log).ok()?;
-    let line = text
-        .lines()
-        .rev()
-        .map(str::trim)
-        .find(|line| !line.is_empty())?;
-    Some(
-        line.trim_start_matches("rmhost: ")
-            .chars()
-            .take(200)
-            .collect(),
-    )
+    let line = text.lines().rev().map(str::trim).find(|line| !line.is_empty())?;
+    Some(line.trim_start_matches("rmhost: ").chars().take(200).collect())
 }

@@ -56,13 +56,8 @@ pub enum Step {
 
 impl Step {
     /// The steps in the order they are done.
-    pub const ALL: [Step; 5] = [
-        Step::Fetch,
-        Step::MakeDisk,
-        Step::InstallSystem,
-        Step::InstallDriver,
-        Step::FirstStart,
-    ];
+    pub const ALL: [Step; 5] =
+        [Step::Fetch, Step::MakeDisk, Step::InstallSystem, Step::InstallDriver, Step::FirstStart];
 
     /// The line for this step on the progress screen. Making the disk is part of installing the
     /// system on a screen, and has none of its own.
@@ -89,10 +84,7 @@ impl Plan {
     /// Windows and Ubuntu are two plans over the same machine: the same steps, each done its own
     /// way by `steps`.
     pub fn for_guest(guest: Guest) -> Plan {
-        Plan {
-            guest,
-            steps: Step::ALL.to_vec(),
-        }
+        Plan { guest, steps: Step::ALL.to_vec() }
     }
 }
 
@@ -120,14 +112,8 @@ mod tests {
 
     #[test]
     fn the_screens_words_are_the_designs() {
-        assert_eq!(
-            Step::Fetch.label(Guest::Windows).unwrap(),
-            "Download Windows"
-        );
-        assert_eq!(
-            Step::InstallSystem.label(Guest::Ubuntu).unwrap(),
-            "Install Ubuntu"
-        );
+        assert_eq!(Step::Fetch.label(Guest::Windows).unwrap(), "Download Windows");
+        assert_eq!(Step::InstallSystem.label(Guest::Ubuntu).unwrap(), "Install Ubuntu");
         assert_eq!(
             Step::InstallDriver.label(Guest::Ubuntu).unwrap(),
             "Install the Guesthouse graphics driver"

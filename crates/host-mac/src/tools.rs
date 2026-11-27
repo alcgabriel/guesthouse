@@ -129,55 +129,27 @@ pub fn locate(tool: Tool, places: &Places) -> Result<Found, String> {
                 why: "You chose it in Settings.".into(),
             });
         }
-        passed_over = Some(format!(
-            "The chosen {} is not there ({setting}). ",
-            tool.file_name()
-        ));
+        passed_over = Some(format!("The chosen {} is not there ({setting}). ", tool.file_name()));
     }
     let prefix = passed_over.unwrap_or_default();
 
     let environment = format!("Set by {} in the environment.", tool.environment());
     let candidates = [
-        (
-            &places.environment,
-            Source::Environment,
-            environment.as_str(),
-        ),
-        (
-            &places.bundled,
-            Source::Bundled,
-            "The copy that comes inside Guesthouse.",
-        ),
+        (&places.environment, Source::Environment, environment.as_str()),
+        (&places.bundled, Source::Bundled, "The copy that comes inside Guesthouse."),
     ];
     let lab = places.lab.iter().map(|path| {
-        (
-            Some(path),
-            Source::Lab,
-            "The lab's own build, used because it is there. Only the lab's Mac has it.",
-        )
+        (Some(path), Source::Lab, "The lab's own build, used because it is there. Only the lab's Mac has it.")
     });
-    let candidates = candidates
-        .into_iter()
-        .map(|(path, source, why)| (path.as_ref(), source, why))
-        .chain(lab);
+    let candidates =
+        candidates.into_iter().map(|(path, source, why)| (path.as_ref(), source, why)).chain(lab);
     for (path, source, why) in candidates {
         if let Some(path) = path.filter(|path| path.is_file()) {
-            return Ok(Found {
-                path: path.clone(),
-                source,
-                why: format!("{prefix}{why}"),
-            });
+            return Ok(Found { path: path.clone(), source, why: format!("{prefix}{why}") });
         }
     }
-    let choose = if matches!(tool, Tool::Qemu | Tool::PvgQemu) {
-        " Choose it in Settings."
-    } else {
-        ""
-    };
-    Err(format!(
-        "{prefix}Guesthouse cannot find {}.{choose}",
-        tool.described()
-    ))
+    let choose = if matches!(tool, Tool::Qemu | Tool::PvgQemu) { " Choose it in Settings." } else { "" };
+    Err(format!("{prefix}Guesthouse cannot find {}.{choose}", tool.described()))
 }
 
 /// `locate`, and then a look at what the program found can do: a graphics process that cannot
@@ -213,8 +185,7 @@ mod tests {
 
     impl Scratch {
         fn new(name: &str) -> Scratch {
-            let path =
-                std::env::temp_dir().join(format!("guesthouse-qemu-{name}-{}", std::process::id()));
+            let path = std::env::temp_dir().join(format!("guesthouse-qemu-{name}-{}", std::process::id()));
             let _ = fs::remove_dir_all(&path);
             fs::create_dir_all(&path).unwrap();
             Scratch(path)
@@ -258,11 +229,8 @@ mod tests {
     #[test]
     fn bundled_comes_before_the_lab() {
         let dir = Scratch::new("bundled");
-        let places = Places {
-            bundled: Some(dir.file("bundled")),
-            lab: vec![dir.file("lab")],
-            ..Places::default()
-        };
+        let places =
+            Places { bundled: Some(dir.file("bundled")), lab: vec![dir.file("lab")], ..Places::default() };
         assert_eq!(locate(Tool::Qemu, &places).unwrap().source, Source::Bundled);
     }
 
@@ -274,19 +242,13 @@ mod tests {
             bundled: Some(dir.file("bundled")),
             ..Places::default()
         };
-        assert_eq!(
-            locate(Tool::Qemu, &places).unwrap().source,
-            Source::Environment
-        );
+        assert_eq!(locate(Tool::Qemu, &places).unwrap().source, Source::Environment);
     }
 
     #[test]
     fn the_lab_build_is_used_last_and_says_so() {
         let dir = Scratch::new("lab");
-        let places = Places {
-            lab: vec![dir.file("lab")],
-            ..Places::default()
-        };
+        let places = Places { lab: vec![dir.file("lab")], ..Places::default() };
         let found = locate(Tool::Qemu, &places).unwrap();
         assert_eq!(found.source, Source::Lab);
         assert!(found.why.contains("lab"));
@@ -296,10 +258,8 @@ mod tests {
     fn the_newer_lab_graphics_process_comes_before_the_older_one() {
         let dir = Scratch::new("pvg");
         let (newer, older) = (dir.file("newer"), dir.file("older"));
-        let mut places = Places {
-            lab: vec![dir.0.join("absent"), newer.clone(), older.clone()],
-            ..Places::default()
-        };
+        let mut places =
+            Places { lab: vec![dir.0.join("absent"), newer.clone(), older.clone()], ..Places::default() };
         assert_eq!(locate(Tool::PvgHost, &places).unwrap().path, newer);
         places.lab.remove(1);
         assert_eq!(locate(Tool::PvgHost, &places).unwrap().path, older);
@@ -315,19 +275,12 @@ mod tests {
         };
         let found = locate(Tool::Qemu, &places).unwrap();
         assert_eq!(found.source, Source::Bundled);
-        assert!(
-            found
-                .why
-                .starts_with("The chosen qemu-system-aarch64 is not there (/no/such/qemu).")
-        );
+        assert!(found.why.starts_with("The chosen qemu-system-aarch64 is not there (/no/such/qemu)."));
     }
 
     #[test]
     fn a_missing_setting_and_nothing_else_is_an_error_that_names_the_setting() {
-        let places = Places {
-            setting: Some("/no/such/qemu".into()),
-            ..Places::default()
-        };
+        let places = Places { setting: Some("/no/such/qemu".into()), ..Places::default() };
         let error = locate(Tool::Qemu, &places).unwrap_err();
         assert!(error.contains("/no/such/qemu"));
     }
@@ -335,14 +288,8 @@ mod tests {
     #[test]
     fn rmhost_is_found_like_qemu_and_its_absence_has_its_own_sentence() {
         let dir = Scratch::new("rmhost");
-        let places = Places {
-            bundled: Some(dir.file("rmhost")),
-            ..Places::default()
-        };
-        assert_eq!(
-            locate(Tool::Rmhost, &places).unwrap().source,
-            Source::Bundled
-        );
+        let places = Places { bundled: Some(dir.file("rmhost")), ..Places::default() };
+        assert_eq!(locate(Tool::Rmhost, &places).unwrap().source, Source::Bundled);
         let error = locate(Tool::Rmhost, &Places::default()).unwrap_err();
         assert!(error.contains("rmhost"));
         assert!(!error.contains("Settings"));
@@ -351,11 +298,8 @@ mod tests {
     #[test]
     fn an_empty_setting_counts_as_none() {
         let dir = Scratch::new("empty");
-        let places = Places {
-            setting: Some(String::new()),
-            bundled: Some(dir.file("bundled")),
-            ..Places::default()
-        };
+        let places =
+            Places { setting: Some(String::new()), bundled: Some(dir.file("bundled")), ..Places::default() };
         let found = locate(Tool::Qemu, &places).unwrap();
         assert_eq!(found.source, Source::Bundled);
         assert!(!found.why.contains("not there"));

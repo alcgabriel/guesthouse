@@ -15,21 +15,12 @@ struct Scripted {
 
 impl Scripted {
     fn new(answers: Vec<Result<Ended, StepError>>) -> Scripted {
-        Scripted {
-            answers: answers.into(),
-            asked: vec![],
-            report: vec![],
-        }
+        Scripted { answers: answers.into(), asked: vec![], report: vec![] }
     }
 }
 
 impl Steps for Scripted {
-    fn run(
-        &mut self,
-        step: Step,
-        _info: &InstallInfo,
-        progress: Progress,
-    ) -> Result<Ended, StepError> {
+    fn run(&mut self, step: Step, _info: &InstallInfo, progress: Progress) -> Result<Ended, StepError> {
         self.asked.push(step);
         for report in self.report.clone() {
             if !progress(report) {
@@ -91,12 +82,7 @@ fn progress_from_a_step_reaches_the_state() {
     let mut steps = Scripted::new(vec![]);
     steps.report = vec![Report::Bytes(500, Some(1000))];
     runner.run(&mut steps);
-    let halves = seen
-        .lock()
-        .unwrap()
-        .iter()
-        .filter(|i| i.steps[0].progress.fraction == 0.5)
-        .count();
+    let halves = seen.lock().unwrap().iter().filter(|i| i.steps[0].progress.fraction == 0.5).count();
     assert!(halves >= 1);
     let _ = std::fs::remove_dir_all(folder);
 }
@@ -111,9 +97,7 @@ fn a_download_s_many_reports_are_told_at_most_every_tenth_of_a_second_and_its_en
     let clock = || tick.fetch_add(1, Ordering::Relaxed) / 20;
     let mut runner = runner(&folder, &seen, &mut changed, &clock);
     let mut steps = Scripted::new(vec![]);
-    steps.report = (1..=1000)
-        .map(|done| Report::Bytes(done, Some(1000)))
-        .collect();
+    steps.report = (1..=1000).map(|done| Report::Bytes(done, Some(1000))).collect();
     runner.run(&mut steps);
     let seen = seen.lock().unwrap();
     let during = seen
@@ -123,14 +107,8 @@ fn a_download_s_many_reports_are_told_at_most_every_tenth_of_a_second_and_its_en
             fraction > 0.0 && fraction < 1.0
         })
         .count();
-    assert!(
-        during <= 2,
-        "{during} changes told for 1000 chunks in 50 ms"
-    );
-    assert!(
-        seen.iter().any(|i| i.steps[0].progress.fraction == 1.0),
-        "the end is told"
-    );
+    assert!(during <= 2, "{during} changes told for 1000 chunks in 50 ms");
+    assert!(seen.iter().any(|i| i.steps[0].progress.fraction == 1.0), "the end is told");
     drop(seen);
     let _ = std::fs::remove_dir_all(folder);
 }
@@ -146,18 +124,12 @@ fn a_failure_stops_the_run_with_its_code_and_choices_and_try_again_goes_on_from_
         Ok(Ended::Done),
         Ok(Ended::Done),
         Ok(Ended::Done),
-        Err(StepError::coded(
-            "0x80070005",
-            "Windows turned the driver away.",
-        )),
+        Err(StepError::coded("0x80070005", "Windows turned the driver away.")),
     ]);
     runner.run(&mut steps);
     assert_eq!(runner.info.state, Phase::Failed);
     let failure = runner.info.failure.clone().unwrap();
-    assert_eq!(
-        (failure.step, failure.code.as_deref()),
-        (Step::InstallDriver, Some("0x80070005"))
-    );
+    assert_eq!((failure.step, failure.code.as_deref()), (Step::InstallDriver, Some("0x80070005")));
     assert!(failure.choices.contains(&Choice::OpenWithoutDriver));
     assert_eq!(steps.asked.len(), 4);
 
@@ -186,19 +158,9 @@ fn opening_without_the_driver_goes_on_without_asking_for_it_again() {
     assert!(runner.info.open_without_driver());
     runner.run(&mut steps);
     assert_eq!(runner.info.state, Phase::Done);
-    assert_eq!(
-        runner.info.status_of(Step::InstallDriver),
-        StepStatus::Skipped
-    );
+    assert_eq!(runner.info.status_of(Step::InstallDriver), StepStatus::Skipped);
     assert_eq!(steps.asked.last(), Some(&Step::FirstStart));
-    assert_eq!(
-        steps
-            .asked
-            .iter()
-            .filter(|s| **s == Step::InstallDriver)
-            .count(),
-        1
-    );
+    assert_eq!(steps.asked.iter().filter(|s| **s == Step::InstallDriver).count(), 1);
     let _ = std::fs::remove_dir_all(folder);
 }
 
@@ -223,12 +185,7 @@ fn stopping_ends_the_step_in_hand_and_leaves_the_rest_for_later() {
     flag.store(false, Ordering::Relaxed);
     struct StopAfterFirst(Arc<AtomicBool>, Scripted);
     impl Steps for StopAfterFirst {
-        fn run(
-            &mut self,
-            step: Step,
-            info: &InstallInfo,
-            progress: Progress,
-        ) -> Result<Ended, StepError> {
+        fn run(&mut self, step: Step, info: &InstallInfo, progress: Progress) -> Result<Ended, StepError> {
             self.0.store(true, Ordering::Relaxed);
             self.1.run(step, info, progress)
         }
@@ -246,11 +203,8 @@ fn an_install_found_half_done_is_gone_on_from_by_a_new_runner() {
     let clock = || 0;
     {
         let mut first = runner(&folder, &seen, &mut changed, &clock);
-        let mut steps = Scripted::new(vec![
-            Ok(Ended::Done),
-            Ok(Ended::Done),
-            Err(StepError::new("closed mid-way")),
-        ]);
+        let mut steps =
+            Scripted::new(vec![Ok(Ended::Done), Ok(Ended::Done), Err(StepError::new("closed mid-way"))]);
         first.run(&mut steps);
     }
     // The app closed with the third step running; as found, it is running.
@@ -262,10 +216,7 @@ fn an_install_found_half_done_is_gone_on_from_by_a_new_runner() {
     second.info = found;
     let mut steps = Scripted::new(vec![]);
     second.run(&mut steps);
-    assert_eq!(
-        steps.asked,
-        [Step::InstallSystem, Step::InstallDriver, Step::FirstStart]
-    );
+    assert_eq!(steps.asked, [Step::InstallSystem, Step::InstallDriver, Step::FirstStart]);
     assert_eq!(second.info.state, Phase::Done);
     let _ = std::fs::remove_dir_all(folder);
 }

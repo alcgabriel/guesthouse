@@ -86,17 +86,14 @@ pub struct RealSteps<'a> {
 }
 
 fn from_fetch(error: FetchError) -> StepError {
-    StepError {
-        code: error.code,
-        message: error.message,
-    }
+    StepError { code: error.code, message: error.message }
 }
 
 /// Sets and removes keys in the machine's `machine.json`, keeping every other.
 pub fn set_keys(folder: &Path, changes: &[(&str, Option<&str>)]) -> Result<(), StepError> {
     let path = folder.join(MACHINE_FILE);
-    let text = fs::read_to_string(&path)
-        .map_err(|e| StepError::new(format!("Cannot read {MACHINE_FILE}: {e}")))?;
+    let text =
+        fs::read_to_string(&path).map_err(|e| StepError::new(format!("Cannot read {MACHINE_FILE}: {e}")))?;
     let mut settings: serde_json::Value = serde_json::from_str(&text)
         .map_err(|e| StepError::new(format!("{MACHINE_FILE} is not valid: {e}")))?;
     for (key, value) in changes {
@@ -107,8 +104,7 @@ pub fn set_keys(folder: &Path, changes: &[(&str, Option<&str>)]) -> Result<(), S
             }
         }
     }
-    write_json(&path, &settings)
-        .map_err(|e| StepError::new(format!("Cannot write {MACHINE_FILE}: {e}")))
+    write_json(&path, &settings).map_err(|e| StepError::new(format!("Cannot write {MACHINE_FILE}: {e}")))
 }
 
 /// The installer the fetch named in the machine's file.
@@ -124,11 +120,7 @@ fn read_firmware(path: &Path) -> Option<Vec<u8>> {
         return fs::read(path).ok();
     }
     let compressed = PathBuf::from(format!("{}.bz2", path.display()));
-    let output = std::process::Command::new("bunzip2")
-        .arg("-c")
-        .arg(&compressed)
-        .output()
-        .ok()?;
+    let output = std::process::Command::new("bunzip2").arg("-c").arg(&compressed).output().ok()?;
     (compressed.is_file() && output.status.success()).then_some(output.stdout)
 }
 
@@ -138,11 +130,7 @@ pub fn firmware_dirs_of(qemu: &Path) -> Vec<PathBuf> {
     let Some(folder) = qemu.parent() else {
         return Vec::new();
     };
-    let mut dirs: Vec<PathBuf> = folder
-        .parent()
-        .map(|p| p.join("share/qemu"))
-        .into_iter()
-        .collect();
+    let mut dirs: Vec<PathBuf> = folder.parent().map(|p| p.join("share/qemu")).into_iter().collect();
     dirs.push(folder.join("pc-bios"));
     dirs
 }
@@ -157,10 +145,7 @@ pub fn find_firmware(dirs: &[PathBuf]) -> Result<(Vec<u8>, Vec<u8>), StepError> 
             return Ok((code, vars));
         }
     }
-    Err(StepError::coded(
-        "no_firmware",
-        "QEMU's firmware for ARM (edk2) was not found next to QEMU.",
-    ))
+    Err(StepError::coded("no_firmware", "QEMU's firmware for ARM (edk2) was not found next to QEMU."))
 }
 
 impl RealSteps<'_> {
@@ -170,8 +155,9 @@ impl RealSteps<'_> {
 
     fn fetch(&mut self, info: &InstallInfo, progress: Progress) -> Result<Ended, StepError> {
         let installer = match (self.setup.guest, &info.source) {
-            (Guest::Windows, Source::File { path }) => windows::check_installer(Path::new(path))
-                .map_err(|m| StepError::coded("bad_installer", m))?,
+            (Guest::Windows, Source::File { path }) => {
+                windows::check_installer(Path::new(path)).map_err(|m| StepError::coded("bad_installer", m))?
+            }
             (Guest::Windows, Source::Download) => {
                 return Err(StepError::coded(
                     "choose_installer",
@@ -195,12 +181,8 @@ impl RealSteps<'_> {
                     .map_err(from_fetch)?;
                 let image = ubuntu::pick_image(&sums).map_err(StepError::new)?;
                 let folder = self.setup.downloads.join("ubuntu");
-                let request = Request {
-                    url: &image.url,
-                    folder: &folder,
-                    name: &image.name,
-                    sha256: &image.sha256,
-                };
+                let request =
+                    Request { url: &image.url, folder: &folder, name: &image.name, sha256: &image.sha256 };
                 match fetch::download(self.transport, &request, &mut |done, total| {
                     progress(Report::Bytes(done, Some(total)))
                 })
@@ -211,10 +193,7 @@ impl RealSteps<'_> {
                 }
             }
         };
-        set_keys(
-            &self.folder(),
-            &[("installer", Some(&installer.display().to_string()))],
-        )?;
+        set_keys(&self.folder(), &[("installer", Some(&installer.display().to_string()))])?;
         // The driver comes with the installer, so a missing package stops the install here and
         // not an hour in. A folder named by the lab takes its place.
         if self.setup.guest == Guest::Windows && self.setup.driver_dir.is_none() {
@@ -308,8 +287,7 @@ impl RealSteps<'_> {
                             "The driver's files were not found. Download them again.",
                         )
                     })?;
-                let files =
-                    driver::package_files(&dir).map_err(|m| StepError::coded("no_driver", m))?;
+                let files = driver::package_files(&dir).map_err(|m| StepError::coded("no_driver", m))?;
                 self.control
                     .make_stick(&folder.join("stick.img"), &files)
                     .map_err(|m| StepError::coded("stick", m))?;
@@ -364,9 +342,7 @@ impl RealSteps<'_> {
                     format!("The guest did not finish in {} minutes.", max_ms / 60_000),
                 ));
             }
-            if !progress(Report::Fraction(
-                (elapsed as f64 / usual_ms.max(1) as f64).min(GUESS_CEILING),
-            )) {
+            if !progress(Report::Fraction((elapsed as f64 / usual_ms.max(1) as f64).min(GUESS_CEILING))) {
                 return Ok(None);
             }
             self.control.sleep_ms(POLL_MS);
@@ -381,22 +357,14 @@ impl RealSteps<'_> {
             Guest::Windows => SYSTEM_INSTALL_MAX_MS,
             Guest::Ubuntu => UBUNTU_INSTALL_USUAL_MS,
         };
-        let heard = self.wait_for(
-            SYSTEM_INSTALL_MAX_MS,
-            usual,
-            0,
-            progress,
-            |text| match guest {
-                Guest::Windows => text
-                    .contains(windows::marker::SYSTEM_INSTALLED)
-                    .then_some(Ok(())),
-                Guest::Ubuntu if text.contains(ubuntu::FAILED) => Some(Err(StepError::coded(
-                    "autoinstall",
-                    "Ubuntu's installer reported an error. Its log is in the machine's serial.log.",
-                ))),
-                Guest::Ubuntu => text.contains(ubuntu::FINISHED).then_some(Ok(())),
-            },
-        )?;
+        let heard = self.wait_for(SYSTEM_INSTALL_MAX_MS, usual, 0, progress, |text| match guest {
+            Guest::Windows => text.contains(windows::marker::SYSTEM_INSTALLED).then_some(Ok(())),
+            Guest::Ubuntu if text.contains(ubuntu::FAILED) => Some(Err(StepError::coded(
+                "autoinstall",
+                "Ubuntu's installer reported an error. Its log is in the machine's serial.log.",
+            ))),
+            Guest::Ubuntu => text.contains(ubuntu::FINISHED).then_some(Ok(())),
+        })?;
         if heard.is_none() {
             return Ok(Ended::Stopped);
         }
@@ -421,53 +389,31 @@ impl RealSteps<'_> {
             return self.ubuntu_driver(progress);
         }
         let heard = self.wait_for(DRIVER_MAX_MS, DRIVER_MAX_MS, 0, progress, |text| {
-            if let Some(line) = text
-                .lines()
-                .find(|l| l.contains(windows::marker::DRIVER_FAILED))
-            {
+            if let Some(line) = text.lines().find(|l| l.contains(windows::marker::DRIVER_FAILED)) {
                 let code = line.rsplit(' ').next().unwrap_or("").trim().to_string();
                 return Some(Err(StepError {
                     message: format!("Windows turned the driver away with error {code}."),
                     code: Some(code),
                 }));
             }
-            text.contains(windows::marker::DRIVER_INSTALLED)
-                .then_some(Ok(()))
+            text.contains(windows::marker::DRIVER_INSTALLED).then_some(Ok(()))
         })?;
-        Ok(if heard.is_some() {
-            Ended::Done
-        } else {
-            Ended::Stopped
-        })
+        Ok(if heard.is_some() { Ended::Done } else { Ended::Stopped })
     }
 
     fn first_start(&mut self, info: &InstallInfo, progress: Progress) -> Result<Ended, StepError> {
         let folder = self.folder();
-        set_keys(
-            &folder,
-            &[("installer", None), ("answer_disc", None), ("stick", None)],
-        )?;
+        set_keys(&folder, &[("installer", None), ("answer_disc", None), ("stick", None)])?;
         // The answers hold the account's password. Once the disc is no longer in the machine
         // nothing needs it, so it does not stay on the Mac.
         let _ = fs::remove_file(folder.join("answers.iso"));
         match self.setup.guest {
             Guest::Windows => {
                 // The guest restarts itself after the driver; its next start says it came up.
-                let heard = self.wait_for(
-                    FIRST_START_MAX_MS,
-                    FIRST_START_MAX_MS,
-                    0,
-                    progress,
-                    |text| {
-                        text.contains(windows::marker::FIRST_START)
-                            .then_some(Ok(()))
-                    },
-                )?;
-                Ok(if heard.is_some() {
-                    Ended::Done
-                } else {
-                    Ended::Stopped
-                })
+                let heard = self.wait_for(FIRST_START_MAX_MS, FIRST_START_MAX_MS, 0, progress, |text| {
+                    text.contains(windows::marker::FIRST_START).then_some(Ok(()))
+                })?;
+                Ok(if heard.is_some() { Ended::Done } else { Ended::Stopped })
             }
             Guest::Ubuntu => {
                 let with_driver = info.status_of(Step::InstallDriver) == StepStatus::Done;
@@ -478,12 +424,7 @@ impl RealSteps<'_> {
 }
 
 impl Steps for RealSteps<'_> {
-    fn run(
-        &mut self,
-        step: Step,
-        info: &InstallInfo,
-        progress: Progress,
-    ) -> Result<Ended, StepError> {
+    fn run(&mut self, step: Step, info: &InstallInfo, progress: Progress) -> Result<Ended, StepError> {
         match step {
             Step::Fetch => self.fetch(info, progress),
             Step::MakeDisk => self.make_disk(),

@@ -47,11 +47,7 @@ pub fn read_options(arguments: impl IntoIterator<Item = String>) -> Result<Optio
     let mut options = Options::default();
     let mut arguments = arguments.into_iter();
     while let Some(argument) = arguments.next() {
-        let mut value = || {
-            arguments
-                .next()
-                .ok_or_else(|| format!("{argument} needs a value after it."))
-        };
+        let mut value = || arguments.next().ok_or_else(|| format!("{argument} needs a value after it."));
         match argument.as_str() {
             "--machine" => options.machine = Some(value()?),
             "--kind" => {
@@ -113,9 +109,7 @@ fn machines(support: &Path) -> Vec<(String, String)> {
         .filter_map(|entry| {
             let id = entry.file_name().to_string_lossy().into_owned();
             let text = fs::read_to_string(entry.path().join("machine.json")).ok()?;
-            let name = serde_json::from_str::<serde_json::Value>(&text).ok()?["name"]
-                .as_str()?
-                .to_owned();
+            let name = serde_json::from_str::<serde_json::Value>(&text).ok()?["name"].as_str()?.to_owned();
             Some((id, name))
         })
         .collect();
@@ -135,18 +129,11 @@ fn choose(support: &Path, wanted: Option<&str>) -> Result<Option<(String, String
             .map(Some)
             .ok_or_else(|| {
                 let names: Vec<&str> = all.iter().map(|(_, name)| name.as_str()).collect();
-                format!(
-                    "There's no machine called {wanted}. The machines are: {}.",
-                    names.join(", ")
-                )
+                format!("There's no machine called {wanted}. The machines are: {}.", names.join(", "))
             }),
         None => Ok(all
             .into_iter()
-            .max_by_key(|(id, _)| {
-                fs::metadata(support.join("Run").join(id))
-                    .and_then(|m| m.modified())
-                    .ok()
-            })
+            .max_by_key(|(id, _)| fs::metadata(support.join("Run").join(id)).and_then(|m| m.modified()).ok())
             .filter(|(id, _)| support.join("Run").join(id).is_dir())),
     }
 }
@@ -193,9 +180,9 @@ pub fn run(
     };
     match &machine {
         Some((_, name)) => term.say(&format!("The report is about {name}.")),
-        None => term.say(
-            "No machine has run, so the report is about the app and this Mac. --machine picks one.",
-        ),
+        None => {
+            term.say("No machine has run, so the report is about the app and this Mac. --machine picks one.")
+        }
     }
     term.say("Gathering...");
     let description = match options.description {
@@ -224,17 +211,11 @@ pub fn run(
     show_contents(term, &prepared);
     let saved = folder.join(prepared.archive.file_name().unwrap_or_default());
     if fs::copy(&prepared.archive, &saved).is_err() {
-        term.say(&format!(
-            "It couldn't be copied here, so it is in {}",
-            prepared.archive.display()
-        ));
+        term.say(&format!("It couldn't be copied here, so it is in {}", prepared.archive.display()));
     } else {
         term.say(&format!("\nWritten to {}", saved.display()));
     }
-    term.say(&format!(
-        "The files are unpacked in {}, to read first.",
-        prepared.folder.display()
-    ));
+    term.say(&format!("The files are unpacked in {}, to read first.", prepared.folder.display()));
     if options.save_only {
         return ExitCode::SUCCESS;
     }
@@ -243,12 +224,7 @@ pub fn run(
          tools, and deleted after {KEPT_DAYS} days. Your user name, host name and home folder were taken out \
          where they were found, but logs are free text, so look through it first if that matters to you."
     ));
-    let thin = before_sending(
-        request.machine.is_some(),
-        false,
-        found.has_run_logs,
-        options.kind,
-    );
+    let thin = before_sending(request.machine.is_some(), false, found.has_run_logs, options.kind);
     let question = match thin {
         Some(text) => {
             term.say(&format!("\n{text}"));
@@ -299,10 +275,7 @@ pub fn main() -> ExitCode {
         eprintln!("This Mac has no home folder, so there is nowhere to look.");
         return ExitCode::FAILURE;
     };
-    let places = Places {
-        support,
-        home: PathBuf::from(home),
-    };
+    let places = Places { support, home: PathBuf::from(home) };
     run(
         options,
         &places,

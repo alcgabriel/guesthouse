@@ -66,11 +66,7 @@ const TAR: &str = "/usr/bin/tar";
 
 /// A stick that holds `files`: 64 MB, or more when they need it (a Linux package's `.deb`s).
 fn stick_megabytes(files: &[PathBuf]) -> u64 {
-    let bytes: u64 = files
-        .iter()
-        .filter_map(|f| fs::metadata(f).ok())
-        .map(|m| m.len())
-        .sum();
+    let bytes: u64 = files.iter().filter_map(|f| fs::metadata(f).ok()).map(|m| m.len()).sum();
     // FAT's own tables and the clusters' rounding take about a tenth more.
     let needed = bytes / 1_000_000 * 11 / 10 + STICK_SPARE_MEGABYTES;
     needed.max(STICK_MEGABYTES)
@@ -89,15 +85,7 @@ impl MachineControl for AgentControl {
     fn make_disc(&mut self, folder: &Path, label: &str, out: &Path) -> Result<(), String> {
         let _ = fs::remove_file(out);
         let output = Command::new("hdiutil")
-            .args([
-                "makehybrid",
-                "-quiet",
-                "-iso",
-                "-joliet",
-                "-default-volume-name",
-                label,
-                "-o",
-            ])
+            .args(["makehybrid", "-quiet", "-iso", "-joliet", "-default-volume-name", label, "-o"])
             .arg(out)
             .arg(folder)
             .output()
@@ -105,10 +93,7 @@ impl MachineControl for AgentControl {
         if output.status.success() {
             return Ok(());
         }
-        Err(format!(
-            "The answer disc could not be made: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ))
+        Err(format!("The answer disc could not be made: {}", String::from_utf8_lossy(&output.stderr).trim()))
     }
 
     fn make_stick(&mut self, image: &Path, files: &[PathBuf]) -> Result<(), String> {
@@ -119,31 +104,18 @@ impl MachineControl for AgentControl {
             .install
             .stick_script
             .clone()
-            .or_else(|| {
-                std::env::var_os("HOME").and_then(|home| crate::lab::stick_script(Path::new(&home)))
-            })
+            .or_else(|| std::env::var_os("HOME").and_then(|home| crate::lab::stick_script(Path::new(&home))))
             .filter(|path| path.is_file())
             .ok_or("stick.sh, which makes the driver's disk, was not found.")?;
         let _ = fs::remove_file(image);
         let run = |args: Vec<std::ffi::OsString>| {
-            let output = Command::new("sh")
-                .arg(&script)
-                .args(args)
-                .output()
-                .map_err(|e| e.to_string())?;
+            let output = Command::new("sh").arg(&script).args(args).output().map_err(|e| e.to_string())?;
             if output.status.success() {
                 return Ok(());
             }
-            Err(format!(
-                "stick.sh failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ))
+            Err(format!("stick.sh failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
         };
-        run(vec![
-            "new".into(),
-            image.into(),
-            stick_megabytes(files).to_string().into(),
-        ])?;
+        run(vec!["new".into(), image.into(), stick_megabytes(files).to_string().into()])?;
         let mut put: Vec<std::ffi::OsString> = vec!["put".into(), image.into()];
         put.extend(files.iter().map(|f| f.into()));
         run(put)
@@ -210,8 +182,8 @@ impl Agent {
         file: Option<String>,
         tools: Tools,
     ) -> Result<String, String> {
-        let guest = Guest::from_name(guest)
-            .ok_or_else(|| format!("{guest} is not a guest this can install."))?;
+        let guest =
+            Guest::from_name(guest).ok_or_else(|| format!("{guest} is not a guest this can install."))?;
         let machines = &self.shared.config.machines;
         if let Some(password) = &tools.password {
             password::check(&password.0)?;
@@ -222,10 +194,8 @@ impl Agent {
             return Err(format!("{word} is not a desktop this can install."));
         }
         let sizes = tools.sizes;
-        let (cores, memory_mb, _) = default_sizes(
-            guest,
-            std::thread::available_parallelism().map_or(4, |n| n.get() as u32),
-        );
+        let (cores, memory_mb, _) =
+            default_sizes(guest, std::thread::available_parallelism().map_or(4, |n| n.get() as u32));
         let id = create_machine(
             machines,
             name,
@@ -258,9 +228,7 @@ impl Agent {
         path: Option<String>,
         password: Option<Secret>,
     ) -> Result<(), String> {
-        let mut info = self
-            .install_info(id)
-            .ok_or("There is no install for this machine.")?;
+        let mut info = self.install_info(id).ok_or("There is no install for this machine.")?;
         let done = match choice {
             "try_again" => info.retry(),
             "choose_installer" => path.is_some_and(|path| info.choose_installer(&path)),
@@ -270,17 +238,10 @@ impl Agent {
         if !done {
             return Err("That is not offered at this point of the install.".into());
         }
-        let _ = state::save(
-            &store::default_folder_of(&self.shared.config.machines, id),
-            &info,
-        );
+        let _ = state::save(&store::default_folder_of(&self.shared.config.machines, id), &info);
         if let Some(password) = password {
-            lock(&self.shared.slots)
-                .entry(id.to_string())
-                .or_default()
-                .install
-                .tools
-                .password = Some(password);
+            lock(&self.shared.slots).entry(id.to_string()).or_default().install.tools.password =
+                Some(password);
         }
         self.publish_install(id, info);
         self.spawn_install(id);
@@ -299,10 +260,7 @@ impl Agent {
 
     /// Every install the agent knows, for a listing.
     pub(super) fn installs(&self) -> Vec<InstallInfo> {
-        lock(&self.shared.slots)
-            .values()
-            .filter_map(|slot| slot.install.info.clone())
-            .collect()
+        lock(&self.shared.slots).values().filter_map(|slot| slot.install.info.clone()).collect()
     }
 
     fn install_info(&self, id: &str) -> Option<InstallInfo> {
@@ -314,11 +272,7 @@ impl Agent {
 
     fn publish_install(&self, id: &str, info: InstallInfo) {
         let line = install_event_line(&info);
-        lock(&self.shared.slots)
-            .entry(id.to_string())
-            .or_default()
-            .install
-            .info = Some(info);
+        lock(&self.shared.slots).entry(id.to_string()).or_default().install.info = Some(info);
         lock(&self.shared.subscribers).retain(|(_, sender)| sender.send(line.clone()).is_ok());
     }
 
@@ -337,11 +291,7 @@ impl Agent {
                 lock(&self.shared.slots).entry(id).or_default().install.info = Some(info);
                 continue;
             }
-            lock(&self.shared.slots)
-                .entry(id.clone())
-                .or_default()
-                .install
-                .info = Some(info);
+            lock(&self.shared.slots).entry(id.clone()).or_default().install.info = Some(info);
             self.spawn_install(&id);
         }
     }
@@ -363,11 +313,7 @@ impl Agent {
         let id = id.to_string();
         thread::spawn(move || {
             agent.run_install(&id, cancel, tools);
-            lock(&agent.shared.slots)
-                .entry(id)
-                .or_default()
-                .install
-                .running = false;
+            lock(&agent.shared.slots).entry(id).or_default().install.running = false;
         });
     }
 
@@ -377,28 +323,20 @@ impl Agent {
         };
         let config = &self.shared.config;
         let machines = config.machines.clone();
-        let support = machines
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| machines.clone());
+        let support = machines.parent().map(Path::to_path_buf).unwrap_or_else(|| machines.clone());
         // The firmware beside the QEMU the request or the agent names, then beside the protected
         // path's QEMU as the app finds it with none named (the environment, the lab's build).
         let mut qemus: Vec<PathBuf> = tools.qemu.iter().map(PathBuf::from).collect();
         qemus.extend(config.qemu.clone());
         qemus.extend(
-            tools::locate(
-                Tool::PvgQemu,
-                &Places::on_this_mac(Tool::PvgQemu, None, None),
-            )
-            .ok()
-            .map(|found| found.path),
+            tools::locate(Tool::PvgQemu, &Places::on_this_mac(Tool::PvgQemu, None, None))
+                .ok()
+                .map(|found| found.path),
         );
-        let mut firmware_dirs: Vec<PathBuf> =
-            qemus.iter().flat_map(|q| firmware_dirs_of(q)).collect();
+        let mut firmware_dirs: Vec<PathBuf> = qemus.iter().flat_map(|q| firmware_dirs_of(q)).collect();
         firmware_dirs.extend(config.install.firmware_dir.clone());
-        firmware_dirs.extend(
-            std::env::var_os("HOME").and_then(|home| crate::lab::firmware_dir(Path::new(&home))),
-        );
+        firmware_dirs
+            .extend(std::env::var_os("HOME").and_then(|home| crate::lab::firmware_dir(Path::new(&home))));
         let setup = Setup {
             machines: machines.clone(),
             id: id.to_string(),
@@ -408,10 +346,7 @@ impl Agent {
             mac_user: crate::install::windows::mac_user(),
             downloads: support.join("Downloads"),
             password: tools.password.as_ref().map(|p| p.0.clone()),
-            driver_dir: tools
-                .driver_dir
-                .clone()
-                .or_else(|| config.install.driver_dir.clone()),
+            driver_dir: tools.driver_dir.clone().or_else(|| config.install.driver_dir.clone()),
             check_space: !config.install.fake,
             firmware_dirs,
             desktop: desktop_for(&info, &tools),
@@ -422,28 +357,18 @@ impl Agent {
             move || real_clock.now().as_millis() as u64
         };
         let mut changed = |info: &InstallInfo| self.publish_install(id, info.clone());
-        let mut runner = Runner {
-            folder: machines.join(id),
-            info,
-            cancel,
-            clock: &clock,
-            changed: &mut changed,
-        };
+        let mut runner =
+            Runner { folder: machines.join(id), info, cancel, clock: &clock, changed: &mut changed };
         if config.install.fake {
             let mut network = FakeNetwork;
             let mut control = FakeGuest::quick(runner.info.guest);
             // Slower on request, so a person can watch the screens go through the steps.
-            if let Some(ms) = std::env::var("GUESTHOUSE_INSTALL_FAKE_PAUSE_MS")
-                .ok()
-                .and_then(|v| v.parse().ok())
+            if let Some(ms) =
+                std::env::var("GUESTHOUSE_INSTALL_FAKE_PAUSE_MS").ok().and_then(|v| v.parse().ok())
             {
                 control.real_pause_ms = ms;
             }
-            let mut steps = RealSteps {
-                setup,
-                transport: &mut network,
-                control: &mut control,
-            };
+            let mut steps = RealSteps { setup, transport: &mut network, control: &mut control };
             runner.run(&mut steps);
         } else {
             let mut network = CurlTransport;
@@ -453,11 +378,7 @@ impl Agent {
                 run_dir: store::run_folder(&machines, id),
                 clock: real_clock,
             };
-            let mut steps = RealSteps {
-                setup,
-                transport: &mut network,
-                control: &mut control,
-            };
+            let mut steps = RealSteps { setup, transport: &mut network, control: &mut control };
             runner.run(&mut steps);
         }
     }
@@ -480,11 +401,7 @@ fn disk_gb_for(info: &InstallInfo, tools: &Tools, fake: bool) -> u64 {
     if fake {
         return FAKE_DISK_GB;
     }
-    tools
-        .sizes
-        .disk_gb
-        .or(info.disk_gb)
-        .unwrap_or(default_sizes(info.guest, 4).2)
+    tools.sizes.disk_gb.or(info.disk_gb).unwrap_or(default_sizes(info.guest, 4).2)
 }
 
 #[cfg(test)]
@@ -505,10 +422,7 @@ mod tests {
         fs::write(&small, vec![0u8; 1000]).unwrap();
         assert_eq!(stick_megabytes(std::slice::from_ref(&small)), 64);
         let big = folder.join("big");
-        fs::File::create(&big)
-            .unwrap()
-            .set_len(100_000_000)
-            .unwrap();
+        fs::File::create(&big).unwrap().set_len(100_000_000).unwrap();
         assert_eq!(stick_megabytes(&[small, big]), 126);
         let _ = fs::remove_dir_all(folder);
     }
@@ -516,39 +430,18 @@ mod tests {
     #[test]
     fn an_agent_that_took_the_install_up_again_makes_the_disk_the_record_kept() {
         let fresh_agent = Tools::default();
-        assert_eq!(
-            disk_gb_for(&info(Guest::Windows, Some(96)), &fresh_agent, false),
-            96
-        );
+        assert_eq!(disk_gb_for(&info(Guest::Windows, Some(96)), &fresh_agent, false), 96);
         // With nothing kept (an older record) it is the guest's default, as before.
-        assert_eq!(
-            disk_gb_for(&info(Guest::Windows, None), &fresh_agent, false),
-            64
-        );
-        assert_eq!(
-            disk_gb_for(&info(Guest::Ubuntu, None), &fresh_agent, false),
-            32
-        );
+        assert_eq!(disk_gb_for(&info(Guest::Windows, None), &fresh_agent, false), 64);
+        assert_eq!(disk_gb_for(&info(Guest::Ubuntu, None), &fresh_agent, false), 32);
     }
 
     #[test]
     fn what_this_agent_was_asked_wins_and_the_stand_in_stays_small() {
-        let asked = Tools {
-            sizes: Sizes {
-                cores: None,
-                memory_mb: None,
-                disk_gb: Some(40),
-            },
-            ..Tools::default()
-        };
-        assert_eq!(
-            disk_gb_for(&info(Guest::Windows, Some(96)), &asked, false),
-            40
-        );
-        assert_eq!(
-            disk_gb_for(&info(Guest::Windows, Some(96)), &asked, true),
-            FAKE_DISK_GB
-        );
+        let asked =
+            Tools { sizes: Sizes { cores: None, memory_mb: None, disk_gb: Some(40) }, ..Tools::default() };
+        assert_eq!(disk_gb_for(&info(Guest::Windows, Some(96)), &asked, false), 40);
+        assert_eq!(disk_gb_for(&info(Guest::Windows, Some(96)), &asked, true), FAKE_DISK_GB);
     }
 
     #[test]
@@ -560,9 +453,6 @@ mod tests {
         assert_eq!(back.disk_gb, Some(96));
         // An older record, with no disk in it, still loads.
         let older = json.replace(",\"disk_gb\":96", "");
-        assert_eq!(
-            serde_json::from_str::<InstallInfo>(&older).unwrap().disk_gb,
-            None
-        );
+        assert_eq!(serde_json::from_str::<InstallInfo>(&older).unwrap().disk_gb, None);
     }
 }

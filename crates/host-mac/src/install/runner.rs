@@ -20,17 +20,11 @@ pub struct StepError {
 
 impl StepError {
     pub fn new(message: impl Into<String>) -> StepError {
-        StepError {
-            code: None,
-            message: message.into(),
-        }
+        StepError { code: None, message: message.into() }
     }
 
     pub fn coded(code: &str, message: impl Into<String>) -> StepError {
-        StepError {
-            code: Some(code.to_string()),
-            message: message.into(),
-        }
+        StepError { code: Some(code.to_string()), message: message.into() }
     }
 }
 
@@ -62,12 +56,7 @@ pub const PROGRESS_EVERY_MS: u64 = 100;
 pub trait Steps {
     /// Does one step. `info` is the state as it is, for what a step needs of earlier ones (the
     /// source of the installer, the guest).
-    fn run(
-        &mut self,
-        step: Step,
-        info: &InstallInfo,
-        progress: Progress,
-    ) -> Result<Ended, StepError>;
+    fn run(&mut self, step: Step, info: &InstallInfo, progress: Progress) -> Result<Ended, StepError>;
 }
 
 /// Everything a run needs besides the steps.

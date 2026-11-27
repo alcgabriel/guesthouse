@@ -2,8 +2,7 @@
 //! Adding, renaming and finding QEMU through the C functions, in a support folder of their own.
 
 use guesthouse_core::machines_ffi::{
-    guesthouse_machine_check, guesthouse_machine_create, guesthouse_machine_rename,
-    guesthouse_tool_locate,
+    guesthouse_machine_check, guesthouse_machine_create, guesthouse_machine_rename, guesthouse_tool_locate,
 };
 use guesthouse_core::{guesthouse_machine_list, guesthouse_string_free};
 use serde_json::{Value, json};
@@ -45,26 +44,24 @@ fn a_machine_is_added_listed_renamed_and_the_search_for_qemu_answers() {
     };
 
     let bad = call(|| unsafe {
-        guesthouse_machine_check(c(&json!({
-        "name": "", "cores": 2, "memory_mb": 4096, "disk": "/none", "firmware_code": "/none",
-        "firmware_vars": "/none", "host_memory_mb": 16384, "host_cores": 8
-    }).to_string()).as_ptr())
+        guesthouse_machine_check(
+            c(&json!({
+                "name": "", "cores": 2, "memory_mb": 4096, "disk": "/none", "firmware_code": "/none",
+                "firmware_vars": "/none", "host_memory_mb": 16384, "host_cores": 8
+            })
+            .to_string())
+            .as_ptr(),
+        )
     });
     assert_eq!(bad["problems"].as_array().unwrap().len(), 4);
 
     let made = call(|| unsafe { guesthouse_machine_create(request("Test Machine").as_ptr()) });
     assert_eq!(made["id"], "test-machine");
     let again = call(|| unsafe { guesthouse_machine_create(request("Test Machine").as_ptr()) });
-    assert!(
-        again["problems"][0]
-            .as_str()
-            .unwrap()
-            .contains("already exists")
-    );
+    assert!(again["problems"][0].as_str().unwrap().contains("already exists"));
 
-    let renamed = call(|| unsafe {
-        guesthouse_machine_rename(c("test-machine").as_ptr(), c("Other").as_ptr())
-    });
+    let renamed =
+        call(|| unsafe { guesthouse_machine_rename(c("test-machine").as_ptr(), c("Other").as_ptr()) });
     assert_eq!(renamed["ok"], true);
     let listing = call(|| unsafe { guesthouse_machine_list(std::ptr::null()) });
     assert_eq!(listing["machines"][0]["name"], "Other");

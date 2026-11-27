@@ -13,21 +13,13 @@ struct Fake {
 
 impl Fake {
     fn new(content: &[u8]) -> Fake {
-        Fake {
-            content: content.to_vec(),
-            ranges: true,
-            break_after: None,
-            calls: vec![],
-        }
+        Fake { content: content.to_vec(), ranges: true, break_after: None, calls: vec![] }
     }
 }
 
 impl Transport for Fake {
     fn head(&mut self, _url: &str) -> Result<Head, FetchError> {
-        Ok(Head {
-            length: self.content.len() as u64,
-            ranges: self.ranges,
-        })
+        Ok(Head { length: self.content.len() as u64, ranges: self.ranges })
     }
 
     fn get_from(
@@ -39,10 +31,7 @@ impl Transport for Fake {
     ) -> Result<(), FetchError> {
         self.calls.push(from);
         let body = &self.content[from as usize..];
-        let limit = self
-            .break_after
-            .take()
-            .map_or(body.len(), |n| (n as usize).min(body.len()));
+        let limit = self.break_after.take().map_or(body.len(), |n| (n as usize).min(body.len()));
         for (index, chunk) in body[..limit].chunks(4).enumerate() {
             out.write_all(chunk).unwrap();
             if !progress((index * 4 + chunk.len()) as u64) {
@@ -61,10 +50,7 @@ impl Transport for Fake {
 }
 
 fn sum(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn folder(name: &str) -> PathBuf {
@@ -74,12 +60,7 @@ fn folder(name: &str) -> PathBuf {
 }
 
 fn request<'a>(folder: &'a Path, sha: &'a str) -> Request<'a> {
-    Request {
-        url: "https://example.test/file.iso",
-        folder,
-        name: "file.iso",
-        sha256: sha,
-    }
+    Request { url: "https://example.test/file.iso", folder, name: "file.iso", sha256: sha }
 }
 
 const CONTENT: &[u8] = b"an installer, as far as these tests go, with some length to it";
@@ -89,14 +70,10 @@ fn a_file_is_fetched_checked_and_kept_with_its_checksum() {
     let dir = folder("whole");
     let mut transport = Fake::new(CONTENT);
     let mut last = (0, 0);
-    let outcome = download(
-        &mut transport,
-        &request(&dir, &sum(CONTENT)),
-        &mut |done, total| {
-            last = (done, total);
-            true
-        },
-    )
+    let outcome = download(&mut transport, &request(&dir, &sum(CONTENT)), &mut |done, total| {
+        last = (done, total);
+        true
+    })
     .unwrap();
     assert_eq!(outcome, Outcome::Done(dir.join("file.iso")));
     assert_eq!(fs::read(dir.join("file.iso")).unwrap(), CONTENT);
@@ -117,21 +94,11 @@ fn a_dropped_connection_is_gone_on_from_where_it_stopped() {
     let dir = folder("resume");
     let mut transport = Fake::new(CONTENT);
     transport.break_after = Some(20);
-    let error = download(
-        &mut transport,
-        &request(&dir, &sum(CONTENT)),
-        &mut |_, _| true,
-    )
-    .unwrap_err();
+    let error = download(&mut transport, &request(&dir, &sum(CONTENT)), &mut |_, _| true).unwrap_err();
     assert!(error.message.contains("dropped"));
     assert_eq!(fs::metadata(dir.join("file.iso.part")).unwrap().len(), 20);
     // The second try asks for the rest only.
-    download(
-        &mut transport,
-        &request(&dir, &sum(CONTENT)),
-        &mut |_, _| true,
-    )
-    .unwrap();
+    download(&mut transport, &request(&dir, &sum(CONTENT)), &mut |_, _| true).unwrap();
     assert_eq!(transport.calls, [0, 20]);
     assert_eq!(fs::read(dir.join("file.iso")).unwrap(), CONTENT);
     let _ = fs::remove_dir_all(dir);
@@ -144,12 +111,7 @@ fn a_server_without_ranges_is_fetched_from_the_start() {
     fs::write(dir.join("file.iso.part"), &CONTENT[..10]).unwrap();
     let mut transport = Fake::new(CONTENT);
     transport.ranges = false;
-    download(
-        &mut transport,
-        &request(&dir, &sum(CONTENT)),
-        &mut |_, _| true,
-    )
-    .unwrap();
+    download(&mut transport, &request(&dir, &sum(CONTENT)), &mut |_, _| true).unwrap();
     assert_eq!(transport.calls, [0]);
     assert_eq!(fs::read(dir.join("file.iso")).unwrap(), CONTENT);
     let _ = fs::remove_dir_all(dir);
@@ -159,12 +121,8 @@ fn a_server_without_ranges_is_fetched_from_the_start() {
 fn a_file_that_is_not_the_published_one_is_thrown_away_with_a_code() {
     let dir = folder("wrong");
     let mut transport = Fake::new(CONTENT);
-    let error = download(
-        &mut transport,
-        &request(&dir, &sum(b"something else")),
-        &mut |_, _| true,
-    )
-    .unwrap_err();
+    let error =
+        download(&mut transport, &request(&dir, &sum(b"something else")), &mut |_, _| true).unwrap_err();
     assert_eq!(error.code.as_deref(), Some("checksum"));
     assert!(!dir.join("file.iso").exists() && !dir.join("file.iso.part").exists());
     let _ = fs::remove_dir_all(dir);
@@ -174,12 +132,7 @@ fn a_file_that_is_not_the_published_one_is_thrown_away_with_a_code() {
 fn stopping_keeps_the_part_and_says_so() {
     let dir = folder("stop");
     let mut transport = Fake::new(CONTENT);
-    let outcome = download(
-        &mut transport,
-        &request(&dir, &sum(CONTENT)),
-        &mut |done, _| done < 8,
-    )
-    .unwrap();
+    let outcome = download(&mut transport, &request(&dir, &sum(CONTENT)), &mut |done, _| done < 8).unwrap();
     assert_eq!(outcome, Outcome::Stopped);
     assert!(dir.join("file.iso.part").is_file());
     assert!(!dir.join("file.iso").exists());
@@ -195,10 +148,7 @@ fn not_enough_room_is_said_with_how_much_more_is_needed_before_anything_is_fetch
     struct Huge(Fake);
     impl Transport for Huge {
         fn head(&mut self, _: &str) -> Result<Head, FetchError> {
-            Ok(Head {
-                length: u64::MAX / 4,
-                ranges: true,
-            })
+            Ok(Head { length: u64::MAX / 4, ranges: true })
         }
         fn get_from(
             &mut self,
@@ -216,11 +166,7 @@ fn not_enough_room_is_said_with_how_much_more_is_needed_before_anything_is_fetch
     let mut huge = Huge(transport);
     let error = download(&mut huge, &request(&dir, "00"), &mut |_, _| true).unwrap_err();
     assert_eq!(error.code.as_deref(), Some("no_space"));
-    assert!(
-        error.message.contains("more is needed"),
-        "{}",
-        error.message
-    );
+    assert!(error.message.contains("more is needed"), "{}", error.message);
     assert!(huge.0.calls.is_empty());
     let _ = fs::remove_dir_all(dir);
 }
@@ -269,31 +215,14 @@ fn curl_is_told_to_refuse_http_and_a_redirect_to_it() {
     let args = CURL_ARGS.join(" ");
     assert!(args.contains("--proto =https"));
     assert!(args.contains("--proto-redir =https"));
-    assert!(
-        args.contains("--location"),
-        "redirects are followed, within https"
-    );
+    assert!(args.contains("--location"), "redirects are followed, within https");
 }
 
 #[test]
 fn the_real_transport_refuses_http_without_starting_curl() {
     let mut transport = CurlTransport;
-    assert_eq!(
-        transport
-            .text("http://example.test/x")
-            .unwrap_err()
-            .code
-            .as_deref(),
-        Some(NOT_HTTPS)
-    );
-    assert_eq!(
-        transport
-            .head("http://example.test/x")
-            .unwrap_err()
-            .code
-            .as_deref(),
-        Some(NOT_HTTPS)
-    );
+    assert_eq!(transport.text("http://example.test/x").unwrap_err().code.as_deref(), Some(NOT_HTTPS));
+    assert_eq!(transport.head("http://example.test/x").unwrap_err().code.as_deref(), Some(NOT_HTTPS));
     let mut sink = Vec::new();
     let refused = transport.get_from("http://example.test/x", 0, &mut sink, &mut |_| true);
     assert_eq!(refused.unwrap_err().code.as_deref(), Some(NOT_HTTPS));

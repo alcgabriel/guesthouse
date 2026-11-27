@@ -34,10 +34,7 @@ impl Step {
 
 /// Whether a process for the machine is, or may be, there.
 pub fn is_alive(state: State) -> bool {
-    matches!(
-        state,
-        State::Starting | State::Running | State::Stopping | State::StoppingStalled
-    )
+    matches!(state, State::Starting | State::Running | State::Stopping | State::StoppingStalled)
 }
 
 /// The action that makes sense next: open the screen of a running machine, turn off a shutdown
@@ -53,10 +50,7 @@ pub fn next_step(state: State) -> Option<Step> {
 
 /// Force Off is for a machine that is coming up or running, and for a shutdown that has stalled.
 pub fn can_force_off(state: State) -> bool {
-    matches!(
-        state,
-        State::Starting | State::Running | State::StoppingStalled
-    )
+    matches!(state, State::Starting | State::Running | State::StoppingStalled)
 }
 
 /// A machine the app runs shows its screen while it is up; one run by hand shows it whenever it
@@ -84,30 +78,12 @@ pub fn shows_install(install_state: &str, seen: bool) -> bool {
 #[derive(Deserialize)]
 #[serde(tag = "rule", rename_all = "snake_case")]
 enum Rule {
-    NextStep {
-        state: State,
-    },
-    IsAlive {
-        state: State,
-    },
-    CanForceOff {
-        state: State,
-    },
-    CanOpenScreen {
-        has_screen: bool,
-        startable: bool,
-        state: State,
-    },
-    CanStart {
-        startable: bool,
-        problem: bool,
-        agent_connected: bool,
-        state: State,
-    },
-    ShowsInstall {
-        install_state: String,
-        seen: bool,
-    },
+    NextStep { state: State },
+    IsAlive { state: State },
+    CanForceOff { state: State },
+    CanOpenScreen { has_screen: bool, startable: bool, state: State },
+    CanStart { startable: bool, problem: bool, agent_connected: bool, state: State },
+    ShowsInstall { install_state: String, seen: bool },
     StartCheckOrder,
 }
 
@@ -118,21 +94,13 @@ pub fn answer(request: &str) -> String {
             Rule::NextStep { state } => json!({"step": next_step(state).map(Step::name)}),
             Rule::IsAlive { state } => json!({"yes": is_alive(state)}),
             Rule::CanForceOff { state } => json!({"yes": can_force_off(state)}),
-            Rule::CanOpenScreen {
-                has_screen,
-                startable,
-                state,
-            } => json!({"yes": can_open_screen(has_screen, startable, state)}),
-            Rule::CanStart {
-                startable,
-                problem,
-                agent_connected,
-                state,
-            } => json!({"yes": can_start(startable, problem, agent_connected, state)}),
-            Rule::ShowsInstall {
-                install_state,
-                seen,
-            } => json!({"yes": shows_install(&install_state, seen)}),
+            Rule::CanOpenScreen { has_screen, startable, state } => {
+                json!({"yes": can_open_screen(has_screen, startable, state)})
+            }
+            Rule::CanStart { startable, problem, agent_connected, state } => {
+                json!({"yes": can_start(startable, problem, agent_connected, state)})
+            }
+            Rule::ShowsInstall { install_state, seen } => json!({"yes": shows_install(&install_state, seen)}),
             Rule::StartCheckOrder => json!({"order": START_CHECK_ORDER}),
         },
         Err(error) => json!({"error": error.to_string()}),

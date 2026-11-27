@@ -32,12 +32,7 @@ fn the_socket_is_owner_only_in_an_owner_only_folder_and_its_owner_can_use_it() {
         qemu: None,
         rmhost: None,
         pvg_host: None,
-        install: InstallConfig {
-            fake: true,
-            driver_dir: None,
-            stick_script: None,
-            firmware_dir: None,
-        },
+        install: InstallConfig { fake: true, driver_dir: None, stick_script: None, firmware_dir: None },
         shutdown_timeout: Duration::from_secs(5),
         start_timeout: Duration::from_secs(10),
     });
@@ -56,9 +51,7 @@ fn the_socket_is_owner_only_in_an_owner_only_folder_and_its_owner_can_use_it() {
     // The same user connects and is answered.
     use std::io::{BufRead, BufReader, Write};
     let mut stream = UnixStream::connect(&socket).unwrap();
-    stream
-        .write_all(b"{\"v\":1,\"id\":1,\"op\":\"list\"}\n")
-        .unwrap();
+    stream.write_all(b"{\"v\":1,\"id\":1,\"op\":\"list\"}\n").unwrap();
     let mut line = String::new();
     BufReader::new(&stream).read_line(&mut line).unwrap();
     assert!(line.contains("\"ok\":true"), "{line}");

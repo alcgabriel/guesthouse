@@ -47,17 +47,13 @@ fn request(agent: &Agent, line: &str) -> Value {
 }
 
 fn shares(agent: &Agent) -> Vec<ShareInfo> {
-    let list: Response =
-        serde_json::from_str(&agent.handle(r#"{"v":1,"id":1,"op":"list"}"#)).unwrap();
+    let list: Response = serde_json::from_str(&agent.handle(r#"{"v":1,"id":1,"op":"list"}"#)).unwrap();
     list.shares.unwrap()
 }
 
 /// A share's state in the word it has on the wire.
 fn state_name(state: guesthouse_core::protocol::ShareState) -> String {
-    serde_json::to_string(&state)
-        .unwrap()
-        .trim_matches('"')
-        .to_string()
+    serde_json::to_string(&state).unwrap().trim_matches('"').to_string()
 }
 
 fn wait_for<T>(what: &str, mut check: impl FnMut() -> Option<T>) -> T {
@@ -86,11 +82,7 @@ fn share_in(agent: &Agent, state: &str, pairing: Option<bool>) -> ShareInfo {
 /// error it printed.
 fn view(viewcheck: &Path, port: u16, state: &Path, seconds: u32) -> Result<u32, String> {
     let output = Command::new(viewcheck)
-        .args([
-            &format!("127.0.0.1:{port}"),
-            &state.display().to_string(),
-            &seconds.to_string(),
-        ])
+        .args([&format!("127.0.0.1:{port}"), &state.display().to_string(), &seconds.to_string()])
         .output()
         .unwrap();
     let out = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -119,9 +111,7 @@ fn view_later(
 
 /// The share once a device waits to be answered.
 fn pending_in(agent: &Agent) -> ShareInfo {
-    wait_for("a device to wait", || {
-        shares(agent).into_iter().find(|s| s.pending.is_some())
-    })
+    wait_for("a device to wait", || shares(agent).into_iter().find(|s| s.pending.is_some()))
 }
 
 fn ok(agent: &Agent, line: &str) {
@@ -132,18 +122,13 @@ fn ok(agent: &Agent, line: &str) {
 fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     let places = Places::on_this_mac(Tool::Rmhost, None, None);
     let Ok(found) = tools::locate(Tool::Rmhost, &places) else {
-        eprintln!(
-            "\n*** share_flow SKIPPED: rmhost is not built here (set GUESTHOUSE_RMHOST) ***\n"
-        );
+        eprintln!("\n*** share_flow SKIPPED: rmhost is not built here (set GUESTHOUSE_RMHOST) ***\n");
         return;
     };
     let rmhost = found.path;
     // An rmhost built before pairing could be opened while running has "nobody is waiting" (its answer to pair accept) nowhere in it.
     let bytes = fs::read(&rmhost).unwrap();
-    if !bytes
-        .windows(17)
-        .any(|window| window == b"nobody is waiting")
-    {
+    if !bytes.windows(17).any(|window| window == b"nobody is waiting") {
         eprintln!(
             "\n*** share_flow SKIPPED: this rmhost has no pair accept command; build win/rmhost again ***\n"
         );
@@ -152,9 +137,7 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     let beside = |name: &str| rmhost.with_file_name(name);
     let (testsource, viewcheck) = (beside("testsource"), beside("viewcheck"));
     if !testsource.is_file() || !viewcheck.is_file() {
-        eprintln!(
-            "\n*** share_flow SKIPPED: testsource or viewcheck is not built beside rmhost ***\n"
-        );
+        eprintln!("\n*** share_flow SKIPPED: testsource or viewcheck is not built beside rmhost ***\n");
         return;
     }
 
@@ -209,19 +192,11 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     assert!(shares(&agent).is_empty());
 
     // Starting the machine starts the share, since it is allowed.
-    let start = format!(
-        r#"{{"v":1,"id":2,"op":"start","machine":"sh","rmhost":"{}"}}"#,
-        rmhost.display()
-    );
+    let start = format!(r#"{{"v":1,"id":2,"op":"start","machine":"sh","rmhost":"{}"}}"#, rmhost.display());
     assert_eq!(request(&agent, &start)["ok"], true);
     let listening = share_in(&agent, "listening", Some(false));
     assert_eq!(listening.port, Some(port));
-    assert!(
-        listening
-            .fingerprint
-            .as_deref()
-            .is_some_and(|f| f.len() >= 16)
-    );
+    assert!(listening.fingerprint.as_deref().is_some_and(|f| f.len() >= 16));
     let run = root.join("Run/sh");
     let pid = process::read_file(&run.join(remote::PID_FILE)).expect("a pid file for rmhost");
     assert!(process::is_running(&pid));
@@ -231,10 +206,7 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
 
     // A device nobody knows is turned away while pairing is closed.
     let state = |name: &str| root.join(name);
-    assert!(
-        view(&viewcheck, port, &state("v1"), 2).is_err(),
-        "an unpaired device got in"
-    );
+    assert!(view(&viewcheck, port, &state("v1"), 2).is_err(), "an unpaired device got in");
 
     // The lines the agent sends, as the app does.
     let open = |seconds: u64| {
@@ -250,10 +222,7 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     ok(&agent, &open(30));
     let opened = share_in(&agent, "listening", Some(true));
     assert!(opened.pairing_until_ms.is_some() && opened.pending.is_none());
-    assert_eq!(
-        opened.fingerprint, listening.fingerprint,
-        "the host keeps its identity"
-    );
+    assert_eq!(opened.fingerprint, listening.fingerprint, "the host keeps its identity");
     let first = view_later(&viewcheck, port, &state("v1"), 3);
     let waiting = pending_in(&agent);
     let device = waiting.pending.clone().unwrap();
@@ -261,20 +230,11 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     // "123 456": two groups of three digits, as the device shows them.
     let digits: Vec<&str> = device.code.split(' ').collect();
     assert!(
-        digits.len() == 2
-            && digits
-                .iter()
-                .all(|d| d.len() == 3 && d.bytes().all(|b| b.is_ascii_digit()))
+        digits.len() == 2 && digits.iter().all(|d| d.len() == 3 && d.bytes().all(|b| b.is_ascii_digit()))
     );
     assert!(device.seconds > 50 && device.seconds <= 60);
-    assert!(
-        !waiting.pairing,
-        "waiting is not open, and not closed either"
-    );
-    assert!(
-        waiting.closed_reason.is_none() && waiting.viewer.is_none(),
-        "it was let in unasked"
-    );
+    assert!(!waiting.pairing, "waiting is not open, and not closed either");
+    assert!(waiting.closed_reason.is_none() && waiting.viewer.is_none(), "it was let in unasked");
     ok(&agent, &say("pair_accept"));
     let closed = share_in(&agent, "listening", Some(false));
     assert_eq!(closed.paired.as_deref(), Some("viewcheck"));
@@ -284,16 +244,11 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     assert!(frames > 30, "only {frames} frames after accepting");
     assert!(same_rmhost(), "pairing restarted rmhost");
     // The accepted device is listed, with clipboard and files off until the person turns them on.
-    let listed = wait_for("the device list", || {
-        shares(&agent).into_iter().find(|s| !s.devices.is_empty())
-    });
+    let listed = wait_for("the device list", || shares(&agent).into_iter().find(|s| !s.devices.is_empty()));
     let me = &listed.devices[0];
     assert_eq!(me.name, "viewcheck");
     assert!(me.permissions.input && me.permissions.sound);
-    assert!(
-        !me.permissions.clipboard && !me.permissions.files,
-        "clipboard and files start on"
-    );
+    assert!(!me.permissions.clipboard && !me.permissions.files, "clipboard and files start on");
     let fingerprint = me.fingerprint.clone();
 
     // Declined: refused, and not trusted afterwards.
@@ -303,16 +258,10 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     ok(&agent, &say("pair_decline"));
     let declined = share_in(&agent, "listening", Some(false));
     assert_eq!(declined.closed_reason, Some(CloseReason::Declined));
-    assert!(
-        declined.paired.is_none(),
-        "paired is cleared when pairing opens"
-    );
+    assert!(declined.paired.is_none(), "paired is cleared when pairing opens");
     let error = second.join().unwrap().unwrap_err();
     assert!(error.contains("declined"), "{error}");
-    assert!(
-        view(&viewcheck, port, &state("v2"), 2).is_err(),
-        "a declined device got in later"
-    );
+    assert!(view(&viewcheck, port, &state("v2"), 2).is_err(), "a declined device got in later");
 
     // The pairing time does not run out under a waiting device.
     ok(&agent, &open(2));
@@ -320,10 +269,7 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     pending_in(&agent);
     thread::sleep(Duration::from_secs(4));
     let still = pending_in(&agent);
-    assert!(
-        still.closed_reason.is_none(),
-        "pairing closed under a waiting device"
-    );
+    assert!(still.closed_reason.is_none(), "pairing closed under a waiting device");
     ok(&agent, &say("pair_accept"));
     share_in(&agent, "listening", Some(false));
     assert!(third.join().unwrap().expect("accepted late") > 20);
@@ -333,36 +279,20 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     ok(&agent, &open(30));
     let fourth = view_later(&viewcheck, port, &state("v4"), 4);
     pending_in(&agent);
-    let known =
-        view(&viewcheck, port, &state("v1"), 2).expect("a paired device is let straight in");
+    let known = view(&viewcheck, port, &state("v1"), 2).expect("a paired device is let straight in");
     assert!(known > 20, "only {known} frames for the paired device");
-    assert!(
-        fourth.join().unwrap().is_err(),
-        "the waiting device was not cut off"
-    );
-    assert_eq!(
-        share_in(&agent, "listening", Some(false)).closed_reason,
-        Some(CloseReason::Other)
-    );
+    assert!(fourth.join().unwrap().is_err(), "the waiting device was not cut off");
+    assert_eq!(share_in(&agent, "listening", Some(false)).closed_reason, Some(CloseReason::Other));
 
     // Pairing closes at the end of its time with nobody coming, and when asked.
     ok(&agent, &open(2));
     share_in(&agent, "listening", Some(true));
-    assert_eq!(
-        share_in(&agent, "listening", Some(false)).closed_reason,
-        Some(CloseReason::Timeout)
-    );
+    assert_eq!(share_in(&agent, "listening", Some(false)).closed_reason, Some(CloseReason::Timeout));
     ok(&agent, &open(30));
     share_in(&agent, "listening", Some(true));
     ok(&agent, &say("pair_close"));
-    assert_eq!(
-        share_in(&agent, "listening", Some(false)).closed_reason,
-        Some(CloseReason::Asked)
-    );
-    assert!(
-        view(&viewcheck, port, &state("v5"), 2).is_err(),
-        "a device got in with pairing closed"
-    );
+    assert_eq!(share_in(&agent, "listening", Some(false)).closed_reason, Some(CloseReason::Asked));
+    assert!(view(&viewcheck, port, &state("v5"), 2).is_err(), "a device got in with pairing closed");
 
     // A time outside what rmhost takes is refused with a sentence, not passed on.
     for seconds in [0, 3601] {
@@ -373,35 +303,15 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
 
     // Per-device controls: view-only, a permission, disconnect, forget.
     let device = |op: &str, extra: &str| {
-        format!(
-            r#"{{"v":1,"id":4,"op":"{op}","machine":"sh","fingerprint":"{fingerprint}"{extra}}}"#
-        )
+        format!(r#"{{"v":1,"id":4,"op":"{op}","machine":"sh","fingerprint":"{fingerprint}"{extra}}}"#)
     };
-    let find = |agent: &Agent| {
-        shares(agent)[0]
-            .devices
-            .iter()
-            .find(|d| d.fingerprint == fingerprint)
-            .cloned()
-    };
-    ok(
-        &agent,
-        &device("device_allow", r#","what":"input","on":false"#),
-    );
-    wait_for("view-only", || {
-        find(&agent).filter(|d| !d.permissions.input)
-    });
-    ok(
-        &agent,
-        &device("device_allow", r#","what":"clipboard","on":true"#),
-    );
-    wait_for("clipboard on", || {
-        find(&agent).filter(|d| d.permissions.clipboard)
-    });
-    let refused = request(
-        &agent,
-        &device("device_allow", r#","what":"root","on":true"#),
-    );
+    let find =
+        |agent: &Agent| shares(agent)[0].devices.iter().find(|d| d.fingerprint == fingerprint).cloned();
+    ok(&agent, &device("device_allow", r#","what":"input","on":false"#));
+    wait_for("view-only", || find(&agent).filter(|d| !d.permissions.input));
+    ok(&agent, &device("device_allow", r#","what":"clipboard","on":true"#));
+    wait_for("clipboard on", || find(&agent).filter(|d| d.permissions.clipboard));
+    let refused = request(&agent, &device("device_allow", r#","what":"root","on":true"#));
     assert_eq!(refused["ok"], false);
     let refused = request(
         &agent,
@@ -409,76 +319,40 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
             r#"{{"v":1,"id":4,"op":"device_revoke","machine":"sh","fingerprint":"{fingerprint}\npair open 5"}}"#
         ),
     );
-    assert_eq!(
-        refused["ok"], false,
-        "a second command got through on the fingerprint"
-    );
+    assert_eq!(refused["ok"], false, "a second command got through on the fingerprint");
 
     let watching = view_later(&viewcheck, port, &state("v1"), 9);
-    wait_for("the viewer to connect", || {
-        find(&agent).filter(|d| d.connected)
-    });
+    wait_for("the viewer to connect", || find(&agent).filter(|d| d.connected));
     ok(&agent, &say("device_drop"));
-    wait_for("the viewer to be dropped", || {
-        find(&agent).filter(|d| !d.connected)
-    });
+    wait_for("the viewer to be dropped", || find(&agent).filter(|d| !d.connected));
     // viewcheck waits out its nine seconds either way; a dropped one got only the frames
     // before the drop, far fewer than nine seconds of 60 a second.
     if let Ok(frames) = watching.join().unwrap() {
-        assert!(
-            frames < 400,
-            "the viewer was not disconnected: {frames} frames"
-        );
+        assert!(frames < 400, "the viewer was not disconnected: {frames} frames");
     }
-    assert!(
-        find(&agent).is_some(),
-        "disconnecting made the device forgotten"
-    );
+    assert!(find(&agent).is_some(), "disconnecting made the device forgotten");
 
     ok(&agent, &device("device_revoke", ""));
-    wait_for("the device to be forgotten", || {
-        find(&agent).is_none().then_some(())
-    });
-    assert!(
-        view(&viewcheck, port, &state("v1"), 2).is_err(),
-        "a removed device got in"
-    );
+    wait_for("the device to be forgotten", || find(&agent).is_none().then_some(()));
+    assert!(view(&viewcheck, port, &state("v1"), 2).is_err(), "a removed device got in");
     assert!(same_rmhost(), "rmhost was restarted along the way");
 
     // Turning the share off ends rmhost, and nothing is left listening.
     let pid = process::read_file(&run.join(remote::PID_FILE)).unwrap();
-    assert_eq!(
-        request(
-            &agent,
-            r#"{"v":1,"id":4,"op":"share","machine":"sh","on":false}"#
-        )["ok"],
-        true
-    );
+    assert_eq!(request(&agent, r#"{"v":1,"id":4,"op":"share","machine":"sh","on":false}"#)["ok"], true);
     assert!(shares(&agent).is_empty());
-    wait_for("rmhost to end", || {
-        (!process::is_running(&pid)).then_some(())
-    });
+    wait_for("rmhost to end", || (!process::is_running(&pid)).then_some(()));
     assert!(!run.join(remote::PID_FILE).exists());
-    assert!(
-        view(&viewcheck, port, &state("v1"), 2).is_err(),
-        "something still listens"
-    );
+    assert!(view(&viewcheck, port, &state("v1"), 2).is_err(), "something still listens");
 
     // On again, then the machine is forced off: rmhost goes with it.
-    let plain = format!(
-        r#"{{"v":1,"id":9,"op":"share","machine":"sh","on":true,"rmhost":"{}"}}"#,
-        rmhost.display()
-    );
+    let plain =
+        format!(r#"{{"v":1,"id":9,"op":"share","machine":"sh","on":true,"rmhost":"{}"}}"#, rmhost.display());
     assert_eq!(request(&agent, &plain)["ok"], true);
     share_in(&agent, "listening", Some(false));
     let pid = process::read_file(&run.join(remote::PID_FILE)).unwrap();
-    assert_eq!(
-        request(&agent, r#"{"v":1,"id":5,"op":"force_off","machine":"sh"}"#)["ok"],
-        true
-    );
-    wait_for("rmhost to end with the machine", || {
-        (!process::is_running(&pid)).then_some(())
-    });
+    assert_eq!(request(&agent, r#"{"v":1,"id":5,"op":"force_off","machine":"sh"}"#)["ok"], true);
+    wait_for("rmhost to end with the machine", || (!process::is_running(&pid)).then_some(()));
     assert!(shares(&agent).is_empty());
 
     // Switched off in the machine's settings: starting the machine shares nothing.

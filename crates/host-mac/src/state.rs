@@ -64,10 +64,7 @@ impl Status {
 
     /// Whether a QEMU process is, or may be, there.
     pub fn is_alive(&self) -> bool {
-        matches!(
-            self,
-            Status::Starting | Status::Running | Status::ShuttingDown { .. }
-        )
+        matches!(self, Status::Starting | Status::Running | Status::ShuttingDown { .. })
     }
 }
 
@@ -117,9 +114,7 @@ pub fn next(status: &Status, event: &Event) -> Result<Status, Refused> {
         },
         Event::ShutDown => match status {
             Running => Ok(ShuttingDown { stalled: false }),
-            Starting => Err(refuse(
-                "the machine is still starting; use Force Off".into(),
-            )),
+            Starting => Err(refuse("the machine is still starting; use Force Off".into())),
             ShuttingDown { .. } => Err(refuse("the machine is already shutting down".into())),
             Stopped | Failed { .. } => Err(refuse("the machine is not running".into())),
         },
@@ -128,9 +123,7 @@ pub fn next(status: &Status, event: &Event) -> Result<Status, Refused> {
             Stopped | Failed { .. } => Err(refuse("the machine is not running".into())),
         },
         Event::StartRefused { reason } => match status {
-            Starting => Ok(Failed {
-                reason: reason.clone(),
-            }),
+            Starting => Ok(Failed { reason: reason.clone() }),
             _ => unchanged(),
         },
         Event::Ready => match status {
@@ -138,9 +131,7 @@ pub fn next(status: &Status, event: &Event) -> Result<Status, Refused> {
             _ => unchanged(),
         },
         Event::StartTimedOut => match status {
-            Starting => Ok(Failed {
-                reason: "QEMU did not open its control socket in time".into(),
-            }),
+            Starting => Ok(Failed { reason: "QEMU did not open its control socket in time".into() }),
             _ => unchanged(),
         },
         Event::ShutdownStalled => match status {
@@ -156,9 +147,7 @@ pub fn next(status: &Status, event: &Event) -> Result<Status, Refused> {
                 },
             }),
             Running if *clean => Ok(Stopped),
-            Running => Ok(Failed {
-                reason: reason.clone(),
-            }),
+            Running => Ok(Failed { reason: reason.clone() }),
             // Whatever the status, it went because it was asked to.
             ShuttingDown { .. } => Ok(Stopped),
             Stopped | Failed { .. } => unchanged(),
@@ -186,16 +175,11 @@ mod tests {
     use Status::*;
 
     fn exited(clean: bool, reason: &str) -> Event {
-        Event::Exited {
-            clean,
-            reason: reason.into(),
-        }
+        Event::Exited { clean, reason: reason.into() }
     }
 
     fn failed(reason: &str) -> Status {
-        Failed {
-            reason: reason.into(),
-        }
+        Failed { reason: reason.into() }
     }
 
     #[test]
@@ -223,16 +207,8 @@ mod tests {
 
     #[test]
     fn shut_down_needs_a_running_machine() {
-        assert_eq!(
-            next(&Running, &Event::ShutDown),
-            Ok(ShuttingDown { stalled: false })
-        );
-        for status in [
-            Stopped,
-            Starting,
-            failed("x"),
-            ShuttingDown { stalled: true },
-        ] {
+        assert_eq!(next(&Running, &Event::ShutDown), Ok(ShuttingDown { stalled: false }));
+        for status in [Stopped, Starting, failed("x"), ShuttingDown { stalled: true }] {
             assert!(next(&status, &Event::ShutDown).is_err(), "{status:?}");
         }
     }
@@ -240,10 +216,7 @@ mod tests {
     #[test]
     fn force_off_works_on_anything_alive() {
         for status in [Starting, Running, ShuttingDown { stalled: true }] {
-            assert_eq!(
-                next(&status, &Event::ForceOff),
-                Ok(ShuttingDown { stalled: false })
-            );
+            assert_eq!(next(&status, &Event::ForceOff), Ok(ShuttingDown { stalled: false }));
         }
         assert!(next(&Stopped, &Event::ForceOff).is_err());
         assert!(next(&failed("x"), &Event::ForceOff).is_err());
@@ -261,23 +234,12 @@ mod tests {
 
     #[test]
     fn a_failed_start_keeps_its_reason() {
-        let refused = Event::StartRefused {
-            reason: "no QEMU".into(),
-        };
+        let refused = Event::StartRefused { reason: "no QEMU".into() };
         assert_eq!(next(&Starting, &refused), Ok(failed("no QEMU")));
-        assert_eq!(
-            next(&Starting, &exited(false, "cannot open disk")),
-            Ok(failed("cannot open disk"))
-        );
+        assert_eq!(next(&Starting, &exited(false, "cannot open disk")), Ok(failed("cannot open disk")));
         // Even a clean exit before the machine was up is a failure.
-        assert_eq!(
-            next(&Starting, &exited(true, "")),
-            Ok(failed("QEMU exited before it was ready"))
-        );
-        assert!(matches!(
-            next(&Starting, &Event::StartTimedOut),
-            Ok(Failed { .. })
-        ));
+        assert_eq!(next(&Starting, &exited(true, "")), Ok(failed("QEMU exited before it was ready")));
+        assert!(matches!(next(&Starting, &Event::StartTimedOut), Ok(Failed { .. })));
     }
 
     #[test]
@@ -291,10 +253,7 @@ mod tests {
 
     #[test]
     fn leaving_while_shutting_down_is_a_stop_even_after_a_signal() {
-        assert_eq!(
-            next(&ShuttingDown { stalled: true }, &exited(false, "signal 15")),
-            Ok(Stopped)
-        );
+        assert_eq!(next(&ShuttingDown { stalled: true }, &exited(false, "signal 15")), Ok(Stopped));
     }
 
     #[test]

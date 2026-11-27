@@ -72,16 +72,11 @@ fn request(agent: &Agent, text: &str) -> Response {
 fn wait_state(agent: &Agent, id: &str, state: &str) {
     let deadline = Instant::now() + WAIT;
     loop {
-        let list = request(agent, r#"{"v":1,"id":1,"op":"list"}"#)
-            .machines
-            .unwrap();
+        let list = request(agent, r#"{"v":1,"id":1,"op":"list"}"#).machines.unwrap();
         if list.iter().any(|s| s.machine == id && s.state == state) {
             return;
         }
-        assert!(
-            Instant::now() < deadline,
-            "timed out waiting for {id} to be {state}"
-        );
+        assert!(Instant::now() < deadline, "timed out waiting for {id} to be {state}");
         thread::sleep(Duration::from_millis(50));
     }
 }
@@ -100,10 +95,7 @@ fn a_linux_machine_starts_with_a_network_and_the_scale_it_was_given() {
     support.machine("win", "windows", "guarded");
     let agent = support.agent();
     let start = |id: &str, scale: &str| {
-        request(
-            &agent,
-            &format!(r#"{{"v":1,"id":1,"op":"start","machine":"{id}"{scale}}}"#),
-        )
+        request(&agent, &format!(r#"{{"v":1,"id":1,"op":"start","machine":"{id}"{scale}}}"#))
     };
     assert!(start("deb", "").ok);
     assert!(start("std", r#","scale":1"#).ok);
@@ -113,22 +105,10 @@ fn a_linux_machine_starts_with_a_network_and_the_scale_it_was_given() {
     }
     let deb = support.run_file("deb", "fake-qemu.args");
     assert!(has_pair(&deb, "-netdev", "user,id=net"));
-    assert!(has_pair(
-        &deb,
-        "-device",
-        "virtio-net-pci,netdev=net,romfile="
-    ));
-    assert!(has_pair(
-        &deb,
-        "-fw_cfg",
-        "name=opt/com.ruxn.guesthouse/scale,string=2"
-    ));
+    assert!(has_pair(&deb, "-device", "virtio-net-pci,netdev=net,romfile="));
+    assert!(has_pair(&deb, "-fw_cfg", "name=opt/com.ruxn.guesthouse/scale,string=2"));
     let std = support.run_file("std", "fake-qemu.args");
-    assert!(has_pair(
-        &std,
-        "-fw_cfg",
-        "name=opt/com.ruxn.guesthouse/scale,string=1"
-    ));
+    assert!(has_pair(&std, "-fw_cfg", "name=opt/com.ruxn.guesthouse/scale,string=1"));
     let win = support.run_file("win", "fake-qemu.args");
     assert!(has_pair(&win, "-nic", "none"));
     assert!(!win.contains("-fw_cfg"));
@@ -177,20 +157,14 @@ fn the_wanted_size_reaches_a_running_guarded_machine_and_nothing_else() {
     let applied = want("deb", 2560, 1440);
     assert_eq!(applied["applied"], true, "{applied}");
     assert_eq!(applied["mode"], "2560x1440@60");
-    assert_eq!(
-        support.run_file("deb", "fake-pvg-host.modes"),
-        "2560x1440@60\n"
-    );
+    assert_eq!(support.run_file("deb", "fake-pvg-host.modes"), "2560x1440@60\n");
 
     let qemu = want("q", 2560, 1440);
     assert_eq!(qemu["applied"], false, "{qemu}");
     assert!(qemu["why"].as_str().unwrap().contains("QEMU's own device"));
 
     let refused = want("hostnomodes", 1280, 800);
-    assert!(
-        refused["error"].as_str().unwrap().contains("refused"),
-        "{refused}"
-    );
+    assert!(refused["error"].as_str().unwrap().contains("refused"), "{refused}");
 
     for id in ["deb", "q", "hostnomodes"] {
         let off = format!(r#"{{"v":1,"id":2,"op":"force_off","machine":"{id}"}}"#);

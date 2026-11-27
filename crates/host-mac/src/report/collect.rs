@@ -71,12 +71,7 @@ const CRASH_REPORT_DAYS: u64 = 14;
 const CRASH_REPORT_LINES: usize = 200;
 /// What a crash report's file name starts with: the process's own name, which for the graphics process is
 /// `guesthouse-pvg-host` (and `guesthouse-daemon` once there is one).
-const CRASH_NAMES: [&str; 4] = [
-    "Guesthouse",
-    "qemu",
-    "guesthouse-pvg-host",
-    "guesthouse-daemon",
-];
+const CRASH_NAMES: [&str; 4] = ["Guesthouse", "qemu", "guesthouse-pvg-host", "guesthouse-daemon"];
 
 pub fn collect(request: &Request, places: &Places) -> Collection {
     let mut found = Collection::default();
@@ -98,8 +93,7 @@ pub fn collect(request: &Request, places: &Places) -> Collection {
     );
     if request.driver_version.is_none() {
         found.notes.push(
-            "The guest's graphics driver version is not reported yet, so it is not in the report."
-                .to_owned(),
+            "The guest's graphics driver version is not reported yet, so it is not in the report.".to_owned(),
         );
     }
     found
@@ -115,17 +109,10 @@ fn machine(found: &mut Collection, request: &Request, places: &Places, id: &str)
     let run = places.support.join("Run").join(id);
     match fs::read_to_string(folder.join("machine.json")) {
         Ok(text) => found.add("machine/machine.json", without_private_fields(&text)),
-        Err(error) => found.miss(
-            "machine/machine.json",
-            &format!("it could not be read: {error}"),
-        ),
+        Err(error) => found.miss("machine/machine.json", &format!("it could not be read: {error}")),
     }
     if folder.join("install.json").is_file() {
-        found.add_file(
-            "machine/install.json",
-            &folder.join("install.json"),
-            "it could not be read",
-        );
+        found.add_file("machine/install.json", &folder.join("install.json"), "it could not be read");
     }
     let mut logs: Vec<(&str, &str)> = vec![
         ("machine/qemu.log", "qemu.log"),
@@ -138,11 +125,7 @@ fn machine(found: &mut Collection, request: &Request, places: &Places, id: &str)
         found.miss("machine/serial.log", "left out at the person's choice");
     }
     for (name, file) in logs {
-        if found.add_file(
-            name,
-            &run.join(file),
-            "the machine has not run, or this log was not made",
-        ) {
+        if found.add_file(name, &run.join(file), "the machine has not run, or this log was not made") {
             found.has_run_logs = true;
         }
     }
@@ -150,17 +133,14 @@ fn machine(found: &mut Collection, request: &Request, places: &Places, id: &str)
 
 /// The settings with each private field marked as left out.
 pub fn without_private_fields(text: &str) -> String {
-    let Ok(serde_json::Value::Object(mut fields)) = serde_json::from_str::<serde_json::Value>(text)
-    else {
+    let Ok(serde_json::Value::Object(mut fields)) = serde_json::from_str::<serde_json::Value>(text) else {
         return "(machine.json could not be read as JSON, so it was left out)\n".to_owned();
     };
     for name in PRIVATE_FIELDS {
         if let Some(value) = fields.get_mut(name) {
             *value = match value {
                 serde_json::Value::String(text) if text.is_empty() => continue,
-                serde_json::Value::Array(list) => {
-                    format!("{LEFT_OUT}: {} of them", list.len()).into()
-                }
+                serde_json::Value::Array(list) => format!("{LEFT_OUT}: {} of them", list.len()).into(),
                 _ => LEFT_OUT.into(),
             };
         }
@@ -172,21 +152,15 @@ pub fn without_private_fields(text: &str) -> String {
 /// the core's versions. No serial number, no hardware UUID and no names.
 fn facts(request: &Request) -> String {
     let ask = |program: &str, args: &[&str]| {
-        run_limited(program, args)
-            .map_or_else(|| "unknown".to_owned(), |text| text.trim().to_owned())
+        run_limited(program, args).map_or_else(|| "unknown".to_owned(), |text| text.trim().to_owned())
     };
-    let memory: u64 = ask("/usr/sbin/sysctl", &["-n", "hw.memsize"])
-        .parse()
-        .unwrap_or(0);
+    let memory: u64 = ask("/usr/sbin/sysctl", &["-n", "hw.memsize"]).parse().unwrap_or(0);
     let mut text = String::new();
     let mut line = |key: &str, value: String| text.push_str(&format!("{key}: {value}\n"));
     line("Guesthouse", request.app_version.clone());
     line("Core", env!("CARGO_PKG_VERSION").to_owned());
     line("Model", ask("/usr/sbin/sysctl", &["-n", "hw.model"]));
-    line(
-        "Chip",
-        ask("/usr/sbin/sysctl", &["-n", "machdep.cpu.brand_string"]),
-    );
+    line("Chip", ask("/usr/sbin/sysctl", &["-n", "machdep.cpu.brand_string"]));
     line("Processors", ask("/usr/sbin/sysctl", &["-n", "hw.ncpu"]));
     line("Memory", format!("{} GB", memory / (1 << 30)));
     line("macOS", ask("/usr/bin/sw_vers", &["-productVersion"]));
@@ -211,10 +185,8 @@ fn unified_log(found: &mut Collection) {
     ];
     match run_limited("/usr/bin/log", &args) {
         Some(text) if !text.trim().is_empty() => found.add("app/unified-log.txt", text),
-        _ => found.miss(
-            "app/unified-log.txt",
-            "the system's log had nothing from the app, or could not be read",
-        ),
+        _ => found
+            .miss("app/unified-log.txt", "the system's log had nothing from the app, or could not be read"),
     }
 }
 
@@ -223,10 +195,7 @@ fn unified_log(found: &mut Collection) {
 fn crashes(found: &mut Collection, home: &Path) {
     let folder = home.join("Library/Logs/DiagnosticReports");
     let Ok(entries) = fs::read_dir(&folder) else {
-        found.miss(
-            "host/crashes.txt",
-            "the folder of crash reports could not be read",
-        );
+        found.miss("host/crashes.txt", "the folder of crash reports could not be read");
         return;
     };
     let oldest = SystemTime::now() - Duration::from_secs(CRASH_REPORT_DAYS * 86_400);
@@ -252,10 +221,7 @@ fn crashes(found: &mut Collection, home: &Path) {
     let mut text = String::new();
     for (_, path) in recent.into_iter().take(MOST_CRASH_REPORTS) {
         let body = fs::read_to_string(&path).unwrap_or_default();
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
+        let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         text.push_str(&format!("=== {name}\n"));
         for line in body.lines().take(CRASH_REPORT_LINES) {
             text.push_str(line);
@@ -285,9 +251,7 @@ fn run_limited(program: &str, args: &[&str]) -> Option<String> {
         match child.try_wait() {
             Ok(Some(status)) => {
                 let text = reader.join().ok()?;
-                return status
-                    .success()
-                    .then(|| String::from_utf8_lossy(&text).into_owned());
+                return status.success().then(|| String::from_utf8_lossy(&text).into_owned());
             }
             Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
             _ => {

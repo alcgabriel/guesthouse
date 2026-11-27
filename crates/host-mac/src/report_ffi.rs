@@ -27,10 +27,7 @@ unsafe fn text<'a>(text: *const c_char) -> Option<&'a str> {
 }
 
 fn places() -> Option<Places> {
-    Some(Places {
-        support: store::support_folder()?,
-        home: PathBuf::from(std::env::var_os("HOME")?),
-    })
+    Some(Places { support: store::support_folder()?, home: PathBuf::from(std::env::var_os("HOME")?) })
 }
 
 fn prepared_json(prepared: &Prepared, warning: Option<String>) -> Value {
@@ -58,27 +55,23 @@ fn prepared_json(prepared: &Prepared, warning: Option<String>) -> Value {
 pub unsafe extern "C" fn guesthouse_report_prepare(request: *const c_char) -> *mut c_char {
     // SAFETY: passed on from the caller.
     let request = unsafe { text(request) };
-    into_c_string(
-        match (request.map(serde_json::from_str::<Request>), places()) {
-            (Some(Ok(request)), Some(places)) => {
-                let found = collect::collect(&request, &places);
-                let warning = report::before_sending(
-                    request.machine.is_some(),
-                    request.machine_running,
-                    found.has_run_logs,
-                    request.problem_kind(),
-                );
-                match bundle::prepare(&request, &found, &places) {
-                    Ok(prepared) => prepared_json(&prepared, warning).to_string(),
-                    Err(error) => error_json(&error),
-                }
+    into_c_string(match (request.map(serde_json::from_str::<Request>), places()) {
+        (Some(Ok(request)), Some(places)) => {
+            let found = collect::collect(&request, &places);
+            let warning = report::before_sending(
+                request.machine.is_some(),
+                request.machine_running,
+                found.has_run_logs,
+                request.problem_kind(),
+            );
+            match bundle::prepare(&request, &found, &places) {
+                Ok(prepared) => prepared_json(&prepared, warning).to_string(),
+                Err(error) => error_json(&error),
             }
-            (Some(Err(error)), _) => {
-                error_json(&format!("the report request is not valid: {error}"))
-            }
-            _ => error_json("no support folder, or the request is not text"),
-        },
-    )
+        }
+        (Some(Err(error)), _) => error_json(&format!("the report request is not valid: {error}")),
+        _ => error_json("no support folder, or the request is not text"),
+    })
 }
 
 /// Sends a report made by `guesthouse_report_prepare`: `archive` is its archive and `summary_header`
@@ -94,8 +87,7 @@ pub unsafe extern "C" fn guesthouse_report_send(
     summary_json: *const c_char,
 ) -> *mut c_char {
     // SAFETY: passed on from the caller.
-    let (archive, header, summary) =
-        unsafe { (text(archive), text(summary_header), text(summary_json)) };
+    let (archive, header, summary) = unsafe { (text(archive), text(summary_header), text(summary_json)) };
     into_c_string(match archive {
         Some(archive) => match send::send(std::path::Path::new(archive), header.unwrap_or("")) {
             Ok(id) => {

@@ -26,9 +26,7 @@ pub fn check_installer(path: &Path) -> Result<PathBuf, String> {
     if !path.is_file() {
         return Err(format!("{} is not there.", path.display()));
     }
-    let is_iso = path
-        .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("iso"));
+    let is_iso = path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("iso"));
     if !is_iso {
         return Err("Choose the Windows 11 installer, a file ending in .iso.".into());
     }
@@ -48,10 +46,7 @@ pub fn account_name(mac_user: &str) -> String {
         .take(MOST_WINDOWS_NAME_CHARS)
         .collect();
     if name.is_empty() || !name.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
-        name = format!("user{name}")
-            .chars()
-            .take(MOST_WINDOWS_NAME_CHARS)
-            .collect();
+        name = format!("user{name}").chars().take(MOST_WINDOWS_NAME_CHARS).collect();
     }
     if WINDOWS_RESERVED.contains(&name.to_ascii_lowercase().as_str()) {
         name.push('1');
@@ -61,9 +56,7 @@ pub fn account_name(mac_user: &str) -> String {
 
 /// The Mac's user, by its short name.
 pub fn mac_user() -> String {
-    std::env::var("USER")
-        .or_else(|_| std::env::var("LOGNAME"))
-        .unwrap_or_default()
+    std::env::var("USER").or_else(|_| std::env::var("LOGNAME")).unwrap_or_default()
 }
 
 /// What the guest says on its serial port, which the host reads from the machine's `serial.log`.

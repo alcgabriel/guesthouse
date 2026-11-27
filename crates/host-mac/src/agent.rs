@@ -87,12 +87,8 @@ impl Config {
         };
         Some(Config {
             machines: store::default_folder()?,
-            qemu: std::env::var_os("GUESTHOUSE_QEMU")
-                .filter(|path| !path.is_empty())
-                .map(PathBuf::from),
-            rmhost: std::env::var_os("GUESTHOUSE_RMHOST")
-                .filter(|path| !path.is_empty())
-                .map(PathBuf::from),
+            qemu: std::env::var_os("GUESTHOUSE_QEMU").filter(|path| !path.is_empty()).map(PathBuf::from),
+            rmhost: std::env::var_os("GUESTHOUSE_RMHOST").filter(|path| !path.is_empty()).map(PathBuf::from),
             install: InstallConfig {
                 fake: std::env::var_os("GUESTHOUSE_INSTALL_FAKE").is_some_and(|v| !v.is_empty()),
                 driver_dir: std::env::var_os("GUESTHOUSE_DRIVER_DIR")
@@ -195,26 +191,10 @@ impl Agent {
                 response.installs = Some(self.installs());
                 return response.to_line();
             }
-            Op::Start {
-                machine,
-                qemu,
-                rmhost,
-                pvg_host,
-                scale,
-            } => self.start(
-                &machine,
-                qemu.as_deref(),
-                rmhost.as_deref(),
-                pvg_host.as_deref(),
-                scale,
-            ),
-            Op::Share {
-                machine,
-                on,
-                pairing,
-                pairing_seconds,
-                rmhost,
-            } => self.share(
+            Op::Start { machine, qemu, rmhost, pvg_host, scale } => {
+                self.start(&machine, qemu.as_deref(), rmhost.as_deref(), pvg_host.as_deref(), scale)
+            }
+            Op::Share { machine, on, pairing, pairing_seconds, rmhost } => self.share(
                 &machine,
                 on,
                 pairing.then(|| pairing_seconds.unwrap_or(crate::remote::PAIRING_SECONDS)),
@@ -244,11 +224,7 @@ impl Agent {
                     driver_dir: driver_dir.map(PathBuf::from),
                     password,
                     desktop,
-                    sizes: Sizes {
-                        cores,
-                        memory_mb,
-                        disk_gb,
-                    },
+                    sizes: Sizes { cores, memory_mb, disk_gb },
                 },
             ) {
                 Ok(machine) => {
@@ -258,41 +234,28 @@ impl Agent {
                 }
                 Err(why) => Err(why),
             },
-            Op::InstallChoose {
-                machine,
-                choice,
-                path,
-                password,
-            } => self.install_choose(&machine, &choice, path, password),
+            Op::InstallChoose { machine, choice, path, password } => {
+                self.install_choose(&machine, &choice, path, password)
+            }
             Op::InstallStatus { machine } => {
                 let mut response = Response::ok(id);
-                response.installs = Some(
-                    self.installs()
-                        .into_iter()
-                        .filter(|i| i.machine == machine)
-                        .collect(),
-                );
+                response.installs =
+                    Some(self.installs().into_iter().filter(|i| i.machine == machine).collect());
                 return response.to_line();
             }
             Op::InstallCancel { machine } => self.install_cancel(&machine),
             Op::PairClose { machine } => self.pair_event(&machine, PairEvent::Stop),
             Op::PairAccept { machine } => self.pair_event(&machine, PairEvent::Accept),
             Op::PairDecline { machine } => self.pair_event(&machine, PairEvent::Decline),
-            Op::DeviceAllow {
-                machine,
-                fingerprint,
-                what,
-                on,
-            } => self.device_command(&machine, |policy| {
-                policy.device_allow(&fingerprint, &what, on)
-            }),
-            Op::DeviceRevoke {
-                machine,
-                fingerprint,
-            } => self.device_command(&machine, |policy| policy.device_revoke(&fingerprint)),
-            Op::DeviceDrop { machine } => self.device_command(&machine, |_| {
-                Ok(guesthouse_remote_view_core::ctl::device_drop())
-            }),
+            Op::DeviceAllow { machine, fingerprint, what, on } => {
+                self.device_command(&machine, |policy| policy.device_allow(&fingerprint, &what, on))
+            }
+            Op::DeviceRevoke { machine, fingerprint } => {
+                self.device_command(&machine, |policy| policy.device_revoke(&fingerprint))
+            }
+            Op::DeviceDrop { machine } => {
+                self.device_command(&machine, |_| Ok(guesthouse_remote_view_core::ctl::device_drop()))
+            }
         };
         match result {
             Ok(()) => Response::ok(id),
@@ -304,13 +267,7 @@ impl Agent {
     /// Every machine in the machines folder, and any running one whose folder is gone.
     pub fn list(&self) -> Vec<MachineState> {
         let mut ids: Vec<String> = store::list(&self.shared.config.machines)
-            .map(|listing| {
-                listing
-                    .machines
-                    .into_iter()
-                    .map(|machine| machine.id)
-                    .collect()
-            })
+            .map(|listing| listing.machines.into_iter().map(|machine| machine.id).collect())
             .unwrap_or_default();
         let slots = lock(&self.shared.slots);
         for (id, slot) in slots.iter() {
@@ -333,18 +290,13 @@ impl Agent {
         *next += 1;
         let id = *next;
         lock(&self.shared.subscribers).push((id, sender));
-        Subscription {
-            shared: self.shared.clone(),
-            id,
-        }
+        Subscription { shared: self.shared.clone(), id }
     }
 
     /// Nothing is running and nobody is listening: the agent may go.
     pub fn is_idle(&self) -> bool {
         lock(&self.shared.subscribers).is_empty()
-            && !lock(&self.shared.slots)
-                .values()
-                .any(|slot| slot.status().is_alive())
+            && !lock(&self.shared.slots).values().any(|slot| slot.status().is_alive())
     }
 
     fn start(
@@ -371,9 +323,7 @@ impl Agent {
         let run = self.begin(id, Event::Start).map_err(|refused| refused.0)?;
         self.remember_rmhost(id, rmhost);
         if let Err(reason) = self.spawn(id, run, &launch, qemu, pvg_host) {
-            let event = Event::StartRefused {
-                reason: reason.clone(),
-            };
+            let event = Event::StartRefused { reason: reason.clone() };
             self.apply(id, Some(run), event);
             return Err(reason);
         }
@@ -426,14 +376,9 @@ impl Agent {
         if self.wait_while(id, ticket, QUIT_WAIT) {
             return;
         }
-        let pid = lock(&self.shared.slots)
-            .get(id)
-            .and_then(|slot| slot.pid.clone());
+        let pid = lock(&self.shared.slots).get(id).and_then(|slot| slot.pid.clone());
         if let Some(pid) = pid {
-            eprintln!(
-                "guesthouse-agent: {id}: still there after quit, sending SIGTERM to {}",
-                pid.pid
-            );
+            eprintln!("guesthouse-agent: {id}: still there after quit, sending SIGTERM to {}", pid.pid);
             process::terminate(&pid);
         }
         if !self.wait_while(id, ticket, TERM_WAIT) {
@@ -491,12 +436,9 @@ impl Agent {
         }
         let qemu = match qemu.filter(|path| !path.is_empty()) {
             Some(path) => PathBuf::from(path),
-            None => self
-                .shared
-                .config
-                .qemu
-                .clone()
-                .ok_or("No QEMU is set. Choose it in Settings, General.")?,
+            None => {
+                self.shared.config.qemu.clone().ok_or("No QEMU is set. Choose it in Settings, General.")?
+            }
         };
         if !qemu.is_file() {
             return Err(format!("QEMU is not at {}", qemu.display()));
@@ -508,12 +450,9 @@ impl Agent {
         let run_dir = &launch.run_dir;
         store::make_run_folder_private(run_dir)
             .map_err(|error| format!("cannot make {}: {error}", run_dir.display()))?;
-        for stale in [
-            &launch.control_socket,
-            &launch.input_socket,
-            &launch.remote_socket,
-            &run_dir.join(PID_FILE),
-        ] {
+        for stale in
+            [&launch.control_socket, &launch.input_socket, &launch.remote_socket, &run_dir.join(PID_FILE)]
+        {
             let _ = fs::remove_file(stale);
         }
         let Some(host) = host else {
@@ -523,9 +462,7 @@ impl Agent {
         let (id, launch) = (id.to_string(), launch.clone());
         thread::spawn(move || {
             let started = agent.start_host(&id, run, &launch, &host).and_then(|()| {
-                agent
-                    .spawn_qemu(&id, run, &launch, &qemu)
-                    .inspect_err(|_| agent.stop_host(&id))
+                agent.spawn_qemu(&id, run, &launch, &qemu).inspect_err(|_| agent.stop_host(&id))
             });
             if let Err(reason) = started {
                 agent.apply(&id, Some(run), Event::StartRefused { reason });
@@ -537,9 +474,8 @@ impl Agent {
     /// Starts the QEMU process and the threads that watch it.
     fn spawn_qemu(&self, id: &str, run: u64, launch: &Launch, qemu: &Path) -> Result<(), String> {
         let run_dir = &launch.run_dir;
-        let log = File::create(run_dir.join(LOG_FILE)).map_err(|error| {
-            format!("cannot write {}: {error}", run_dir.join(LOG_FILE).display())
-        })?;
+        let log = File::create(run_dir.join(LOG_FILE))
+            .map_err(|error| format!("cannot write {}: {error}", run_dir.join(LOG_FILE).display()))?;
         let mut command = Command::new(qemu);
         command
             .args(launch::qemu_args(launch))
@@ -549,9 +485,7 @@ impl Agent {
             .stderr(log)
             // Its own process group, so a signal meant for the agent does not reach it.
             .process_group(0);
-        let child = command
-            .spawn()
-            .map_err(|error| format!("cannot run {}: {error}", qemu.display()))?;
+        let child = command.spawn().map_err(|error| format!("cannot run {}: {error}", qemu.display()))?;
         let pid = process::identify(child.id() as i32).unwrap_or(Pid {
             pid: child.id() as i32,
             // It was gone before it could be looked at; the watcher is about to say so.
@@ -575,18 +509,9 @@ impl Agent {
         let status = child.wait();
         let _ = fs::remove_file(run_dir.join(PID_FILE));
         let event = match status {
-            Ok(status) if status.success() => Event::Exited {
-                clean: true,
-                reason: String::new(),
-            },
-            Ok(status) => Event::Exited {
-                clean: false,
-                reason: failure_reason(run_dir, status),
-            },
-            Err(error) => Event::Exited {
-                clean: false,
-                reason: format!("cannot wait for QEMU: {error}"),
-            },
+            Ok(status) if status.success() => Event::Exited { clean: true, reason: String::new() },
+            Ok(status) => Event::Exited { clean: false, reason: failure_reason(run_dir, status) },
+            Err(error) => Event::Exited { clean: false, reason: format!("cannot wait for QEMU: {error}") },
         };
         self.apply(id, Some(run), event);
         self.share_stop(id);
@@ -607,13 +532,8 @@ impl Agent {
             }
             thread::sleep(POLL);
         }
-        if matches!(
-            self.apply(id, Some(run), Event::StartTimedOut),
-            Status::Failed { .. }
-        ) {
-            let pid = lock(&self.shared.slots)
-                .get(id)
-                .and_then(|slot| slot.pid.clone());
+        if matches!(self.apply(id, Some(run), Event::StartTimedOut), Status::Failed { .. }) {
+            let pid = lock(&self.shared.slots).get(id).and_then(|slot| slot.pid.clone());
             if let Some(pid) = pid {
                 process::terminate(&pid);
             }
@@ -628,13 +548,7 @@ impl Agent {
 
     /// Finds machines whose QEMU outlived the last agent: pid file and start time agree.
     fn adopt_running(&self) {
-        let Some(run_root) = self
-            .shared
-            .config
-            .machines
-            .parent()
-            .map(|dir| dir.join("Run"))
-        else {
+        let Some(run_root) = self.shared.config.machines.parent().map(|dir| dir.join("Run")) else {
             return;
         };
         let Ok(entries) = fs::read_dir(&run_root) else {
@@ -652,10 +566,7 @@ impl Agent {
                 self.end_leftover_host(&id_of(&entry.path()), &entry.path());
                 continue;
             }
-            eprintln!(
-                "guesthouse-agent: {id}: found running again, pid {}",
-                pid.pid
-            );
+            eprintln!("guesthouse-agent: {id}: found running again, pid {}", pid.pid);
             let run = {
                 let mut slots = lock(&self.shared.slots);
                 let slot = slots.entry(id.clone()).or_default();
@@ -684,14 +595,7 @@ impl Agent {
         }
         let _ = fs::remove_file(pid_file);
         // The exit status of a process that is not our child is not ours to know.
-        self.apply(
-            id,
-            Some(run),
-            Event::Exited {
-                clean: true,
-                reason: String::new(),
-            },
-        );
+        self.apply(id, Some(run), Event::Exited { clean: true, reason: String::new() });
         self.share_stop(id);
         self.stop_host(id);
     }
@@ -749,17 +653,12 @@ impl Agent {
 
 /// The machine id a run folder belongs to: the folder's name.
 fn id_of(run_dir: &Path) -> String {
-    run_dir
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default()
+    run_dir.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
 /// A lock that a panicking thread did not poison for good: the data is plain state.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Why QEMU ended badly: the first line it printed, else how it ended.

@@ -17,9 +17,7 @@ fn stand_in(path: PathBuf) -> thread::JoinHandle<Vec<Value>> {
     thread::spawn(move || {
         let (stream, _) = listener.accept().unwrap();
         let mut writer = stream.try_clone().unwrap();
-        writer
-            .write_all(b"{\"QMP\": {\"version\": {}, \"capabilities\": [\"oob\"]}}\r\n")
-            .unwrap();
+        writer.write_all(b"{\"QMP\": {\"version\": {}, \"capabilities\": [\"oob\"]}}\r\n").unwrap();
         let mut lines = Vec::new();
         for line in BufReader::new(stream).lines() {
             let Ok(line) = line else { break };
@@ -122,11 +120,7 @@ fn scripted_input_reaches_qmp_and_held_keys_are_let_go_on_close() {
         send(json!([key("c", true)])),
         send(json!([btn("right", true)])),
         // The close.
-        send(json!([
-            key("c", false),
-            key("ctrl", false),
-            btn("right", false)
-        ])),
+        send(json!([key("c", false), key("ctrl", false), btn("right", false)])),
     ];
     assert_eq!(lines.len(), expected.len(), "got {lines:#?}");
     for (got, want) in lines.iter().zip(&expected) {

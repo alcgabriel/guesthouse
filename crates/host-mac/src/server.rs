@@ -102,11 +102,7 @@ fn peer_is_this_user(stream: &UnixStream) -> bool {
 }
 
 fn lock_file(path: &Path) -> Result<File, ServeError> {
-    let file = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(path)?;
+    let file = OpenOptions::new().create(true).truncate(false).write(true).open(path)?;
     // SAFETY: flock on a descriptor we own; the lock goes when the file is closed.
     if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
         let error = io::Error::last_os_error();
@@ -143,11 +139,7 @@ fn talk(agent: &Agent, stream: UnixStream) {
 
 fn write_lines(mut output: UnixStream, receiver: Receiver<String>) {
     for line in receiver {
-        if output
-            .write_all(line.as_bytes())
-            .and_then(|()| output.write_all(b"\n"))
-            .is_err()
-        {
+        if output.write_all(line.as_bytes()).and_then(|()| output.write_all(b"\n")).is_err() {
             break;
         }
     }
@@ -167,10 +159,7 @@ impl Connection {
         let input = stream.try_clone()?;
         let (sender, lines) = mpsc::channel();
         thread::spawn(move || read_lines(input, sender));
-        Ok(Connection {
-            output: stream,
-            lines,
-        })
+        Ok(Connection { output: stream, lines })
     }
 
     pub fn send(&self, line: &str) -> io::Result<()> {
@@ -205,8 +194,5 @@ fn read_lines(input: UnixStream, sender: Sender<io::Result<String>>) {
 }
 
 fn closed() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::UnexpectedEof,
-        "the agent closed the connection",
-    )
+    io::Error::new(io::ErrorKind::UnexpectedEof, "the agent closed the connection")
 }

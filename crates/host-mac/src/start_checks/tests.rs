@@ -7,18 +7,11 @@ fn run(request: Value) -> Value {
 
 #[test]
 fn memory_names_the_machine_that_runs_and_says_what_to_do() {
-    let said = run(
-        json!({"check": "memory", "machine": "Ubuntu", "wanted_mb": 4096, "host_mb": 16384,
-        "running": [{"name": "Windows 11", "memory_mb": 12288}]}),
-    );
+    let said = run(json!({"check": "memory", "machine": "Ubuntu", "wanted_mb": 4096, "host_mb": 16384,
+        "running": [{"name": "Windows 11", "memory_mb": 12288}]}));
     let problem = &said["problem"];
     assert_eq!(problem["title"], "Not enough memory to start Ubuntu");
-    assert!(
-        problem["message"]
-            .as_str()
-            .unwrap()
-            .contains("because Windows 11 is running with 12 GB")
-    );
+    assert!(problem["message"].as_str().unwrap().contains("because Windows 11 is running with 12 GB"));
     assert_eq!(problem["running"], "Windows 11");
     assert_eq!(problem["start_anyway"], false);
 }
@@ -36,31 +29,23 @@ fn nothing_is_said_when_there_is_room_or_nothing_else_runs() {
 
 #[test]
 fn two_machines_running_are_not_named_one_by_one() {
-    let said = run(
-        json!({"check": "memory", "machine": "U", "wanted_mb": 8192, "host_mb": 16384,
-        "running": [{"name": "A", "memory_mb": 4096}, {"name": "B", "memory_mb": 4096}]}),
-    );
+    let said = run(json!({"check": "memory", "machine": "U", "wanted_mb": 8192, "host_mb": 16384,
+        "running": [{"name": "A", "memory_mb": 4096}, {"name": "B", "memory_mb": 4096}]}));
     assert_eq!(said["problem"]["running"], Value::Null);
     assert_eq!(said["problem"]["running_mb"], 8192);
 }
 
 #[test]
 fn memory_free_now_is_compared_and_offers_to_start_anyway() {
-    let tight = run(
-        json!({"check": "memory_now", "machine": "W", "wanted_mb": 6144, "available_mb": 4000}),
-    );
+    let tight = run(json!({"check": "memory_now", "machine": "W", "wanted_mb": 6144, "available_mb": 4000}));
     assert_eq!(tight["problem"]["spare_mb"], 4000 - HEADROOM_MB);
     assert_eq!(tight["problem"]["start_anyway"], true);
     assert_eq!(
-        run(
-            json!({"check": "memory_now", "machine": "W", "wanted_mb": 6144, "available_mb": 9000})
-        )["problem"],
+        run(json!({"check": "memory_now", "machine": "W", "wanted_mb": 6144, "available_mb": 9000}))["problem"],
         Value::Null
     );
     assert_eq!(
-        run(
-            json!({"check": "memory_now", "machine": "W", "wanted_mb": 6144, "available_mb": null})
-        )["problem"],
+        run(json!({"check": "memory_now", "machine": "W", "wanted_mb": 6144, "available_mb": null}))["problem"],
         Value::Null,
         "unknown says nothing"
     );
@@ -96,8 +81,7 @@ fn creating_a_machine_next_to_one_that_runs_gets_the_warning_only_when_tight() {
         run(json!({"check": "advice", "new_mb": 2048, "running_mb": 2048, "host_mb": 16384}))["warning"],
         Value::Null
     );
-    let said =
-        run(json!({"check": "advice", "new_mb": 6144, "running_mb": 6144, "host_mb": 16384}));
+    let said = run(json!({"check": "advice", "new_mb": 6144, "running_mb": 6144, "host_mb": 16384}));
     let warning = said["warning"].as_str().unwrap();
     assert!(warning.contains("Another machine is running with 6 GB"));
     assert!(warning.contains("would leave this Mac 4 GB"));

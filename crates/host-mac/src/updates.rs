@@ -22,24 +22,13 @@ const FETCH_SECONDS: &str = "20";
 /// file can be.
 fn fetch_latest() -> Option<String> {
     let output = Command::new("curl")
-        .args([
-            "--fail",
-            "--silent",
-            "--location",
-            "--proto",
-            "=https",
-            "--max-time",
-            FETCH_SECONDS,
-        ])
+        .args(["--fail", "--silent", "--location", "--proto", "=https", "--max-time", FETCH_SECONDS])
         .args(["--max-filesize", &LONGEST.to_string(), LATEST_URL])
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output()
         .ok()?;
-    output
-        .status
-        .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+    output.status.success().then(|| String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// What a check found, as JSON for the app: `state` is `newer`, `latest` or `cant_tell`; with
@@ -65,17 +54,15 @@ pub fn check(current: &str) -> String {
 mod tests {
     use super::*;
 
-    const FILE: &str = r#"{"version": "0.2.0", "notes": "https://github.com/ruxnlabs/guesthouse/releases/tag/mac-v0.2.0"}"#;
+    const FILE: &str =
+        r#"{"version": "0.2.0", "notes": "https://github.com/ruxnlabs/guesthouse/releases/tag/mac-v0.2.0"}"#;
 
     #[test]
     fn a_newer_release_is_named_with_its_page() {
         let said: serde_json::Value = serde_json::from_str(&answer("0.1.0", Some(FILE))).unwrap();
         assert_eq!(said["state"], "newer");
         assert_eq!(said["version"], "0.2.0");
-        assert_eq!(
-            said["where"],
-            "https://github.com/ruxnlabs/guesthouse/releases/tag/mac-v0.2.0"
-        );
+        assert_eq!(said["where"], "https://github.com/ruxnlabs/guesthouse/releases/tag/mac-v0.2.0");
     }
 
     #[test]
@@ -97,10 +84,7 @@ mod tests {
         assert_eq!(answer("0.1.0", Some("garbled")), r#"{"state":"cant_tell"}"#);
         // A release page that is not the project's own is never shown.
         assert_eq!(
-            answer(
-                "0.1.0",
-                Some(r#"{"version":"0.2.0","notes":"https://example.com/"}"#)
-            ),
+            answer("0.1.0", Some(r#"{"version":"0.2.0","notes":"https://example.com/"}"#)),
             r#"{"state":"cant_tell"}"#
         );
     }

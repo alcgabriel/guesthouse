@@ -23,10 +23,7 @@ fn a_download_says_how_far_it_has_got_and_how_long_is_left_by_its_pace() {
     info.progress(Step::Fetch, 250, Some(1000), 10_000);
     let progress = info.steps[0].progress;
     assert_eq!(progress.fraction, 0.25);
-    assert_eq!(
-        (progress.bytes_done, progress.bytes_total),
-        (Some(250), Some(1000))
-    );
+    assert_eq!((progress.bytes_done, progress.bytes_total), (Some(250), Some(1000)));
     assert_eq!(progress.seconds_left, Some(30));
     // The whole is that plus the usual for the rest.
     assert_eq!(info.seconds_left, Some(30 + 20 + 1500 + 120 + 90));
@@ -63,26 +60,13 @@ fn each_step_offers_what_the_failure_screen_says() {
         assert_eq!(failure.code.as_deref(), Some("0x800b0109"));
         failure.choices
     };
-    assert_eq!(
-        offered(Step::Fetch),
-        [Choice::TryAgain, Choice::ChooseInstaller]
-    );
-    assert_eq!(
-        offered(Step::InstallSystem),
-        [Choice::TryAgain, Choice::SendReport]
-    );
+    assert_eq!(offered(Step::Fetch), [Choice::TryAgain, Choice::ChooseInstaller]);
+    assert_eq!(offered(Step::InstallSystem), [Choice::TryAgain, Choice::SendReport]);
     assert_eq!(
         offered(Step::InstallDriver),
-        [
-            Choice::TryAgain,
-            Choice::OpenWithoutDriver,
-            Choice::SendReport
-        ]
+        [Choice::TryAgain, Choice::OpenWithoutDriver, Choice::SendReport]
     );
-    assert_eq!(
-        offered(Step::FirstStart),
-        [Choice::TryAgain, Choice::SendReport]
-    );
+    assert_eq!(offered(Step::FirstStart), [Choice::TryAgain, Choice::SendReport]);
 }
 
 #[test]
@@ -110,12 +94,7 @@ fn a_chosen_installer_replaces_the_download_only_where_it_is_offered() {
     let mut info = self::info();
     info.fail(Step::Fetch, None, "the network went");
     assert!(info.choose_installer("/Users/me/Win11.iso"));
-    assert_eq!(
-        info.source,
-        Source::File {
-            path: "/Users/me/Win11.iso".into()
-        }
-    );
+    assert_eq!(info.source, Source::File { path: "/Users/me/Win11.iso".into() });
     assert_eq!(info.status_of(Step::Fetch), StepStatus::Pending);
 }
 
@@ -126,11 +105,7 @@ fn opening_without_the_driver_skips_it_and_goes_on_to_the_first_start() {
         info.start_step(step, 0);
         info.finish_step(step);
     }
-    info.fail(
-        Step::InstallDriver,
-        Some("0x80070005".into()),
-        "turned away",
-    );
+    info.fail(Step::InstallDriver, Some("0x80070005".into()), "turned away");
     assert!(info.open_without_driver());
     assert_eq!(info.status_of(Step::InstallDriver), StepStatus::Skipped);
     assert_eq!(info.next_step(), Some(Step::FirstStart));

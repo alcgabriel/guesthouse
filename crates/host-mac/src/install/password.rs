@@ -16,15 +16,11 @@ pub fn check(password: &str) -> Result<(), String> {
         return Err(problem);
     }
     let fits = (LEAST..=MOST).contains(&password.len())
-        && password
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-');
+        && password.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
     if fits {
         Ok(())
     } else {
-        Err(format!(
-            "The password must be {LEAST} to {MOST} letters, digits or dashes."
-        ))
+        Err(format!("The password must be {LEAST} to {MOST} letters, digits or dashes."))
     }
 }
 

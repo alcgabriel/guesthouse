@@ -18,12 +18,7 @@ pub fn send(archive: &Path, summary_header: &str) -> Result<String, String> {
     }
     let answer_file = archive.with_extension("answer");
     let output = Command::new("curl")
-        .args(curl_arguments(
-            &report_address(),
-            summary_header,
-            archive,
-            &answer_file,
-        ))
+        .args(curl_arguments(&report_address(), summary_header, archive, &answer_file))
         .output();
     let body = fs::read_to_string(&answer_file).unwrap_or_default();
     let _ = fs::remove_file(&answer_file);

@@ -19,10 +19,7 @@ pub struct FetchError {
 
 impl FetchError {
     pub fn new(message: impl Into<String>) -> FetchError {
-        FetchError {
-            code: None,
-            message: message.into(),
-        }
+        FetchError { code: None, message: message.into() }
     }
 }
 
@@ -89,9 +86,7 @@ pub struct Request<'a> {
 fn checked_marker(file: &Path) -> PathBuf {
     file.with_file_name(format!(
         "{}.sha256",
-        file.file_name()
-            .map(|n| n.to_string_lossy())
-            .unwrap_or_default()
+        file.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
     ))
 }
 
@@ -107,11 +102,7 @@ pub fn sha256_of(path: &Path) -> std::io::Result<String> {
         }
         hasher.update(&buffer[..read]);
     }
-    Ok(hasher
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect())
+    Ok(hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
 /// Fetches the file, going on from a part kept earlier when the server takes ranges, and keeps it
@@ -129,8 +120,7 @@ pub fn download(
     let marker = checked_marker(&file);
     // Fetched and checked before: nothing to do.
     if file.is_file()
-        && fs::read_to_string(&marker)
-            .is_ok_and(|text| text.trim().eq_ignore_ascii_case(request.sha256))
+        && fs::read_to_string(&marker).is_ok_and(|text| text.trim().eq_ignore_ascii_case(request.sha256))
     {
         return Ok(Outcome::Done(file));
     }
@@ -173,22 +163,16 @@ pub fn download(
     }
     let got = fs::metadata(&part).map(|m| m.len()).unwrap_or(0);
     if got != head.length {
-        return Err(FetchError::new(format!(
-            "The download stopped at {got} of {} bytes.",
-            head.length
-        )));
+        return Err(FetchError::new(format!("The download stopped at {got} of {} bytes.", head.length)));
     }
-    let sum = sha256_of(&part)
-        .map_err(|e| FetchError::new(format!("Cannot read {}: {e}", part.display())))?;
+    let sum =
+        sha256_of(&part).map_err(|e| FetchError::new(format!("Cannot read {}: {e}", part.display())))?;
     if !sum.eq_ignore_ascii_case(request.sha256) {
         // What was fetched is not what the publisher published; none of it is kept.
         let _ = fs::remove_file(&part);
         return Err(FetchError {
             code: Some("checksum".into()),
-            message: format!(
-                "{} did not match its published checksum, so it was thrown away.",
-                request.name
-            ),
+            message: format!("{} did not match its published checksum, so it was thrown away.", request.name),
         });
     }
     fs::rename(&part, &file).map_err(|e| FetchError::new(e.to_string()))?;
@@ -218,16 +202,8 @@ pub fn require_https(url: &str) -> Result<(), FetchError> {
 }
 
 /// What curl is run with, before the address: only https, also after a redirect.
-pub const CURL_ARGS: [&str; 8] = [
-    "--fail",
-    "--location",
-    "--silent",
-    "--show-error",
-    "--proto",
-    "=https",
-    "--proto-redir",
-    "=https",
-];
+pub const CURL_ARGS: [&str; 8] =
+    ["--fail", "--location", "--silent", "--show-error", "--proto", "=https", "--proto-redir", "=https"];
 
 /// The real network: the system's `curl`.
 pub struct CurlTransport;
@@ -259,16 +235,9 @@ impl Transport for CurlTransport {
         let length = headers
             .lines()
             .rev()
-            .find_map(|line| {
-                line.strip_prefix("content-length:")?
-                    .trim()
-                    .parse::<u64>()
-                    .ok()
-            })
+            .find_map(|line| line.strip_prefix("content-length:")?.trim().parse::<u64>().ok())
             .ok_or_else(|| FetchError::new(format!("{url} did not say how big it is.")))?;
-        let ranges = headers
-            .lines()
-            .any(|line| line.trim() == "accept-ranges: bytes");
+        let ranges = headers.lines().any(|line| line.trim() == "accept-ranges: bytes");
         Ok(Head { length, ranges })
     }
 
@@ -293,9 +262,7 @@ impl Transport for CurlTransport {
         let mut body = child.stdout.take().expect("piped");
         let (mut buffer, mut written) = (vec![0u8; READ_CHUNK], 0u64);
         loop {
-            let read = body
-                .read(&mut buffer)
-                .map_err(|e| FetchError::new(e.to_string()))?;
+            let read = body.read(&mut buffer).map_err(|e| FetchError::new(e.to_string()))?;
             if read == 0 {
                 break;
             }
@@ -314,10 +281,7 @@ impl Transport for CurlTransport {
             if let Some(mut err) = child.stderr.take() {
                 let _ = err.read_to_string(&mut said);
             }
-            return Err(FetchError::new(format!(
-                "The download stopped: {}",
-                said.trim()
-            )));
+            return Err(FetchError::new(format!("The download stopped: {}", said.trim())));
         }
         Ok(())
     }

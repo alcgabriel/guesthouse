@@ -122,10 +122,7 @@ pub unsafe extern "C" fn guesthouse_input_open(path: *const c_char) -> *mut Gues
     let Ok(path) = unsafe { CStr::from_ptr(path) }.to_str() else {
         return std::ptr::null_mut();
     };
-    let handle = GuesthouseInput {
-        input: Input::default(),
-        link: Link::open(PathBuf::from(path)),
-    };
+    let handle = GuesthouseInput { input: Input::default(), link: Link::open(PathBuf::from(path)) };
     Box::into_raw(Box::new(handle))
 }
 
@@ -134,10 +131,7 @@ pub unsafe extern "C" fn guesthouse_input_open(path: *const c_char) -> *mut Gues
 /// # Safety
 /// `handle` is null or came from `guesthouse_input_open` and is not closed, and no other call
 /// uses it at the same time.
-unsafe fn with_input(
-    handle: *mut GuesthouseInput,
-    body: impl FnOnce(&mut Input) -> Vec<serde_json::Value>,
-) {
+unsafe fn with_input(handle: *mut GuesthouseInput, body: impl FnOnce(&mut Input) -> Vec<serde_json::Value>) {
     // SAFETY: as the caller promises.
     if let Some(handle) = unsafe { handle.as_mut() } {
         let events = body(&mut handle.input);
@@ -160,12 +154,7 @@ pub unsafe extern "C" fn guesthouse_input_pointer(
     picture_width: f64,
     picture_height: f64,
 ) {
-    let fit = Fit {
-        view_width,
-        view_height,
-        picture_width,
-        picture_height,
-    };
+    let fit = Fit { view_width, view_height, picture_width, picture_height };
     // SAFETY: passed on from the caller.
     unsafe { with_input(handle, |input| input.pointer(fit, x, y)) }
 }
@@ -175,11 +164,7 @@ pub unsafe extern "C" fn guesthouse_input_pointer(
 /// # Safety
 /// See `guesthouse_input_pointer`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn guesthouse_input_button(
-    handle: *mut GuesthouseInput,
-    number: u32,
-    down: bool,
-) {
+pub unsafe extern "C" fn guesthouse_input_button(handle: *mut GuesthouseInput, number: u32, down: bool) {
     let Some(button) = Button::from_number(number) else {
         return;
     };
@@ -217,11 +202,7 @@ pub unsafe extern "C" fn guesthouse_input_key(handle: *mut GuesthouseInput, code
 /// # Safety
 /// See `guesthouse_input_pointer`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn guesthouse_input_modifier(
-    handle: *mut GuesthouseInput,
-    code: u16,
-    flag_on: bool,
-) {
+pub unsafe extern "C" fn guesthouse_input_modifier(handle: *mut GuesthouseInput, code: u16, flag_on: bool) {
     // SAFETY: passed on from the caller.
     unsafe { with_input(handle, |input| input.modifier(code, flag_on)) }
 }

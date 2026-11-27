@@ -68,53 +68,35 @@ fn request(agent: &Agent, line: &str) -> Response {
 }
 
 fn status(agent: &Agent, id: &str) -> Option<InstallInfo> {
-    request(
-        agent,
-        &format!(r#"{{"v":1,"id":1,"op":"install_status","machine":"{id}"}}"#),
-    )
-    .installs?
-    .into_iter()
-    .next()
+    request(agent, &format!(r#"{{"v":1,"id":1,"op":"install_status","machine":"{id}"}}"#))
+        .installs?
+        .into_iter()
+        .next()
 }
 
-fn wait_for(
-    agent: &Agent,
-    id: &str,
-    what: &str,
-    done: impl Fn(&InstallInfo) -> bool,
-) -> InstallInfo {
+fn wait_for(agent: &Agent, id: &str, what: &str, done: impl Fn(&InstallInfo) -> bool) -> InstallInfo {
     let deadline = Instant::now() + WAIT;
     loop {
         if let Some(info) = status(agent, id).filter(|i| done(i)) {
             return info;
         }
-        assert!(
-            Instant::now() < deadline,
-            "timed out waiting for {what}: {:?}",
-            status(agent, id)
-        );
+        assert!(Instant::now() < deadline, "timed out waiting for {what}: {:?}", status(agent, id));
         thread::sleep(Duration::from_millis(20));
     }
 }
 
 fn install_line(name: &str, guest: &str, file: Option<&str>) -> String {
-    let file = file
-        .map(|f| format!(r#","file":"{f}""#))
-        .unwrap_or_default();
+    let file = file.map(|f| format!(r#","file":"{f}""#)).unwrap_or_default();
     format!(
         r#"{{"v":1,"id":1,"op":"install","name":"{name}","guest":"{guest}","password":"{PASSWORD}"{file}}}"#
     )
 }
 
 fn choose(agent: &Agent, id: &str, choice: &str, path: Option<&str>) -> Response {
-    let path = path
-        .map(|p| format!(r#","path":"{p}""#))
-        .unwrap_or_default();
+    let path = path.map(|p| format!(r#","path":"{p}""#)).unwrap_or_default();
     request(
         agent,
-        &format!(
-            r#"{{"v":1,"id":1,"op":"install_choose","machine":"{id}","choice":"{choice}"{path}}}"#
-        ),
+        &format!(r#"{{"v":1,"id":1,"op":"install_choose","machine":"{id}","choice":"{choice}"{path}}}"#),
     )
 }
 
@@ -130,35 +112,18 @@ fn ubuntu_installs_to_the_driver_step_and_opens_without_it_and_every_change_is_t
     assert_eq!(id, "ubuntu");
 
     // It goes through the download and the install and stops at the driver, which is not packaged.
-    let stopped = wait_for(&agent, &id, "the driver step to fail", |i| {
-        i.failure.is_some()
-    });
+    let stopped = wait_for(&agent, &id, "the driver step to fail", |i| i.failure.is_some());
     assert_eq!(stopped.failure.as_ref().unwrap().step, Step::InstallDriver);
-    assert_eq!(
-        stopped.failure.as_ref().unwrap().code.as_deref(),
-        Some("no_package")
-    );
+    assert_eq!(stopped.failure.as_ref().unwrap().code.as_deref(), Some("no_package"));
     assert_eq!(stopped.status_of(Step::InstallSystem), StepStatus::Done);
-    assert!(
-        support
-            .0
-            .join("Downloads/ubuntu/ubuntu-26.04-live-server-arm64.iso")
-            .is_file()
-    );
+    assert!(support.0.join("Downloads/ubuntu/ubuntu-26.04-live-server-arm64.iso").is_file());
 
     // Open it without the driver: the first start, and it is done.
     assert!(choose(&agent, &id, "open_without_driver", None).ok);
-    let done = wait_for(&agent, &id, "the install to finish", |i| {
-        i.state == state::Phase::Done
-    });
+    let done = wait_for(&agent, &id, "the install to finish", |i| i.state == state::Phase::Done);
     assert_eq!(done.status_of(Step::InstallDriver), StepStatus::Skipped);
     // Kept in the machine's folder, and told on the way.
-    assert_eq!(
-        state::load(&support.0.join("Machines").join(&id))
-            .unwrap()
-            .state,
-        state::Phase::Done
-    );
+    assert_eq!(state::load(&support.0.join("Machines").join(&id)).unwrap().state, state::Phase::Done);
     let told: Vec<serde_json::Value> = events
         .try_iter()
         .map(|l| serde_json::from_str(&l).unwrap())
@@ -167,9 +132,7 @@ fn ubuntu_installs_to_the_driver_step_and_opens_without_it_and_every_change_is_t
     assert!(told.len() > 5, "{}", told.len());
     assert!(told.iter().any(|v| v["failure"]["code"] == "no_package"));
     // A listing has it too.
-    let listed = request(&agent, r#"{"v":1,"id":2,"op":"list"}"#)
-        .installs
-        .unwrap();
+    let listed = request(&agent, r#"{"v":1,"id":2,"op":"list"}"#).installs.unwrap();
     assert_eq!(listed[0].machine, id);
 }
 
@@ -177,17 +140,10 @@ fn ubuntu_installs_to_the_driver_step_and_opens_without_it_and_every_change_is_t
 fn windows_asks_for_an_installer_and_goes_on_with_the_one_chosen() {
     let support = Support::new("windows");
     let agent = support.agent();
-    let id = request(&agent, &install_line("Windows 11", "windows", None))
-        .machine
-        .unwrap();
-    let stopped = wait_for(&agent, &id, "the download step to fail", |i| {
-        i.failure.is_some()
-    });
+    let id = request(&agent, &install_line("Windows 11", "windows", None)).machine.unwrap();
+    let stopped = wait_for(&agent, &id, "the download step to fail", |i| i.failure.is_some());
     let failure = stopped.failure.unwrap();
-    assert_eq!(
-        (failure.step, failure.code.as_deref()),
-        (Step::Fetch, Some("choose_installer"))
-    );
+    assert_eq!((failure.step, failure.code.as_deref()), (Step::Fetch, Some("choose_installer")));
 
     // Not offered at another point, and a missing path is refused.
     assert!(!choose(&agent, &id, "open_without_driver", None).ok);
@@ -195,15 +151,8 @@ fn windows_asks_for_an_installer_and_goes_on_with_the_one_chosen() {
     assert!(!choose(&agent, &id, "explode", None).ok);
 
     assert!(choose(&agent, &id, "choose_installer", Some(&support.iso())).ok);
-    let done = wait_for(&agent, &id, "the install to finish", |i| {
-        i.state == state::Phase::Done
-    });
-    assert_eq!(
-        done.source,
-        Source::File {
-            path: support.iso()
-        }
-    );
+    let done = wait_for(&agent, &id, "the install to finish", |i| i.state == state::Phase::Done);
+    assert_eq!(done.source, Source::File { path: support.iso() });
     assert!(done.steps.iter().all(|s| s.status == StepStatus::Done));
 }
 
@@ -211,39 +160,16 @@ fn windows_asks_for_an_installer_and_goes_on_with_the_one_chosen() {
 fn an_install_can_be_stopped_and_what_it_made_is_kept() {
     let support = Support::new("cancel");
     let agent = support.agent();
-    let id = request(
-        &agent,
-        &install_line("Windows 11", "windows", Some(&support.iso())),
-    )
-    .machine
-    .unwrap();
+    let id = request(&agent, &install_line("Windows 11", "windows", Some(&support.iso()))).machine.unwrap();
     thread::sleep(Duration::from_millis(40));
-    assert!(
-        request(
-            &agent,
-            &format!(r#"{{"v":1,"id":1,"op":"install_cancel","machine":"{id}"}}"#)
-        )
-        .ok
-    );
-    let stopped = wait_for(&agent, &id, "the install to stop", |i| {
-        i.state == state::Phase::Cancelled
-    });
+    assert!(request(&agent, &format!(r#"{{"v":1,"id":1,"op":"install_cancel","machine":"{id}"}}"#)).ok);
+    let stopped = wait_for(&agent, &id, "the install to stop", |i| i.state == state::Phase::Cancelled);
     assert!(stopped.seconds_left.is_none());
-    assert!(
-        support
-            .0
-            .join("Machines")
-            .join(&id)
-            .join("machine.json")
-            .is_file()
-    );
+    assert!(support.0.join("Machines").join(&id).join("machine.json").is_file());
     // Nothing is running to stop any more.
     assert!(
-        !request(
-            &agent,
-            &format!(r#"{{"v":1,"id":1,"op":"install_cancel","machine":"{id}"}}"#)
-        )
-        .ok || status(&agent, &id).is_some()
+        !request(&agent, &format!(r#"{{"v":1,"id":1,"op":"install_cancel","machine":"{id}"}}"#)).ok
+            || status(&agent, &id).is_some()
     );
 }
 
@@ -264,14 +190,8 @@ fn a_name_that_is_taken_or_a_guest_that_is_not_one_is_refused() {
 fn a_new_agent_takes_up_an_install_that_was_running_and_does_not_fetch_again() {
     let support = Support::new("resume");
     let machines = support.0.join("Machines");
-    let id = guesthouse_core::install::machine::create_machine(
-        &machines,
-        "Ubuntu",
-        Guest::Ubuntu,
-        4,
-        4096,
-    )
-    .unwrap();
+    let id = guesthouse_core::install::machine::create_machine(&machines, "Ubuntu", Guest::Ubuntu, 4, 4096)
+        .unwrap();
     // As the last agent left it: the download and the disk done, the install itself running.
     let mut info = InstallInfo::new(&id, &Plan::for_guest(Guest::Ubuntu), Source::Download);
     for step in [Step::Fetch, Step::MakeDisk] {
@@ -287,19 +207,11 @@ fn a_new_agent_takes_up_an_install_that_was_running_and_does_not_fetch_again() {
     fs::write(folder.join("vars.fd"), b"v").unwrap();
 
     let agent = support.agent();
-    let stopped = wait_for(
-        &agent,
-        &id,
-        "the resumed install to reach the driver",
-        |i| i.failure.is_some(),
-    );
+    let stopped = wait_for(&agent, &id, "the resumed install to reach the driver", |i| i.failure.is_some());
     // The new agent does not have the password (it is only ever in an agent's memory), so it says
     // so and takes it again with Try Again, which the app does from the Keychain.
     let failure = stopped.failure.unwrap();
-    assert_eq!(
-        (failure.step, failure.code.as_deref()),
-        (Step::InstallSystem, Some("password_missing"))
-    );
+    assert_eq!((failure.step, failure.code.as_deref()), (Step::InstallSystem, Some("password_missing")));
     let again = request(
         &agent,
         &format!(
@@ -307,21 +219,11 @@ fn a_new_agent_takes_up_an_install_that_was_running_and_does_not_fetch_again() {
         ),
     );
     assert!(again.ok, "{:?}", again.error);
-    let stopped = wait_for(
-        &agent,
-        &id,
-        "the resumed install to reach the driver",
-        |i| {
-            i.failure
-                .as_ref()
-                .is_some_and(|f| f.step == Step::InstallDriver)
-        },
-    );
+    let stopped = wait_for(&agent, &id, "the resumed install to reach the driver", |i| {
+        i.failure.as_ref().is_some_and(|f| f.step == Step::InstallDriver)
+    });
     assert_eq!(stopped.failure.unwrap().step, Step::InstallDriver);
-    assert!(
-        !support.0.join("Downloads").exists(),
-        "the installer was fetched again"
-    );
+    assert!(!support.0.join("Downloads").exists(), "the installer was fetched again");
 }
 
 #[test]
@@ -332,8 +234,7 @@ fn sizes_chosen_with_customise_are_the_machines_sizes() {
     let made = request(&agent, line);
     assert!(made.ok, "{:?}", made.error);
     let id = made.machine.unwrap();
-    let settings =
-        fs::read_to_string(support.0.join("Machines").join(&id).join("machine.json")).unwrap();
+    let settings = fs::read_to_string(support.0.join("Machines").join(&id).join("machine.json")).unwrap();
     let settings: serde_json::Value = serde_json::from_str(&settings).unwrap();
     assert_eq!(settings["cores"], 2);
     assert_eq!(settings["memory_mb"], 3072);

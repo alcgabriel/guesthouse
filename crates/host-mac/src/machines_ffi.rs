@@ -44,9 +44,7 @@ pub unsafe extern "C" fn guesthouse_tool_locate(
         Some("pvg-host") => Tool::PvgHost,
         Some("pvg-qemu") => Tool::PvgQemu,
         _ => {
-            return into_c_string(error_json(
-                "the tool is not qemu, rmhost, pvg-host or pvg-qemu",
-            ));
+            return into_c_string(error_json("the tool is not qemu, rmhost, pvg-host or pvg-qemu"));
         }
     };
     let places = Places::on_this_mac(tool, setting.map(String::from), bundled.map(PathBuf::from));
@@ -70,9 +68,7 @@ pub unsafe extern "C" fn guesthouse_tool_locate(
 pub unsafe extern "C" fn guesthouse_machine_check(request: *const c_char) -> *mut c_char {
     // SAFETY: passed on from the caller.
     into_c_string(match unsafe { read_request(request) } {
-        Ok((machines, request)) => {
-            json!({ "problems": create::problems(&machines, &request) }).to_string()
-        }
+        Ok((machines, request)) => json!({ "problems": create::problems(&machines, &request) }).to_string(),
         Err(error) => error_json(&error),
     })
 }
@@ -100,10 +96,7 @@ pub unsafe extern "C" fn guesthouse_machine_create(request: *const c_char) -> *m
 /// # Safety
 /// Both point to nul-terminated strings, or are null.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn guesthouse_machine_rename(
-    id: *const c_char,
-    name: *const c_char,
-) -> *mut c_char {
+pub unsafe extern "C" fn guesthouse_machine_rename(id: *const c_char, name: *const c_char) -> *mut c_char {
     // SAFETY: passed on from the caller.
     let (id, name) = unsafe { (text(id), text(name)) };
     into_c_string(match (store::default_folder(), id, name) {
@@ -121,8 +114,7 @@ unsafe fn read_request(request: *const c_char) -> Result<(PathBuf, NewMachine), 
     let machines = store::default_folder().ok_or("no machines folder: HOME is not set")?;
     // SAFETY: passed on from the caller.
     let request = unsafe { text(request) }.ok_or("the request is not text")?;
-    let request =
-        serde_json::from_str(request).map_err(|e| format!("the request is not valid: {e}"))?;
+    let request = serde_json::from_str(request).map_err(|e| format!("the request is not valid: {e}"))?;
     Ok((machines, request))
 }
 
@@ -133,10 +125,7 @@ unsafe fn read_request(request: *const c_char) -> Result<(PathBuf, NewMachine), 
 /// # Safety
 /// `id` is null or points to a nul-terminated string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn guesthouse_machine_set_remote_view(
-    id: *const c_char,
-    on: bool,
-) -> *mut c_char {
+pub unsafe extern "C" fn guesthouse_machine_set_remote_view(id: *const c_char, on: bool) -> *mut c_char {
     // SAFETY: passed on from the caller.
     let id = unsafe { text(id) };
     into_c_string(match (store::default_folder(), id) {
@@ -171,14 +160,7 @@ pub unsafe extern "C" fn guesthouse_machine_set_hardware(
     let parsed = request.and_then(|text| serde_json::from_str::<Hardware>(text).ok());
     into_c_string(match (store::default_folder(), id, parsed) {
         (Some(machines), Some(id), Some(h)) => {
-            match create::set_hardware(
-                &machines,
-                id,
-                h.cores,
-                h.memory_mb,
-                h.host_cores,
-                h.host_memory_mb,
-            ) {
+            match create::set_hardware(&machines, id, h.cores, h.memory_mb, h.host_cores, h.host_memory_mb) {
                 Ok(()) => json!({ "ok": true }).to_string(),
                 Err(problems) => json!({ "problems": problems }).to_string(),
             }
@@ -200,12 +182,10 @@ pub unsafe extern "C" fn guesthouse_machine_set_graphics(
     // SAFETY: passed on from the caller.
     let (id, graphics) = unsafe { (text(id), text(graphics)) };
     into_c_string(match (store::default_folder(), id, graphics) {
-        (Some(machines), Some(id), Some(graphics)) => {
-            match create::set_graphics(&machines, id, graphics) {
-                Ok(()) => json!({ "ok": true }).to_string(),
-                Err(error) => error_json(&error),
-            }
-        }
+        (Some(machines), Some(id), Some(graphics)) => match create::set_graphics(&machines, id, graphics) {
+            Ok(()) => json!({ "ok": true }).to_string(),
+            Err(error) => error_json(&error),
+        },
         _ => error_json("no machines folder, or the machine or choice is not text"),
     })
 }
@@ -232,11 +212,7 @@ pub unsafe extern "C" fn guesthouse_machine_set_wanted_screen(
     let Some(id) = id else {
         return into_c_string(error_json("the machine is not text"));
     };
-    let wanted = crate::screen_size::Wanted {
-        width_px,
-        height_px,
-        scaling_percent,
-    };
+    let wanted = crate::screen_size::Wanted { width_px, height_px, scaling_percent };
     if let Err(error) = crate::screen_size::record(id, wanted) {
         return into_c_string(error_json(&error));
     }
@@ -245,8 +221,7 @@ pub unsafe extern "C" fn guesthouse_machine_set_wanted_screen(
             json!({ "ok": true, "applied": true, "mode": mode }).to_string()
         }
         Ok(crate::screen_size::Told::Overtaken) => {
-            json!({ "ok": true, "applied": false, "why": "a newer size was sent in its place" })
-                .to_string()
+            json!({ "ok": true, "applied": false, "why": "a newer size was sent in its place" }).to_string()
         }
         Ok(crate::screen_size::Told::NotSent(why)) => {
             json!({ "ok": true, "applied": false, "why": why }).to_string()
@@ -256,18 +231,13 @@ pub unsafe extern "C" fn guesthouse_machine_set_wanted_screen(
 }
 
 /// Where machine `id`'s wanted size goes, by its graphics path.
-fn tell_screen(
-    id: &str,
-    wanted: crate::screen_size::Wanted,
-) -> Result<crate::screen_size::Told, String> {
+fn tell_screen(id: &str, wanted: crate::screen_size::Wanted) -> Result<crate::screen_size::Told, String> {
     use crate::launch::Graphics;
     use crate::screen_size::Told;
     let machines = store::default_folder().ok_or("no machines folder")?;
     let machine = store::find(&machines, id)?;
     let Some(launch) = machine.launch else {
-        return Ok(Told::NotSent(
-            "the machine is not started by the app, so nothing is sent".into(),
-        ));
+        return Ok(Told::NotSent("the machine is not started by the app, so nothing is sent".into()));
     };
     if launch.graphics == Graphics::Qemu {
         return Ok(Told::NotSent(
@@ -297,9 +267,7 @@ pub unsafe extern "C" fn guesthouse_graphics_status(id: *const c_char) -> *mut c
     let id = unsafe { text(id) };
     into_c_string(match (store::default_folder(), id) {
         (Some(machines), Some(id)) => {
-            match crate::probe::graphics_status(
-                &store::run_folder(&machines, id).join("control.sock"),
-            ) {
+            match crate::probe::graphics_status(&store::run_folder(&machines, id).join("control.sock")) {
                 Ok(numbers) => numbers.to_string(),
                 Err(error) => error_json(&error),
             }
@@ -335,19 +303,12 @@ pub unsafe extern "C" fn guesthouse_update_check(current: *const c_char) -> *mut
 pub unsafe extern "C" fn guesthouse_driver_state(id: *const c_char) -> *mut c_char {
     // SAFETY: passed on from the caller.
     let id = unsafe { text(id) };
-    into_c_string(
-        match (store::support_folder(), store::default_folder(), id) {
-            (Some(support), Some(machines), Some(id))
-                if !id.contains('/') && !id.starts_with('.') =>
-            {
-                crate::driver_version::answer(&crate::driver_version::state(
-                    &support,
-                    &machines.join(id),
-                ))
-            }
-            _ => json!({"state": "unknown"}).to_string(),
-        },
-    )
+    into_c_string(match (store::support_folder(), store::default_folder(), id) {
+        (Some(support), Some(machines), Some(id)) if !id.contains('/') && !id.starts_with('.') => {
+            crate::driver_version::answer(&crate::driver_version::state(&support, &machines.join(id)))
+        }
+        _ => json!({"state": "unknown"}).to_string(),
+    })
 }
 
 /// Keeps the version of the graphics driver machine `id` reported, for the comparison above.
@@ -356,10 +317,7 @@ pub unsafe extern "C" fn guesthouse_driver_state(id: *const c_char) -> *mut c_ch
 /// # Safety
 /// Both are null or point to nul-terminated strings.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn guesthouse_driver_record(
-    id: *const c_char,
-    version: *const c_char,
-) -> *mut c_char {
+pub unsafe extern "C" fn guesthouse_driver_record(id: *const c_char, version: *const c_char) -> *mut c_char {
     // SAFETY: passed on from the caller.
     let (id, version) = unsafe { (text(id), text(version)) };
     into_c_string(match (store::default_folder(), id, version) {

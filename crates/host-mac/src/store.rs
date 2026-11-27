@@ -166,10 +166,7 @@ pub fn list(folder: &Path) -> io::Result<Listing> {
         }
         match read_machine(&path) {
             Ok(machine) => listing.machines.push(machine),
-            Err(reason) => listing.skipped.push(Skipped {
-                folder: path.display().to_string(),
-                reason,
-            }),
+            Err(reason) => listing.skipped.push(Skipped { folder: path.display().to_string(), reason }),
         }
     }
     listing.machines.sort_by(|a, b| a.name.cmp(&b.name));
@@ -180,21 +177,16 @@ pub fn list(folder: &Path) -> io::Result<Listing> {
 fn read_machine(folder: &Path) -> Result<Machine, String> {
     let text = fs::read_to_string(folder.join(MACHINE_FILE))
         .map_err(|error| format!("cannot read {MACHINE_FILE}: {error}"))?;
-    let settings: Settings = serde_json::from_str(&text)
-        .map_err(|error| format!("{MACHINE_FILE} is not valid: {error}"))?;
-    let id = folder
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
+    let settings: Settings =
+        serde_json::from_str(&text).map_err(|error| format!("{MACHINE_FILE} is not valid: {error}"))?;
+    let id = folder.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
     let launch = launch_for(folder, &id, &settings);
     // A machine the agent starts gets its screen and input names made up; one run by hand
     // keeps what its file says.
     let (frames, qmp) = match &launch {
         Some(launch) => (
             settings.frames.or(Some(launch.frame_name.clone())),
-            settings
-                .qmp
-                .or(Some(launch.input_socket.display().to_string())),
+            settings.qmp.or(Some(launch.input_socket.display().to_string())),
         ),
         None => (settings.frames, settings.qmp),
     };
@@ -250,9 +242,7 @@ fn default_modes(folder: &Path, kind: &str) -> Vec<String> {
     let last = fs::read_to_string(folder.join(SCREEN_MODE_FILE)).unwrap_or_default();
     let last = last.trim();
     if let Some((width, height)) = mode_size(last) {
-        modes.retain(|mode| {
-            mode_size(mode).is_some_and(|(w, h)| w <= width && h <= height) && mode != last
-        });
+        modes.retain(|mode| mode_size(mode).is_some_and(|(w, h)| w <= width && h <= height) && mode != last);
         modes.insert(0, last.to_string());
     }
     modes
@@ -305,10 +295,7 @@ fn launch_for(folder: &Path, id: &str, settings: &Settings) -> Option<Launch> {
     let code = settings.firmware_code.as_deref()?;
     let vars = settings.firmware_vars.as_deref()?;
     let run_dir = run_folder(folder.parent()?, id);
-    let modes = settings
-        .modes
-        .clone()
-        .unwrap_or_else(|| default_modes(folder, &settings.kind));
+    let modes = settings.modes.clone().unwrap_or_else(|| default_modes(folder, &settings.kind));
     Some(Launch {
         graphics: settings.graphics,
         kind: settings.kind.clone(),
@@ -324,19 +311,10 @@ fn launch_for(folder: &Path, id: &str, settings: &Settings) -> Option<Launch> {
         firmware_code: resolve(folder, code),
         firmware_vars: resolve(folder, vars),
         stick: settings.stick.as_deref().map(|path| resolve(folder, path)),
-        installer: settings
-            .installer
-            .as_deref()
-            .map(|path| resolve(folder, path)),
-        answer_disc: settings
-            .answer_disc
-            .as_deref()
-            .map(|path| resolve(folder, path)),
+        installer: settings.installer.as_deref().map(|path| resolve(folder, path)),
+        answer_disc: settings.answer_disc.as_deref().map(|path| resolve(folder, path)),
         installer_boot: installer_boot(folder, settings),
-        option_rom: settings
-            .option_rom
-            .as_deref()
-            .map(|path| resolve(folder, path)),
+        option_rom: settings.option_rom.as_deref().map(|path| resolve(folder, path)),
         modes,
         frame_name: format!("guesthouse.{id}"),
         control_socket: run_dir.join("qmp.sock"),
@@ -404,11 +382,8 @@ mod tests {
 
     fn scratch() -> Scratch {
         static NEXT: AtomicU32 = AtomicU32::new(0);
-        let name = format!(
-            "guesthouse-store-test-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        );
+        let name =
+            format!("guesthouse-store-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed));
         let path = std::env::temp_dir().join(name);
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).unwrap();
@@ -483,12 +458,7 @@ mod tests {
         let store = scratch();
         add_machine(&store, "a", &settings("Zed"));
         add_machine(&store, "b", &settings("Alpha"));
-        let names: Vec<_> = list(&store)
-            .unwrap()
-            .machines
-            .into_iter()
-            .map(|m| m.name)
-            .collect();
+        let names: Vec<_> = list(&store).unwrap().machines.into_iter().map(|m| m.name).collect();
         assert_eq!(names, ["Alpha", "Zed"]);
     }
 
@@ -503,10 +473,8 @@ mod tests {
         assert_eq!(listing.machines.len(), 1);
         assert_eq!(listing.machines[0].name, "Good");
         let skipped: Vec<_> = listing.skipped.iter().map(|s| s.folder.clone()).collect();
-        let expected: Vec<_> = ["broken", "empty", "short"]
-            .iter()
-            .map(|f| store.join(f).display().to_string())
-            .collect();
+        let expected: Vec<_> =
+            ["broken", "empty", "short"].iter().map(|f| store.join(f).display().to_string()).collect();
         assert_eq!(skipped, expected);
         assert!(listing.skipped[1].reason.starts_with("cannot read"));
     }
@@ -545,11 +513,7 @@ mod tests {
                     "installer_command_line": "autoinstall ---""#,
             ),
         );
-        add_machine(
-            &machines,
-            "v",
-            &file(r#", "installer_kernel": "boot/vmlinuz""#),
-        );
+        add_machine(&machines, "v", &file(r#", "installer_kernel": "boot/vmlinuz""#));
         let listing = list(&machines).unwrap().machines;
         let boot = listing[0].launch.as_ref().unwrap().installer_boot.clone();
         assert_eq!(
@@ -579,10 +543,7 @@ mod tests {
         assert_eq!(machine.id, "win");
         let run = store.join("Run/win");
         assert_eq!(machine.frames.as_deref(), Some("guesthouse.win"));
-        assert_eq!(
-            machine.qmp,
-            Some(run.join("input.sock").display().to_string())
-        );
+        assert_eq!(machine.qmp, Some(run.join("input.sock").display().to_string()));
         assert_eq!(machine.modes, ["1024x768@60"]);
         let launch = machine.launch.unwrap();
         // Relative names are inside the machine's folder, absolute ones stay as they are.
@@ -609,10 +570,7 @@ mod tests {
         let machine = list(&machines).unwrap().machines.remove(0);
         assert_eq!(machine.frames.as_deref(), Some("mine.frames"));
         let modes = machine.launch.unwrap().modes;
-        assert_eq!(
-            modes,
-            ["640x480@60", "1024x768@60", "1280x800@60", "1920x1080@60"]
-        );
+        assert_eq!(modes, ["640x480@60", "1024x768@60", "1280x800@60", "1920x1080@60"]);
     }
 
     #[test]
@@ -625,37 +583,17 @@ mod tests {
             r#"{"name": "D", "kind": "linux", "cores": 1, "memory_mb": 1, "disk": "d",
                 "firmware_code": "c", "firmware_vars": "v"}"#,
         );
-        let modes = |machines: &Path| {
-            list(machines)
-                .unwrap()
-                .machines
-                .remove(0)
-                .launch
-                .unwrap()
-                .modes
-        };
-        assert_eq!(
-            modes(&machines),
-            ["1920x1080@60", "1280x800@60", "1024x768@60", "640x480@60"]
-        );
+        let modes = |machines: &Path| list(machines).unwrap().machines.remove(0).launch.unwrap().modes;
+        assert_eq!(modes(&machines), ["1920x1080@60", "1280x800@60", "1024x768@60", "640x480@60"]);
         let folder = machines.join("deb");
         remember_screen_mode(&folder, "linux", "2560x1416@60").unwrap();
         assert_eq!(
             modes(&machines),
-            [
-                "2560x1416@60",
-                "1920x1080@60",
-                "1280x800@60",
-                "1024x768@60",
-                "640x480@60"
-            ]
+            ["2560x1416@60", "1920x1080@60", "1280x800@60", "1024x768@60", "640x480@60"]
         );
         // Behind a smaller one only what is no larger, once: the guest may take the largest.
         remember_screen_mode(&folder, "linux", "1280x800@60").unwrap();
-        assert_eq!(
-            modes(&machines),
-            ["1280x800@60", "1024x768@60", "640x480@60"]
-        );
+        assert_eq!(modes(&machines), ["1280x800@60", "1024x768@60", "640x480@60"]);
         remember_screen_mode(&folder, "linux", "1600x700@60").unwrap();
         assert_eq!(modes(&machines), ["1600x700@60", "640x480@60"]);
         // What is no mode is neither written nor read.

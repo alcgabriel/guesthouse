@@ -2,9 +2,7 @@
 //! The agent's own use of a machine's QMP socket: one short conversation at a time. QEMU takes
 //! one client per socket, so the agent never holds the connection; it comes, asks and leaves.
 
-use crate::link::{
-    CAPABILITIES, HANDSHAKE_TIMEOUT, WRITE_TIMEOUT, connect_long, read_line, refused,
-};
+use crate::link::{CAPABILITIES, HANDSHAKE_TIMEOUT, WRITE_TIMEOUT, connect_long, read_line, refused};
 use std::io::{self, BufReader, Write};
 use std::path::Path;
 
@@ -25,8 +23,7 @@ pub fn talk(socket: &Path, command: Option<&str>) -> io::Result<()> {
         (&stream).write_all(request.as_bytes())?;
         // `quit` may close the socket before it answers, which is as good as an answer.
         match answer(&mut reader) {
-            Err(error) if command == "quit" && error.kind() == io::ErrorKind::ConnectionRefused => {
-            }
+            Err(error) if command == "quit" && error.kind() == io::ErrorKind::ConnectionRefused => {}
             other => other?,
         }
     }

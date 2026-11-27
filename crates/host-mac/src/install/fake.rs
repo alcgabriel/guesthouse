@@ -18,10 +18,7 @@ use std::path::{Path, PathBuf};
 pub const UBUNTU_BYTES: &[u8] = b"pretend this is the ubuntu server disc for arm64";
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// The version the stand-in driver package says it is.
@@ -52,10 +49,7 @@ impl FakeNetwork {
 
 impl Transport for FakeNetwork {
     fn head(&mut self, url: &str) -> Result<Head, FetchError> {
-        Ok(Head {
-            length: Self::body(url).len() as u64,
-            ranges: true,
-        })
+        Ok(Head { length: Self::body(url).len() as u64, ranges: true })
     }
 
     fn get_from(
@@ -68,8 +62,7 @@ impl Transport for FakeNetwork {
         let body = Self::body(url);
         // In pieces, so progress is told more than once.
         for (index, piece) in body[from as usize..].chunks(8).enumerate() {
-            out.write_all(piece)
-                .map_err(|e| FetchError::new(e.to_string()))?;
+            out.write_all(piece).map_err(|e| FetchError::new(e.to_string()))?;
             if !progress((index * 8 + piece.len()) as u64) {
                 return Ok(());
             }
@@ -89,20 +82,12 @@ impl Transport for FakeNetwork {
                     )
                 })
                 .collect();
-            return Ok(format!(
-                r#"{{"version":"{FAKE_DRIVER_VERSION}","files":[{}]}}"#,
-                files.join(",")
-            ));
+            return Ok(format!(r#"{{"version":"{FAKE_DRIVER_VERSION}","files":[{}]}}"#, files.join(",")));
         }
         if !url.starts_with("https://cdimage.ubuntu.com/ubuntu/releases/26.04/release/") {
-            return Err(FetchError::new(format!(
-                "{url} is not somewhere the stand-in knows."
-            )));
+            return Err(FetchError::new(format!("{url} is not somewhere the stand-in knows.")));
         }
-        Ok(format!(
-            "{} *ubuntu-26.04-live-server-arm64.iso\n",
-            sha256_hex(UBUNTU_BYTES)
-        ))
+        Ok(format!("{} *ubuntu-26.04-live-server-arm64.iso\n", sha256_hex(UBUNTU_BYTES)))
     }
 }
 
@@ -142,10 +127,8 @@ const POWER_OFF_AFTER_MS: u64 = 5_000;
 /// The first line of the serial port's words in a stand-in `install.sh`, if it has one.
 fn said_by_script(text: &str) -> Option<String> {
     use super::windows::marker;
-    let start = [marker::DRIVER_FAILED, marker::DRIVER_INSTALLED]
-        .iter()
-        .filter_map(|m| text.find(m))
-        .min()?;
+    let start =
+        [marker::DRIVER_FAILED, marker::DRIVER_INSTALLED].iter().filter_map(|m| text.find(m)).min()?;
     let line = &text[start..];
     let end = line.find(['"', '\'', '\n']).unwrap_or(line.len());
     Some(line[..end].trim().to_string())
@@ -163,12 +146,7 @@ impl FakeGuest {
             ],
             super::plan::Guest::Ubuntu => vec![(30_000, ubuntu::FINISHED.to_string())],
         };
-        FakeGuest {
-            says,
-            stops_at: Some(45_000),
-            real_pause_ms: 20,
-            ..FakeGuest::default()
-        }
+        FakeGuest { says, stops_at: Some(45_000), real_pause_ms: 20, ..FakeGuest::default() }
     }
 }
 
@@ -188,11 +166,8 @@ impl MachineControl for FakeGuest {
             .find(|f| f.file_name().is_some_and(|n| n == driver::LINUX_SCRIPT))
             .and_then(|f| fs::read_to_string(f).ok())
             .and_then(|text| said_by_script(&text));
-        self.stick_files = files
-            .iter()
-            .filter_map(|f| f.file_name())
-            .map(|n| n.to_string_lossy().into_owned())
-            .collect();
+        self.stick_files =
+            files.iter().filter_map(|f| f.file_name()).map(|n| n.to_string_lossy().into_owned()).collect();
         fs::write(image, b"stick").map_err(|e| e.to_string())
     }
 
@@ -217,8 +192,7 @@ impl MachineControl for FakeGuest {
         self.off_at = None;
         // A start with a Linux driver's disk: the service runs its install.sh.
         if let Some(line) = self.stick_line.clone() {
-            self.says
-                .push((self.now + DRIVER_SAYS_AFTER_MS, line.clone()));
+            self.says.push((self.now + DRIVER_SAYS_AFTER_MS, line.clone()));
             if line.contains(super::windows::marker::DRIVER_INSTALLED) {
                 let first = super::windows::marker::FIRST_START.to_string();
                 self.says.push((self.now + FIRST_START_AFTER_MS, first));
@@ -244,11 +218,7 @@ impl MachineControl for FakeGuest {
     }
 
     fn serial(&mut self, _: &str) -> String {
-        self.says
-            .iter()
-            .filter(|(at, _)| *at <= self.now)
-            .map(|(_, t)| format!("{t}\n"))
-            .collect()
+        self.says.iter().filter(|(at, _)| *at <= self.now).map(|(_, t)| format!("{t}\n")).collect()
     }
 
     fn now_ms(&mut self) -> u64 {

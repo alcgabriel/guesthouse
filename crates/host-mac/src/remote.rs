@@ -58,10 +58,9 @@ pub fn set_enabled(machines: &Path, id: &str, on: bool) -> Result<Option<u16>, S
     let port = match (on, machine.remote_port) {
         (false, port) => port,
         (true, Some(port)) => Some(port),
-        (true, None) => Some(
-            choose_port(machines, port_is_free)
-                .ok_or(guesthouse_remote_view_core::switch::NO_PORT)?,
-        ),
+        (true, None) => {
+            Some(choose_port(machines, port_is_free).ok_or(guesthouse_remote_view_core::switch::NO_PORT)?)
+        }
     };
     let path = Path::new(&machine.folder).join(MACHINE_FILE);
     let text = fs::read_to_string(&path).map_err(|e| format!("Cannot read {MACHINE_FILE}: {e}"))?;
@@ -78,13 +77,7 @@ pub fn set_enabled(machines: &Path, id: &str, on: bool) -> Result<Option<u16>, S
 /// The first port in range that no machine has taken and `is_free` accepts.
 pub fn choose_port(machines: &Path, is_free: impl Fn(u16) -> bool) -> Option<u16> {
     let taken: Vec<u16> = store::list(machines)
-        .map(|listing| {
-            listing
-                .machines
-                .iter()
-                .filter_map(|m| m.remote_port)
-                .collect()
-        })
+        .map(|listing| listing.machines.iter().filter_map(|m| m.remote_port).collect())
         .unwrap_or_default();
     guesthouse_remote_view_core::switch::choose_port(&taken, is_free)
 }
@@ -151,9 +144,7 @@ pub enum LogEvent {
 pub fn pairing_event(event: &LogEvent) -> Option<PairingEvent> {
     match event {
         LogEvent::PairingOpen { until_secs } if *until_secs > 0 => {
-            Some(PairingEvent::PairingOpen {
-                until_unix_seconds: *until_secs,
-            })
+            Some(PairingEvent::PairingOpen { until_unix_seconds: *until_secs })
         }
         LogEvent::PairingPending(device) => Some(PairingEvent::DeviceWaits {
             name: device.name.clone(),
@@ -161,10 +152,9 @@ pub fn pairing_event(event: &LogEvent) -> Option<PairingEvent> {
             code: device.code.clone(),
             seconds: u32::try_from(device.seconds).unwrap_or(u32::MAX),
         }),
-        LogEvent::Paired { fingerprint, name } => Some(PairingEvent::Paired {
-            fingerprint: fingerprint.to_ascii_lowercase(),
-            name: name.clone(),
-        }),
+        LogEvent::Paired { fingerprint, name } => {
+            Some(PairingEvent::Paired { fingerprint: fingerprint.to_ascii_lowercase(), name: name.clone() })
+        }
         LogEvent::PairingClosed { reason } => Some(PairingEvent::PairingClosed { reason: *reason }),
         _ => None,
     }
@@ -177,10 +167,9 @@ pub fn pairing_event(event: &LogEvent) -> Option<PairingEvent> {
 pub fn rmhost_line(words: &[String]) -> Result<String, String> {
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
     match words.as_slice() {
-        ["pair", "on", seconds] => seconds
-            .parse()
-            .map(pair_open_line)
-            .map_err(|_| format!("{seconds} is not a number of seconds.")),
+        ["pair", "on", seconds] => {
+            seconds.parse().map(pair_open_line).map_err(|_| format!("{seconds} is not a number of seconds."))
+        }
         ["pair", "off"] => Ok(PAIR_CLOSE_LINE.to_string()),
         ["pair", "accept" | "decline"] | ["revoke", _] | ["drop"] | ["device", ..] => {
             Ok(words.join(" ") + "\n")
@@ -212,17 +201,13 @@ pub fn parse_line(line: &str) -> Option<LogEvent> {
         return Some(LogEvent::ViewerLeft);
     }
     if let Some(until) = line.strip_prefix("rmhost: pairing open until ") {
-        return Some(LogEvent::PairingOpen {
-            until_secs: until.trim().parse().ok()?,
-        });
+        return Some(LogEvent::PairingOpen { until_secs: until.trim().parse().ok()? });
     }
     if let Some(json) = line.strip_prefix("rmhost: devices ") {
         return serde_json::from_str(json).ok().map(LogEvent::Devices);
     }
     if let Some(json) = line.strip_prefix("rmhost: pairing pending ") {
-        return serde_json::from_str(json)
-            .ok()
-            .map(LogEvent::PairingPending);
+        return serde_json::from_str(json).ok().map(LogEvent::PairingPending);
     }
     if let Some(reason) = line.strip_prefix("rmhost: pairing closed: ") {
         // A reason this version does not know reads as `other`, as the shared type says.
@@ -235,11 +220,7 @@ pub fn parse_line(line: &str) -> Option<LogEvent> {
         let name = name.trim();
         return Some(LogEvent::Paired {
             fingerprint: fingerprint.to_string(),
-            name: if name.is_empty() {
-                fingerprint.to_string()
-            } else {
-                name.to_string()
-            },
+            name: if name.is_empty() { fingerprint.to_string() } else { name.to_string() },
         });
     }
     let name = line.strip_prefix("rmhost: viewer \"")?;

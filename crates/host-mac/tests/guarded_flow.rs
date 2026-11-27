@@ -96,16 +96,11 @@ fn request(agent: &Agent, text: &str) -> Response {
 }
 
 fn op(agent: &Agent, op: &str, id: &str) -> Response {
-    request(
-        agent,
-        &format!(r#"{{"v":1,"id":1,"op":"{op}","machine":"{id}"}}"#),
-    )
+    request(agent, &format!(r#"{{"v":1,"id":1,"op":"{op}","machine":"{id}"}}"#))
 }
 
 fn state_of(agent: &Agent, id: &str) -> MachineState {
-    let list = request(agent, r#"{"v":1,"id":1,"op":"list"}"#)
-        .machines
-        .unwrap();
+    let list = request(agent, r#"{"v":1,"id":1,"op":"list"}"#).machines.unwrap();
     list.into_iter().find(|s| s.machine == id).unwrap()
 }
 
@@ -118,9 +113,7 @@ fn wait_for(what: &str, mut check: impl FnMut() -> bool) {
 }
 
 fn wait_state(agent: &Agent, id: &str, state: &str) {
-    wait_for(&format!("{id} to be {state}"), || {
-        state_of(agent, id).state == state
-    });
+    wait_for(&format!("{id} to be {state}"), || state_of(agent, id).state == state);
 }
 
 fn pid_of(run: &Path, file: &str) -> process::Pid {
@@ -147,10 +140,7 @@ fn the_graphics_process_starts_first_and_both_end_when_the_machine_does() {
     assert!(!host_args.contains("--window"));
     let qemu_args = fs::read_to_string(run.join("fake-qemu.args")).unwrap();
     assert!(qemu_args.contains("virt,memory-backend=ram"));
-    assert!(qemu_args.contains(&format!(
-        "pvg-fwd,id=pvg,socket={}",
-        run.join("host.sock").display()
-    )));
+    assert!(qemu_args.contains(&format!("pvg-fwd,id=pvg,socket={}", run.join("host.sock").display())));
     assert!(!qemu_args.contains("apple-gfx"));
     let (host, qemu) = (pid_of(&run, "host.pid"), pid_of(&run, "machine.pid"));
     assert!(host.started <= qemu.started || host.pid != qemu.pid);
@@ -170,10 +160,7 @@ fn a_graphics_process_that_ends_before_its_socket_fails_the_start_with_its_last_
     wait_state(&agent, "hostfail", "failed");
     let reason = state_of(&agent, "hostfail").reason.unwrap();
     assert!(reason.contains("graphics process"), "{reason}");
-    assert!(
-        reason.contains("the frame name guesthouse.hostfail is taken"),
-        "{reason}"
-    );
+    assert!(reason.contains("the frame name guesthouse.hostfail is taken"), "{reason}");
     // QEMU was never started.
     assert!(!support.run("hostfail").join("fake-qemu.args").exists());
     assert!(!support.run("hostfail").join("host.pid").exists());
@@ -225,9 +212,7 @@ fn a_new_agent_finds_both_again_and_force_off_ends_both() {
     assert_eq!(state_of(&second, "win").state, "running");
     assert!(op(&second, "force_off", "win").ok);
     wait_state(&second, "win", "off");
-    wait_for("QEMU and the graphics process to go", || {
-        gone(&qemu) && gone(&host)
-    });
+    wait_for("QEMU and the graphics process to go", || gone(&qemu) && gone(&host));
 }
 
 #[test]
@@ -258,10 +243,7 @@ fn programs_that_cannot_do_the_job_are_refused_before_anything_starts() {
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
         path
     };
-    let old_host = script(
-        "old-host",
-        r#"echo "pvg-host: usage: x --socket P [--window]" >&2; exit 1"#,
-    );
+    let old_host = script("old-host", r#"echo "pvg-host: usage: x --socket P [--window]" >&2; exit 1"#);
     let plain_qemu = script("plain-qemu", r#"echo 'name "apple-gfx-pci"'"#);
     let agent = support.agent();
     let start = |qemu: &Path, host: &Path| {
@@ -306,10 +288,7 @@ fn a_machine_with_sharing_on_is_shared_when_it_runs_however_it_was_started_and_a
     let rmhost = support.fake_rmhost();
     let agent = support.agent();
     // The start names rmhost, as the app's Start button and `--start` both do.
-    let start = format!(
-        r#"{{"v":1,"id":1,"op":"start","machine":"win","rmhost":"{}"}}"#,
-        rmhost.display()
-    );
+    let start = format!(r#"{{"v":1,"id":1,"op":"start","machine":"win","rmhost":"{}"}}"#, rmhost.display());
     assert!(request(&agent, &start).ok);
     wait_state(&agent, "win", "running");
     wait_for("the screen to be shared", || {
@@ -318,13 +297,10 @@ fn a_machine_with_sharing_on_is_shared_when_it_runs_however_it_was_started_and_a
     let share = share_of(&agent, "win").unwrap();
     // The port was chosen then, and written to the machine's file (the stand-in says its own).
     assert_eq!(share.port, Some(7800));
-    let file: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(support.0.join("Machines/win/machine.json")).unwrap(),
-    )
-    .unwrap();
-    let chosen = file["remote_port"]
-        .as_u64()
-        .expect("a port written to machine.json");
+    let file: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(support.0.join("Machines/win/machine.json")).unwrap())
+            .unwrap();
+    let chosen = file["remote_port"].as_u64().expect("a port written to machine.json");
     assert!((7792..=7899).contains(&chosen), "{chosen}");
     // rmhost has its own input pipe in the run folder, and goes with the machine.
     assert!(support.run("win").join("rmhost.in").exists());
@@ -346,13 +322,7 @@ fn a_sharing_that_cannot_start_says_why_where_the_app_can_see_it() {
     wait_for("the failure to be shown", || {
         share_of(&agent, "win").is_some_and(|s| s.state == ShareState::Failed)
     });
-    assert!(
-        share_of(&agent, "win")
-            .unwrap()
-            .reason
-            .unwrap()
-            .contains("rmhost")
-    );
+    assert!(share_of(&agent, "win").unwrap().reason.unwrap().contains("rmhost"));
     assert!(op(&agent, "force_off", "win").ok);
     wait_state(&agent, "win", "off");
 }

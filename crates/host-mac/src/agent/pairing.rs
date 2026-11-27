@@ -28,16 +28,12 @@ struct RmhostGuest<'a> {
 impl Guest for RmhostGuest<'_> {
     /// rmhost answers no word, so there is nothing to ask: its events say what happened.
     fn ctl(&self, _words: &Words) -> Result<String, Unanswered> {
-        Err(Unanswered(
-            "rmhost answers no word, it says what happened".into(),
-        ))
+        Err(Unanswered("rmhost answers no word, it says what happened".into()))
     }
 
     fn send(&self, words: &Words) -> Result<(), NotDelivered> {
         let line = remote::rmhost_line(words).map_err(NotDelivered)?;
-        self.agent
-            .send_to_rmhost(self.machine, &line)
-            .map_err(NotDelivered)
+        self.agent.send_to_rmhost(self.machine, &line).map_err(NotDelivered)
     }
 
     fn log(&self, line: &str) {
@@ -46,19 +42,14 @@ impl Guest for RmhostGuest<'_> {
 }
 
 fn now_ms() -> Millis {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |since| since.as_millis() as Millis)
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_millis() as Millis)
 }
 
 impl Agent {
     /// Runs `ask` with the shared driver for this machine's pairing.
     fn with_pairing_driver<R>(&self, id: &str, ask: impl FnOnce(&Driver) -> R) -> R {
         let policy = Policy::default();
-        let guest = RmhostGuest {
-            agent: self,
-            machine: id,
-        };
+        let guest = RmhostGuest { agent: self, machine: id };
         let now = now_ms;
         ask(&Driver {
             sessions: &self.shared.pairing,
@@ -105,8 +96,7 @@ impl Agent {
     /// `info` with what a screen shows of pairing put in from the shared pairing: whether it is
     /// open and until when, the device that waits, who paired and why it closed.
     pub(super) fn with_pairing_shown(&self, id: &str, mut info: ShareInfo) -> ShareInfo {
-        let shown =
-            self.with_pairing_driver(id, |driver| driver.shown(info.state, info.port, None));
+        let shown = self.with_pairing_driver(id, |driver| driver.shown(info.state, info.port, None));
         info.pairing = shown.pairing;
         info.pairing_until_ms = shown.pairing_until_ms;
         info.pending = shown.pending;
@@ -117,11 +107,6 @@ impl Agent {
 
     /// The machine's rmhost went: a pairing that was open is closed, for no reason of its own.
     pub(super) fn pairing_ended(&self, id: &str) {
-        self.pairing_says(
-            id,
-            &PairingEvent::PairingClosed {
-                reason: CloseReason::Other,
-            },
-        );
+        self.pairing_says(id, &PairingEvent::PairingClosed { reason: CloseReason::Other });
     }
 }

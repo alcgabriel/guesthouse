@@ -106,17 +106,9 @@ pub enum Op {
     PairDecline { machine: String },
     /// Allows or forbids something for a trusted device: `what` is `input` (control; off is
     /// view-only), `clipboard`, `files`, `sound`, `mic` or `camera`.
-    DeviceAllow {
-        machine: String,
-        fingerprint: String,
-        what: String,
-        on: bool,
-    },
+    DeviceAllow { machine: String, fingerprint: String, what: String, on: bool },
     /// Stops trusting a device; it is disconnected and refused from now on.
-    DeviceRevoke {
-        machine: String,
-        fingerprint: String,
-    },
+    DeviceRevoke { machine: String, fingerprint: String },
     /// Disconnects the viewer now; it stays trusted.
     DeviceDrop { machine: String },
     /// Starts or stops sharing a running machine's screen with other devices.
@@ -243,11 +235,7 @@ pub struct StateChange {
 
 impl StateChange {
     pub fn line(state: MachineState) -> String {
-        let change = StateChange {
-            v: VERSION,
-            event: "state".into(),
-            state,
-        };
+        let change = StateChange { v: VERSION, event: "state".into(), state };
         serde_json::to_string(&change).expect("an event always serialises")
     }
 }
@@ -262,13 +250,7 @@ pub fn parse_request(line: &str) -> Result<Request, (u64, String)> {
     let request: Request =
         serde_json::from_str(line).map_err(|error| (id, format!("not a request: {error}")))?;
     if request.v != VERSION {
-        return Err((
-            id,
-            format!(
-                "protocol version {} is not understood, this is {VERSION}",
-                request.v
-            ),
-        ));
+        return Err((id, format!("protocol version {} is not understood, this is {VERSION}", request.v)));
     }
     Ok(request)
 }
@@ -280,14 +262,7 @@ mod tests {
     #[test]
     fn reads_each_request() {
         let list = parse_request(r#"{"v":1,"id":4,"op":"list"}"#).unwrap();
-        assert_eq!(
-            list,
-            Request {
-                v: 1,
-                id: 4,
-                op: Op::List
-            }
-        );
+        assert_eq!(list, Request { v: 1, id: 4, op: Op::List });
         let start = parse_request(r#"{"v":1,"id":5,"op":"start","machine":"win","qemu":"/q"}"#);
         assert_eq!(
             start.unwrap().op,
@@ -302,29 +277,15 @@ mod tests {
         let start = parse_request(r#"{"v":1,"op":"start","machine":"win"}"#).unwrap();
         assert_eq!(
             start.op,
-            Op::Start {
-                machine: "win".into(),
-                qemu: None,
-                rmhost: None,
-                pvg_host: None,
-                scale: None,
-            }
+            Op::Start { machine: "win".into(), qemu: None, rmhost: None, pvg_host: None, scale: None }
         );
         assert_eq!(
-            parse_request(r#"{"v":1,"id":1,"op":"shutdown","machine":"w"}"#)
-                .unwrap()
-                .op,
-            Op::Shutdown {
-                machine: "w".into()
-            }
+            parse_request(r#"{"v":1,"id":1,"op":"shutdown","machine":"w"}"#).unwrap().op,
+            Op::Shutdown { machine: "w".into() }
         );
         assert_eq!(
-            parse_request(r#"{"v":1,"id":1,"op":"force_off","machine":"w"}"#)
-                .unwrap()
-                .op,
-            Op::ForceOff {
-                machine: "w".into()
-            }
+            parse_request(r#"{"v":1,"id":1,"op":"force_off","machine":"w"}"#).unwrap().op,
+            Op::ForceOff { machine: "w".into() }
         );
     }
 
@@ -335,19 +296,10 @@ mod tests {
         let request = Request {
             v: VERSION,
             id: 8,
-            op: Op::Start {
-                machine: "deb".into(),
-                qemu: None,
-                rmhost: None,
-                pvg_host: None,
-                scale: Some(2),
-            },
+            op: Op::Start { machine: "deb".into(), qemu: None, rmhost: None, pvg_host: None, scale: Some(2) },
         };
         let text = serde_json::to_string(&request).unwrap();
-        assert_eq!(
-            text,
-            r#"{"v":1,"id":8,"op":"start","machine":"deb","scale":2}"#
-        );
+        assert_eq!(text, r#"{"v":1,"id":8,"op":"start","machine":"deb","scale":2}"#);
     }
 
     #[test]
@@ -367,13 +319,7 @@ mod tests {
         let request = Request {
             v: VERSION,
             id: 7,
-            op: Op::Start {
-                machine: "w".into(),
-                qemu: None,
-                rmhost: None,
-                pvg_host: None,
-                scale: None,
-            },
+            op: Op::Start { machine: "w".into(), qemu: None, rmhost: None, pvg_host: None, scale: None },
         };
         let text = serde_json::to_string(&request).unwrap();
         assert_eq!(text, r#"{"v":1,"id":7,"op":"start","machine":"w"}"#);
@@ -387,12 +333,7 @@ mod tests {
             Response::error(2, "no such machine").to_line(),
             r#"{"v":1,"id":2,"ok":false,"error":"no such machine"}"#
         );
-        let state = MachineState::new(
-            "win",
-            &Status::Failed {
-                reason: "bad disk".into(),
-            },
-        );
+        let state = MachineState::new("win", &Status::Failed { reason: "bad disk".into() });
         assert_eq!(
             StateChange::line(state),
             r#"{"v":1,"event":"state","machine":"win","state":"failed","reason":"bad disk"}"#
@@ -422,19 +363,9 @@ mod tests {
         let plain = parse_request(r#"{"v":1,"op":"share","machine":"w","on":false}"#).unwrap();
         assert_eq!(
             plain.op,
-            Op::Share {
-                machine: "w".into(),
-                on: false,
-                pairing: false,
-                pairing_seconds: None,
-                rmhost: None
-            }
+            Op::Share { machine: "w".into(), on: false, pairing: false, pairing_seconds: None, rmhost: None }
         );
-        for (op, want) in [
-            ("pair_close", "close"),
-            ("pair_accept", "accept"),
-            ("pair_decline", "decline"),
-        ] {
+        for (op, want) in [("pair_close", "close"), ("pair_accept", "accept"), ("pair_decline", "decline")] {
             let line = format!(r#"{{"v":1,"id":3,"op":"{op}","machine":"w"}}"#);
             let got = parse_request(&line).unwrap().op;
             let name = format!("{got:?}").to_lowercase();

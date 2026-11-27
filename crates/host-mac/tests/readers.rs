@@ -34,20 +34,14 @@ fn spawn(program: &Path, args: &[&str]) -> Guard {
 
 #[test]
 fn a_viewer_through_rmhost_serve_and_a_second_reader_both_get_frames_from_one_publisher() {
-    let Ok(found) = tools::locate(Tool::Rmhost, &Places::on_this_mac(Tool::Rmhost, None, None))
-    else {
+    let Ok(found) = tools::locate(Tool::Rmhost, &Places::on_this_mac(Tool::Rmhost, None, None)) else {
         eprintln!("\n*** readers SKIPPED: rmhost is not built here (set GUESTHOUSE_RMHOST) ***\n");
         return;
     };
     let rmhost = found.path;
-    let (testsource, viewcheck) = (
-        rmhost.with_file_name("testsource"),
-        rmhost.with_file_name("viewcheck"),
-    );
+    let (testsource, viewcheck) = (rmhost.with_file_name("testsource"), rmhost.with_file_name("viewcheck"));
     if !testsource.is_file() || !viewcheck.is_file() {
-        eprintln!(
-            "\n*** readers SKIPPED: testsource or viewcheck is not built beside rmhost ***\n"
-        );
+        eprintln!("\n*** readers SKIPPED: testsource or viewcheck is not built beside rmhost ***\n");
         return;
     }
     let root = std::env::temp_dir().join(format!("gh-readers-{}", std::process::id()));
@@ -60,16 +54,7 @@ fn a_viewer_through_rmhost_serve_and_a_second_reader_both_get_frames_from_one_pu
     let state = root.join("serve");
     let _serve = spawn(
         &rmhost,
-        &[
-            "serve",
-            "-n",
-            &name,
-            "-p",
-            "-l",
-            "127.0.0.1:7886",
-            "-s",
-            &state.display().to_string(),
-        ],
+        &["serve", "-n", &name, "-p", "-l", "127.0.0.1:7886", "-s", &state.display().to_string()],
     );
     thread::sleep(Duration::from_secs(1));
     // The second reader: five seconds of frames, counted, while the viewer is connected.
@@ -82,11 +67,7 @@ fn a_viewer_through_rmhost_serve_and_a_second_reader_both_get_frames_from_one_pu
         .unwrap();
     thread::sleep(Duration::from_millis(500));
     let view = Command::new(&viewcheck)
-        .args([
-            "127.0.0.1:7886",
-            &root.join("viewer").display().to_string(),
-            "4",
-        ])
+        .args(["127.0.0.1:7886", &root.join("viewer").display().to_string(), "4"])
         .output()
         .unwrap();
     let stats = stats.wait_with_output().unwrap();
@@ -95,37 +76,17 @@ fn a_viewer_through_rmhost_serve_and_a_second_reader_both_get_frames_from_one_pu
     let seen: u32 = said
         .lines()
         .find(|l| l.contains(" frames ("))
-        .and_then(|l| {
-            l.strip_prefix("viewcheck: ")?
-                .split_whitespace()
-                .next()?
-                .parse()
-                .ok()
-        })
+        .and_then(|l| l.strip_prefix("viewcheck: ")?.split_whitespace().next()?.parse().ok())
         .unwrap_or(0);
-    assert!(
-        seen > 100,
-        "the viewer behind rmhost serve got {seen} frames: {said}"
-    );
+    assert!(seen > 100, "the viewer behind rmhost serve got {seen} frames: {said}");
 
-    let text = String::from_utf8_lossy(&stats.stderr).into_owned()
-        + &String::from_utf8_lossy(&stats.stdout);
+    let text = String::from_utf8_lossy(&stats.stderr).into_owned() + &String::from_utf8_lossy(&stats.stdout);
     let received: u32 = text
         .lines()
         .find(|l| l.contains("frames received"))
-        .and_then(|l| {
-            l.split(" s: ")
-                .nth(1)?
-                .split_whitespace()
-                .next()?
-                .parse()
-                .ok()
-        })
+        .and_then(|l| l.split(" s: ").nth(1)?.split_whitespace().next()?.parse().ok())
         .unwrap_or(0);
-    assert!(
-        received > 100,
-        "the second reader got {received} frames: {text}"
-    );
+    assert!(received > 100, "the second reader got {received} frames: {text}");
     let _ = std::fs::remove_dir_all(&root);
     eprintln!("readers: RAN, viewer {seen} frames, second reader {received} frames");
 }

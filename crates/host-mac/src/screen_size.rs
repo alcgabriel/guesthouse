@@ -41,25 +41,15 @@ pub fn record(id: &str, wanted: Wanted) -> Result<(), String> {
         return Err("A screen needs a width and a height.".into());
     }
     if !SCALINGS.contains(&wanted.scaling_percent) {
-        return Err(format!(
-            "{}% is not a scaling a guest takes (100 or 200).",
-            wanted.scaling_percent
-        ));
+        return Err(format!("{}% is not a scaling a guest takes (100 or 200).", wanted.scaling_percent));
     }
-    recorded()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .insert(id.to_string(), wanted);
+    recorded().lock().unwrap_or_else(|e| e.into_inner()).insert(id.to_string(), wanted);
     Ok(())
 }
 
 /// The last size recorded for machine `id`.
 pub fn last(id: &str) -> Option<Wanted> {
-    recorded()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .get(id)
-        .copied()
+    recorded().lock().unwrap_or_else(|e| e.into_inner()).get(id).copied()
 }
 
 /// The least time between two sizes sent to one machine.
@@ -121,9 +111,7 @@ pub fn send(id: &str, control: &Path, wanted: Wanted) -> Result<Told, String> {
                 return Ok(Told::Overtaken);
             }
             let now = Instant::now();
-            let wait = pace.sent.map_or(Duration::ZERO, |sent| {
-                (sent + PACE).saturating_duration_since(now)
-            });
+            let wait = pace.sent.map_or(Duration::ZERO, |sent| (sent + PACE).saturating_duration_since(now));
             if wait.is_zero() {
                 pace.sent = Some(now);
             }
@@ -136,9 +124,7 @@ pub fn send(id: &str, control: &Path, wanted: Wanted) -> Result<Told, String> {
     }
     let mode = mode_for(wanted);
     let Ok(stream) = UnixStream::connect(control) else {
-        return Ok(Told::NotSent(
-            "the machine's graphics process is not running".into(),
-        ));
+        return Ok(Told::NotSent("the machine's graphics process is not running".into()));
     };
     let answer = ask(&stream, &format!("modes {mode}"))
         .map_err(|error| format!("the graphics process did not answer: {error}"))?;
@@ -165,16 +151,8 @@ mod tests {
 
     #[test]
     fn the_last_size_asked_for_is_the_one_kept() {
-        let first = Wanted {
-            width_px: 2360,
-            height_px: 1392,
-            scaling_percent: 200,
-        };
-        let second = Wanted {
-            width_px: 1180,
-            height_px: 696,
-            scaling_percent: 100,
-        };
+        let first = Wanted { width_px: 2360, height_px: 1392, scaling_percent: 200 };
+        let second = Wanted { width_px: 1180, height_px: 696, scaling_percent: 100 };
         assert_eq!(last("screen-size-test"), None);
         record("screen-size-test", first).unwrap();
         record("screen-size-test", second).unwrap();
@@ -183,11 +161,7 @@ mod tests {
 
     #[test]
     fn the_mode_sent_is_a_multiple_of_8_wide_and_no_larger_than_the_window_offers() {
-        let wanted = |width_px, height_px| Wanted {
-            width_px,
-            height_px,
-            scaling_percent: 200,
-        };
+        let wanted = |width_px, height_px| Wanted { width_px, height_px, scaling_percent: 200 };
         assert_eq!(mode_for(wanted(2560, 1440)), "2560x1440@60");
         assert_eq!(mode_for(wanted(2362, 1392)), "2360x1392@60");
         assert_eq!(mode_for(wanted(7680, 4320)), "5120x2880@60");
@@ -195,10 +169,7 @@ mod tests {
 
     /// A stand-in graphics process on a socket of its own: answers every line it is given with
     /// `answer` and writes the line down.
-    fn graphics(
-        name: &str,
-        answer: &'static str,
-    ) -> (std::path::PathBuf, std::sync::mpsc::Receiver<String>) {
+    fn graphics(name: &str, answer: &'static str) -> (std::path::PathBuf, std::sync::mpsc::Receiver<String>) {
         let path = std::env::temp_dir().join(format!("gh-size-{name}-{}", std::process::id()));
         let _ = std::fs::remove_file(&path);
         let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
@@ -215,32 +186,18 @@ mod tests {
     }
 
     fn sized(width_px: u32) -> Wanted {
-        Wanted {
-            width_px,
-            height_px: 800,
-            scaling_percent: 100,
-        }
+        Wanted { width_px, height_px: 800, scaling_percent: 100 }
     }
 
     #[test]
     fn a_size_is_applied_only_when_the_graphics_process_says_ok() {
         let (good, heard) = graphics("ok", "ok 1 modes");
-        assert_eq!(
-            send("size-ok", &good, sized(1280)),
-            Ok(Told::Applied("1280x800@60".into()))
-        );
+        assert_eq!(send("size-ok", &good, sized(1280)), Ok(Told::Applied("1280x800@60".into())));
         assert_eq!(heard.recv().unwrap(), "modes 1280x800@60");
         let (bad, _) = graphics("bad", "error the device refused the modes");
-        assert!(
-            send("size-bad", &bad, sized(1280))
-                .unwrap_err()
-                .contains("refused")
-        );
+        assert!(send("size-bad", &bad, sized(1280)).unwrap_err().contains("refused"));
         let nobody = std::env::temp_dir().join("gh-size-nobody");
-        assert!(matches!(
-            send("size-none", &nobody, sized(1280)),
-            Ok(Told::NotSent(_))
-        ));
+        assert!(matches!(send("size-none", &nobody, sized(1280)), Ok(Told::NotSent(_))));
         let _ = (std::fs::remove_file(good), std::fs::remove_file(bad));
     }
 
@@ -248,10 +205,7 @@ mod tests {
     fn at_most_one_size_a_second_goes_and_the_last_one_wins() {
         let (path, heard) = graphics("pace", "ok 1 modes");
         let started = Instant::now();
-        assert!(matches!(
-            send("size-pace", &path, sized(1024)),
-            Ok(Told::Applied(_))
-        ));
+        assert!(matches!(send("size-pace", &path, sized(1024)), Ok(Told::Applied(_))));
         // Three more at once: only the last is sent, a second after the first.
         let later: Vec<_> = [1280u32, 1440, 1600]
             .into_iter()
@@ -262,18 +216,8 @@ mod tests {
                 told
             })
             .collect();
-        let told: Vec<_> = later
-            .into_iter()
-            .map(|t| t.join().unwrap().unwrap())
-            .collect();
-        assert_eq!(
-            told,
-            [
-                Told::Overtaken,
-                Told::Overtaken,
-                Told::Applied("1600x800@60".into())
-            ]
-        );
+        let told: Vec<_> = later.into_iter().map(|t| t.join().unwrap().unwrap()).collect();
+        assert_eq!(told, [Told::Overtaken, Told::Overtaken, Told::Applied("1600x800@60".into())]);
         assert!(started.elapsed() >= PACE);
         let lines: Vec<String> = heard.try_iter().collect();
         assert_eq!(lines, ["modes 1024x800@60", "modes 1600x800@60"]);
@@ -282,17 +226,9 @@ mod tests {
 
     #[test]
     fn nothing_that_is_not_a_screen_is_kept() {
-        let empty = Wanted {
-            width_px: 0,
-            height_px: 10,
-            scaling_percent: 100,
-        };
+        let empty = Wanted { width_px: 0, height_px: 10, scaling_percent: 100 };
         assert!(record("screen-size-bad", empty).is_err());
-        let odd = Wanted {
-            width_px: 10,
-            height_px: 10,
-            scaling_percent: 150,
-        };
+        let odd = Wanted { width_px: 10, height_px: 10, scaling_percent: 150 };
         assert!(record("screen-size-bad", odd).unwrap_err().contains("150%"));
         assert_eq!(last("screen-size-bad"), None);
     }

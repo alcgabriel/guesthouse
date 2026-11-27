@@ -60,30 +60,17 @@ fn reads_the_lines_serve_prints() {
     let line = "rmhost: remoteman host \"Windows 11\" listening: 0.0.0.0:7792\tabc123def (address, fingerprint), pairing on";
     assert_eq!(
         parse_line(line),
-        Some(LogEvent::Listening {
-            port: 7792,
-            fingerprint: "abc123def".into(),
-            pairing: true
-        })
+        Some(LogEvent::Listening { port: 7792, fingerprint: "abc123def".into(), pairing: true })
     );
     let off = line.replace("pairing on", "pairing off");
-    assert!(matches!(
-        parse_line(&off),
-        Some(LogEvent::Listening { pairing: false, .. })
-    ));
+    assert!(matches!(parse_line(&off), Some(LogEvent::Listening { pairing: false, .. })));
     assert_eq!(
         parse_line("rmhost: viewer \"Pat's iPad\" 2388x1668 at 60 Hz, decoders hevc"),
         Some(LogEvent::Viewer("Pat's iPad".into()))
     );
-    assert_eq!(
-        parse_line("rmhost: viewer left"),
-        Some(LogEvent::ViewerLeft)
-    );
+    assert_eq!(parse_line("rmhost: viewer left"), Some(LogEvent::ViewerLeft));
     assert_eq!(parse_line("rmhost: input goes to /s/remote.sock"), None);
-    assert_eq!(
-        parse_line("rmhost: refused: this host sends HEVC only"),
-        None
-    );
+    assert_eq!(parse_line("rmhost: refused: this host sends HEVC only"), None);
     assert_eq!(parse_line(""), None);
 }
 
@@ -157,10 +144,7 @@ fn turning_it_on_picks_a_port_and_keeps_it_and_turning_it_off_keeps_the_port() {
 #[test]
 fn ports_in_use_are_skipped_and_running_out_is_said() {
     let (_scratch, machines) = machines_with(&["a"]);
-    assert_eq!(
-        choose_port(&machines, |port| port != FIRST_PORT),
-        Some(FIRST_PORT + 1)
-    );
+    assert_eq!(choose_port(&machines, |port| port != FIRST_PORT), Some(FIRST_PORT + 1));
     assert_eq!(choose_port(&machines, |_| false), None);
 }
 
@@ -173,25 +157,12 @@ fn device_lines_are_the_crates_words_and_only_from_a_fingerprint_and_a_known_per
     use guesthouse_remote_view_core::policy::Policy;
     let policy = Policy::default();
     let line = |words: Result<Vec<String>, String>| rmhost_line(&words.unwrap()).unwrap();
-    assert_eq!(
-        line(policy.device_allow(FP, "clipboard", true)),
-        format!("device {FP} allow clipboard on\n")
-    );
+    assert_eq!(line(policy.device_allow(FP, "clipboard", true)), format!("device {FP} allow clipboard on\n"));
     // Control is the opposite of view-only.
-    assert_eq!(
-        line(policy.device_allow(FP, "input", false)),
-        format!("device {FP} view-only on\n")
-    );
-    assert_eq!(
-        line(policy.device_allow(FP, "input", true)),
-        format!("device {FP} view-only off\n")
-    );
+    assert_eq!(line(policy.device_allow(FP, "input", false)), format!("device {FP} view-only on\n"));
+    assert_eq!(line(policy.device_allow(FP, "input", true)), format!("device {FP} view-only off\n"));
     assert!(policy.device_allow(FP, "root", true).is_err());
-    assert!(
-        policy
-            .device_allow(&format!("{FP}\npair open 5"), "files", true)
-            .is_err()
-    );
+    assert!(policy.device_allow(&format!("{FP}\npair open 5"), "files", true).is_err());
     assert!(policy.device_allow("", "files", true).is_err());
     assert_eq!(line(policy.device_revoke(FP)), format!("revoke {FP}\n"));
     assert_eq!(rmhost_line(&ctl::device_drop()).unwrap(), "drop\n");
@@ -208,16 +179,10 @@ fn words(line: &str) -> Vec<String> {
 
 #[test]
 fn the_pairings_words_become_the_lines_rmhost_reads() {
-    assert_eq!(
-        rmhost_line(&words("pair on 120")).unwrap(),
-        "pair open 120\n"
-    );
+    assert_eq!(rmhost_line(&words("pair on 120")).unwrap(), "pair open 120\n");
     assert_eq!(rmhost_line(&words("pair off")).unwrap(), "pair close\n");
     assert_eq!(rmhost_line(&words("pair accept")).unwrap(), "pair accept\n");
-    assert_eq!(
-        rmhost_line(&words("pair decline")).unwrap(),
-        "pair decline\n"
-    );
+    assert_eq!(rmhost_line(&words("pair decline")).unwrap(), "pair decline\n");
     assert_eq!(rmhost_line(&words("drop")).unwrap(), "drop\n");
     let fingerprint = "ab".repeat(32);
     assert_eq!(
@@ -228,13 +193,7 @@ fn the_pairings_words_become_the_lines_rmhost_reads() {
 
 #[test]
 fn a_word_rmhost_has_no_line_for_is_not_delivered_with_a_reason() {
-    for line in [
-        "sharing on",
-        "allow clipboard off",
-        "set updates off",
-        "status",
-        "pair on soon",
-    ] {
+    for line in ["sharing on", "allow clipboard off", "set updates off", "status", "pair on soon"] {
         assert!(rmhost_line(&words(line)).is_err(), "{line}");
     }
 }
@@ -242,12 +201,8 @@ fn a_word_rmhost_has_no_line_for_is_not_delivered_with_a_reason() {
 #[test]
 fn what_rmhost_says_of_pairing_is_the_shared_pairings_event_in_lower_case() {
     use guesthouse_remote_view_core::events::PairingEvent;
-    let device = Pending {
-        name: "Phone".into(),
-        fingerprint: "AB:CD".into(),
-        code: "123 456".into(),
-        seconds: 60,
-    };
+    let device =
+        Pending { name: "Phone".into(), fingerprint: "AB:CD".into(), code: "123 456".into(), seconds: 60 };
     assert_eq!(
         pairing_event(&LogEvent::PairingPending(device)),
         Some(PairingEvent::DeviceWaits {
@@ -258,27 +213,14 @@ fn what_rmhost_says_of_pairing_is_the_shared_pairings_event_in_lower_case() {
         })
     );
     assert_eq!(
-        pairing_event(&LogEvent::Paired {
-            fingerprint: "AB".into(),
-            name: "Phone".into()
-        }),
-        Some(PairingEvent::Paired {
-            fingerprint: "ab".into(),
-            name: "Phone".into()
-        })
+        pairing_event(&LogEvent::Paired { fingerprint: "AB".into(), name: "Phone".into() }),
+        Some(PairingEvent::Paired { fingerprint: "ab".into(), name: "Phone".into() })
     );
     assert_eq!(
-        pairing_event(&LogEvent::PairingOpen {
-            until_secs: 1_800_000_000
-        }),
-        Some(PairingEvent::PairingOpen {
-            until_unix_seconds: 1_800_000_000
-        })
+        pairing_event(&LogEvent::PairingOpen { until_secs: 1_800_000_000 }),
+        Some(PairingEvent::PairingOpen { until_unix_seconds: 1_800_000_000 })
     );
     // No time limit is rmhost's lab flag, and the shared pairing takes 0 as ended: not fed.
-    assert_eq!(
-        pairing_event(&LogEvent::PairingOpen { until_secs: 0 }),
-        None
-    );
+    assert_eq!(pairing_event(&LogEvent::PairingOpen { until_secs: 0 }), None);
     assert_eq!(pairing_event(&LogEvent::ViewerLeft), None);
 }

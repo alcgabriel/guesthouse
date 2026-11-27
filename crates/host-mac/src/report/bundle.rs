@@ -89,15 +89,10 @@ fn names(request: &Request, places: &Places) -> Names {
         })
         .collect();
     Names {
-        scrubber: Scrubber::new(
-            &user,
-            &places.home.to_string_lossy(),
-            &computer,
-            &machine_names,
-        )
-        // The Mac's own pass runs inside the shared one, which runs again after it, so nothing
-        // it writes can put back what the shared list takes out.
-        .with_extra(extra::scrub),
+        scrubber: Scrubber::new(&user, &places.home.to_string_lossy(), &computer, &machine_names)
+            // The Mac's own pass runs inside the shared one, which runs again after it, so nothing
+            // it writes can put back what the shared list takes out.
+            .with_extra(extra::scrub),
         ids,
     }
 }
@@ -146,11 +141,7 @@ fn replace_path_part(text: &str, id: &str, mark: &str) -> String {
 }
 
 /// Gathers nothing: makes the report from what `collection` has, in `places`' Reports folder.
-pub fn prepare(
-    request: &Request,
-    collection: &Collection,
-    places: &Places,
-) -> Result<Prepared, String> {
+pub fn prepare(request: &Request, collection: &Collection, places: &Places) -> Result<Prepared, String> {
     let reports = places.support.join(REPORTS_FOLDER);
     fs::create_dir_all(&reports).map_err(|e| format!("Cannot make {}: {e}", reports.display()))?;
     let names = names(request, places);
@@ -194,20 +185,10 @@ fn write_files(
 ) -> Result<Written, String> {
     let mut files: Vec<(String, usize)> = Vec::new();
     for (name, text) in &collection.items {
-        put(
-            folder,
-            &mut files,
-            name,
-            &keep_end(&names.scrub(text), per_file),
-        )?;
+        put(folder, &mut files, name, &keep_end(&names.scrub(text), per_file))?;
     }
     let description = names.scrub(request.description.trim());
-    put(
-        folder,
-        &mut files,
-        DESCRIPTION_FILE,
-        &format!("{description}\n"),
-    )?;
+    put(folder, &mut files, DESCRIPTION_FILE, &format!("{description}\n"))?;
     let summary = summary_of(request, collection, &description);
     put(folder, &mut files, SUMMARY_FILE, &summary.to_json())?;
     let manifest = manifest(&files, &collection.missing, &collection.notes);
@@ -215,12 +196,7 @@ fn write_files(
     Ok((files, summary))
 }
 
-fn put(
-    folder: &Path,
-    files: &mut Vec<(String, usize)>,
-    name: &str,
-    text: &str,
-) -> Result<(), String> {
+fn put(folder: &Path, files: &mut Vec<(String, usize)>, name: &str, text: &str) -> Result<(), String> {
     let path = folder.join(name);
     fs::create_dir_all(path.parent().unwrap_or(folder)).map_err(|e| e.to_string())?;
     fs::write(&path, text).map_err(|e| format!("Cannot write {name}: {e}"))?;
@@ -239,10 +215,7 @@ fn summary_of(request: &Request, collection: &Collection, description: &str) -> 
             .items
             .iter()
             .find(|(name, _)| name == "host/facts.txt")
-            .and_then(|(_, text)| {
-                text.lines()
-                    .find_map(|line| line.strip_prefix(key)?.strip_prefix(": "))
-            })
+            .and_then(|(_, text)| text.lines().find_map(|line| line.strip_prefix(key)?.strip_prefix(": ")))
             .map(str::to_owned)
     };
     if let Some(os) = fact("macOS") {
@@ -267,11 +240,7 @@ const EXTRA_REDACTIONS: &str = "Beyond the user name, host name and home folder,
 fn manifest(files: &[(String, usize)], missing: &[(String, String)], notes: &[String]) -> String {
     let missing: Vec<Missing> = missing
         .iter()
-        .map(|(name, reason)| Missing {
-            name: name.clone(),
-            reason: reason.clone(),
-            how: None,
-        })
+        .map(|(name, reason)| Missing { name: name.clone(), reason: reason.clone(), how: None })
         .collect();
     let mut notes = notes.to_vec();
     notes.insert(0, EXTRA_REDACTIONS.to_owned());
@@ -290,10 +259,7 @@ fn pack(reports: &Path, name: &str, archive: &Path) -> Result<(), String> {
     if result.status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "tar could not pack the report: {}",
-            String::from_utf8_lossy(&result.stderr).trim()
-        ))
+        Err(format!("tar could not pack the report: {}", String::from_utf8_lossy(&result.stderr).trim()))
     }
 }
 

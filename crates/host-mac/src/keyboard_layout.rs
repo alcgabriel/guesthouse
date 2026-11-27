@@ -86,20 +86,13 @@ const TABLE: &[(&str, &str, &str)] = &[
 /// XKB's layout for a macOS input source (`com.apple.keylayout.German`), if the table has it.
 pub fn from_input_source(id: &str) -> Option<Xkb> {
     let name = id.trim().strip_prefix("com.apple.keylayout.")?;
-    TABLE
-        .iter()
-        .find(|(mac, _, _)| *mac == name)
-        .map(|&(_, layout, variant)| Xkb { layout, variant })
+    TABLE.iter().find(|(mac, _, _)| *mac == name).map(|&(_, layout, variant)| Xkb { layout, variant })
 }
 
 /// The layout the Mac's keyboard has now, if macOS says and the table knows it.
 pub fn mac_layout() -> Option<Xkb> {
     let out = Command::new("/usr/bin/defaults")
-        .args([
-            "read",
-            "com.apple.HIToolbox",
-            "AppleCurrentKeyboardLayoutInputSourceID",
-        ])
+        .args(["read", "com.apple.HIToolbox", "AppleCurrentKeyboardLayoutInputSourceID"])
         .output()
         .ok()?;
     if !out.status.success() {
@@ -117,10 +110,7 @@ mod tests {
         let text = |id: &str| from_input_source(id).map(|xkb| xkb.text());
         assert_eq!(text("com.apple.keylayout.German\n").as_deref(), Some("de"));
         assert_eq!(text("com.apple.keylayout.ABC").as_deref(), Some("us"));
-        assert_eq!(
-            text("com.apple.keylayout.SwissFrench").as_deref(),
-            Some("ch fr")
-        );
+        assert_eq!(text("com.apple.keylayout.SwissFrench").as_deref(), Some("ch fr"));
         assert_eq!(text("com.apple.keylayout.Klingon"), None);
         assert_eq!(text("com.apple.inputmethod.Kotoeri.Japanese"), None);
         assert_eq!(text(""), None);
@@ -131,10 +121,7 @@ mod tests {
         for (mac, layout, variant) in TABLE {
             assert!(!mac.is_empty() && !layout.is_empty(), "{mac}");
             for word in [layout, variant] {
-                assert!(
-                    word.bytes().all(|b| b.is_ascii_lowercase()),
-                    "{mac}: {word}"
-                );
+                assert!(word.bytes().all(|b| b.is_ascii_lowercase()), "{mac}: {word}");
             }
         }
     }

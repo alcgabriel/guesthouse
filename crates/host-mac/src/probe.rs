@@ -28,10 +28,7 @@ fn cached(program: &Path, question: &str, ask: impl FnOnce() -> bool) -> bool {
         return *known;
     }
     let answer = ask();
-    answers
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .insert(key, answer);
+    answers.lock().unwrap_or_else(|e| e.into_inner()).insert(key, answer);
     answer
 }
 
@@ -62,16 +59,12 @@ fn say(program: &Path, args: &[&str]) -> Option<String> {
 /// Whether the graphics process can publish its frames (`--frames`). The stock build answers
 /// an option it does not know with a usage line that has no `--frames`, which says so.
 pub fn pvg_host_publishes_frames(program: &Path) -> bool {
-    cached(program, "frames", || {
-        say(program, &["--help"]).is_some_and(|text| text.contains("--frames"))
-    })
+    cached(program, "frames", || say(program, &["--help"]).is_some_and(|text| text.contains("--frames")))
 }
 
 /// Whether QEMU has a device called `device`, from its own list (`-device help`).
 pub fn qemu_has_device(program: &Path, device: &str) -> bool {
-    cached(program, device, || {
-        say(program, &["-device", "help"]).is_some_and(|text| text.contains(device))
-    })
+    cached(program, device, || say(program, &["-device", "help"]).is_some_and(|text| text.contains(device)))
 }
 
 /// What the graphics process says to `status`: a line such as `ok picture 1024x768 presented 9
@@ -85,9 +78,7 @@ pub fn graphics_status(control: &Path) -> Result<serde_json::Value, String> {
     let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
     stream.write_all(b"status\n").map_err(|e| e.to_string())?;
     let mut line = String::new();
-    BufReader::new(stream)
-        .read_line(&mut line)
-        .map_err(|e| e.to_string())?;
+    BufReader::new(stream).read_line(&mut line).map_err(|e| e.to_string())?;
     Ok(parse_status(&line))
 }
 
@@ -120,14 +111,8 @@ mod tests {
 
     #[test]
     fn a_graphics_process_without_frames_is_told_by_its_usage_line() {
-        let with = script(
-            "with",
-            r#"echo "usage: x --socket P [--frames NAME]" >&2; exit 1"#,
-        );
-        let without = script(
-            "without",
-            r#"echo "usage: x --socket P [--window]" >&2; exit 1"#,
-        );
+        let with = script("with", r#"echo "usage: x --socket P [--frames NAME]" >&2; exit 1"#);
+        let without = script("without", r#"echo "usage: x --socket P [--window]" >&2; exit 1"#);
         assert!(pvg_host_publishes_frames(&with));
         assert!(!pvg_host_publishes_frames(&without));
         assert!(!pvg_host_publishes_frames(Path::new("/no/such/program")));
@@ -136,10 +121,7 @@ mod tests {
 
     #[test]
     fn a_qemu_is_asked_for_its_devices() {
-        let has = script(
-            "has",
-            r#"printf 'Misc devices:\nname "pvg-fwd", bus PCI\n'"#,
-        );
+        let has = script("has", r#"printf 'Misc devices:\nname "pvg-fwd", bus PCI\n'"#);
         let hasnt = script("hasnt", r#"printf 'Misc devices:\nname "apple-gfx-pci"\n'"#);
         assert!(qemu_has_device(&has, "pvg-fwd"));
         assert!(!qemu_has_device(&hasnt, "pvg-fwd"));

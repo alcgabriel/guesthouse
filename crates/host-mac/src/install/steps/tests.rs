@@ -35,11 +35,7 @@ impl World {
         fs::create_dir_all(&firmware).unwrap();
         fs::write(firmware.join("edk2-aarch64-code.fd"), b"code").unwrap();
         fs::write(firmware.join("edk2-arm-vars.fd"), b"vars").unwrap();
-        World {
-            root,
-            machines,
-            password: Some(PASSWORD.into()),
-        }
+        World { root, machines, password: Some(PASSWORD.into()) }
     }
 
     fn setup(&self, guest: Guest, driver: bool) -> Setup {
@@ -84,11 +80,7 @@ fn run(
 ) -> InstallInfo {
     let mut network = Network;
     let setup = world.setup(guest, driver);
-    let mut steps = RealSteps {
-        setup,
-        transport: &mut network,
-        control,
-    };
+    let mut steps = RealSteps { setup, transport: &mut network, control };
     let mut changed = |_: &InstallInfo| {};
     let clock = || 0;
     let mut runner = Runner {
@@ -103,8 +95,7 @@ fn run(
 }
 
 fn machine_file(world: &World) -> serde_json::Value {
-    serde_json::from_str(&fs::read_to_string(world.machines.join("m").join(MACHINE_FILE)).unwrap())
-        .unwrap()
+    serde_json::from_str(&fs::read_to_string(world.machines.join("m").join(MACHINE_FILE)).unwrap()).unwrap()
 }
 
 #[test]
@@ -113,14 +104,7 @@ fn ubuntu_is_downloaded_checked_installed_and_stops_at_the_driver_that_is_not_pa
     let mut control = Control::default();
     control.says = vec![(60_000, ubuntu::FINISHED.into())];
     control.stops_at = Some(90_000);
-    let info = run(
-        &world,
-        Guest::Ubuntu,
-        Source::Download,
-        &mut control,
-        false,
-        None,
-    );
+    let info = run(&world, Guest::Ubuntu, Source::Download, &mut control, false, None);
 
     // The download was kept, checked, and named in the machine's file for the installer to boot.
     let file = machine_file(&world);
@@ -129,10 +113,7 @@ fn ubuntu_is_downloaded_checked_installed_and_stops_at_the_driver_that_is_not_pa
     assert_eq!(fs::read(installer).unwrap(), UBUNTU_BYTES);
     // The disk is sparse at its size, with QEMU's firmware beside it.
     let folder = world.machines.join("m");
-    assert_eq!(
-        fs::metadata(folder.join("disk.img")).unwrap().len(),
-        1024 * 1024 * 1024
-    );
+    assert_eq!(fs::metadata(folder.join("disk.img")).unwrap().len(), 1024 * 1024 * 1024);
     assert_eq!(fs::read(folder.join("code.fd")).unwrap(), b"code");
     // The answers went on a CIDATA disc with the account named after the Mac's user.
     let (label, text) = &control.discs[0];
@@ -143,28 +124,15 @@ fn ubuntu_is_downloaded_checked_installed_and_stops_at_the_driver_that_is_not_pa
     // It stopped where the placeholder says, with its choices.
     assert_eq!(info.state, Phase::Failed);
     let failure = info.failure.clone().unwrap();
-    assert_eq!(
-        (failure.step, failure.code.as_deref()),
-        (Step::InstallDriver, Some("no_package"))
-    );
+    assert_eq!((failure.step, failure.code.as_deref()), (Step::InstallDriver, Some("no_package")));
     assert!(failure.reason.contains("not packaged yet"));
     assert!(failure.choices.contains(&Choice::OpenWithoutDriver));
 
     // Open without it: the first start boots the disk alone and the install is done.
     let mut after = info;
     assert!(after.open_without_driver());
-    let mut control = Control {
-        now: 200_000,
-        ..Control::default()
-    };
-    let done = run(
-        &world,
-        Guest::Ubuntu,
-        Source::Download,
-        &mut control,
-        false,
-        Some(after),
-    );
+    let mut control = Control { now: 200_000, ..Control::default() };
+    let done = run(&world, Guest::Ubuntu, Source::Download, &mut control, false, Some(after));
     assert_eq!(done.state, Phase::Done);
     assert_eq!(done.status_of(Step::InstallDriver), StepStatus::Skipped);
     let file = machine_file(&world);
@@ -183,14 +151,7 @@ fn windows_is_installed_from_a_chosen_file_with_our_answers_and_the_driver_on_a_
         (180_000, windows::marker::DRIVER_INSTALLED.into()),
         (400_000, windows::marker::FIRST_START.into()),
     ];
-    let info = run(
-        &world,
-        Guest::Windows,
-        Source::File { path: iso.clone() },
-        &mut control,
-        true,
-        None,
-    );
+    let info = run(&world, Guest::Windows, Source::File { path: iso.clone() }, &mut control, true, None);
     assert_eq!(info.state, Phase::Done, "{:?}", info.failure);
     let (label, text) = &control.discs[0];
     assert_eq!(label, "GPUPV_SETUP");
@@ -207,11 +168,7 @@ fn windows_is_installed_from_a_chosen_file_with_our_answers_and_the_driver_on_a_
     // The stick is attached while the installer runs and gone from the finished machine.
     let file = machine_file(&world);
     assert!(file.get("stick").is_none() && file.get("installer").is_none());
-    assert_eq!(
-        control.started,
-        ["m"],
-        "Windows installs and restarts itself in one run"
-    );
+    assert_eq!(control.started, ["m"], "Windows installs and restarts itself in one run");
     let _ = fs::remove_dir_all(world.root);
 }
 
@@ -219,19 +176,9 @@ fn windows_is_installed_from_a_chosen_file_with_our_answers_and_the_driver_on_a_
 fn windows_needs_a_chosen_installer_and_says_so_and_a_chosen_one_goes_on() {
     let world = World::new("choose");
     let mut control = Control::default();
-    let mut info = run(
-        &world,
-        Guest::Windows,
-        Source::Download,
-        &mut control,
-        true,
-        None,
-    );
+    let mut info = run(&world, Guest::Windows, Source::Download, &mut control, true, None);
     let failure = info.failure.clone().unwrap();
-    assert_eq!(
-        (failure.step, failure.code.as_deref()),
-        (Step::Fetch, Some("choose_installer"))
-    );
+    assert_eq!((failure.step, failure.code.as_deref()), (Step::Fetch, Some("choose_installer")));
     assert_eq!(failure.choices, [Choice::TryAgain, Choice::ChooseInstaller]);
     assert!(failure.reason.contains("Microsoft"));
     assert!(control.started.is_empty());
@@ -242,14 +189,7 @@ fn windows_needs_a_chosen_installer_and_says_so_and_a_chosen_one_goes_on() {
         (2_000, windows::marker::DRIVER_INSTALLED.into()),
         (3_000, windows::marker::FIRST_START.into()),
     ];
-    let done = run(
-        &world,
-        Guest::Windows,
-        Source::Download,
-        &mut control,
-        true,
-        Some(info),
-    );
+    let done = run(&world, Guest::Windows, Source::Download, &mut control, true, Some(info));
     assert_eq!(done.state, Phase::Done, "{:?}", done.failure);
     let _ = fs::remove_dir_all(world.root);
 }
@@ -263,18 +203,13 @@ fn a_chosen_file_that_is_not_an_installer_is_refused_before_anything_starts() {
     let info = run(
         &world,
         Guest::Windows,
-        Source::File {
-            path: small.display().to_string(),
-        },
+        Source::File { path: small.display().to_string() },
         &mut control,
         true,
         None,
     );
     let failure = info.failure.unwrap();
-    assert_eq!(
-        (failure.step, failure.code.as_deref()),
-        (Step::Fetch, Some("bad_installer"))
-    );
+    assert_eq!((failure.step, failure.code.as_deref()), (Step::Fetch, Some("bad_installer")));
     assert!(failure.reason.contains("too small"));
     let _ = fs::remove_dir_all(world.root);
 }
@@ -285,26 +220,11 @@ fn a_driver_windows_turns_away_gives_its_code_and_the_choice_to_go_on_without() 
     let mut control = Control::default();
     control.says = vec![
         (1_000, windows::marker::SYSTEM_INSTALLED.into()),
-        (
-            2_000,
-            format!("{} 0x800b0109", windows::marker::DRIVER_FAILED),
-        ),
+        (2_000, format!("{} 0x800b0109", windows::marker::DRIVER_FAILED)),
     ];
-    let info = run(
-        &world,
-        Guest::Windows,
-        Source::File {
-            path: world.big_iso(),
-        },
-        &mut control,
-        true,
-        None,
-    );
+    let info = run(&world, Guest::Windows, Source::File { path: world.big_iso() }, &mut control, true, None);
     let failure = info.failure.unwrap();
-    assert_eq!(
-        (failure.step, failure.code.as_deref()),
-        (Step::InstallDriver, Some("0x800b0109"))
-    );
+    assert_eq!((failure.step, failure.code.as_deref()), (Step::InstallDriver, Some("0x800b0109")));
     assert!(failure.reason.contains("0x800b0109"));
     assert!(failure.choices.contains(&Choice::OpenWithoutDriver));
     let _ = fs::remove_dir_all(world.root);
@@ -318,19 +238,11 @@ fn a_disk_that_does_not_fit_says_how_much_to_free() {
     setup.check_space = true;
     let mut control = Control::default();
     let mut network = Network;
-    let mut steps = RealSteps {
-        setup,
-        transport: &mut network,
-        control: &mut control,
-    };
+    let mut steps = RealSteps { setup, transport: &mut network, control: &mut control };
     let info = InstallInfo::new("m", &Plan::for_guest(Guest::Ubuntu), Source::Download);
     let error = steps.run(Step::MakeDisk, &info, &mut |_| true).unwrap_err();
     assert_eq!(error.code.as_deref(), Some("no_space"));
-    assert!(
-        error.message.contains("free") && error.message.contains("GB"),
-        "{}",
-        error.message
-    );
+    assert!(error.message.contains("free") && error.message.contains("GB"), "{}", error.message);
     let _ = fs::remove_dir_all(world.root);
 }
 
@@ -338,43 +250,15 @@ fn a_disk_that_does_not_fit_says_how_much_to_free() {
 fn a_guest_that_never_finishes_times_out_and_one_that_fails_says_why() {
     let world = World::new("timeout");
     let mut control = Control::default();
-    let info = run(
-        &world,
-        Guest::Windows,
-        Source::File {
-            path: world.big_iso(),
-        },
-        &mut control,
-        true,
-        None,
-    );
+    let info = run(&world, Guest::Windows, Source::File { path: world.big_iso() }, &mut control, true, None);
     let failure = info.failure.unwrap();
-    assert_eq!(
-        (failure.step, failure.code.as_deref()),
-        (Step::InstallSystem, Some("timeout"))
-    );
+    assert_eq!((failure.step, failure.code.as_deref()), (Step::InstallSystem, Some("timeout")));
 
     let world = World::new("failed");
-    let mut control = Control {
-        fails: Some("QEMU stopped: the disk image is not there".into()),
-        ..Control::default()
-    };
-    let info = run(
-        &world,
-        Guest::Windows,
-        Source::File {
-            path: world.big_iso(),
-        },
-        &mut control,
-        true,
-        None,
-    );
-    assert!(
-        info.failure
-            .unwrap()
-            .reason
-            .contains("the disk image is not there")
-    );
+    let mut control =
+        Control { fails: Some("QEMU stopped: the disk image is not there".into()), ..Control::default() };
+    let info = run(&world, Guest::Windows, Source::File { path: world.big_iso() }, &mut control, true, None);
+    assert!(info.failure.unwrap().reason.contains("the disk image is not there"));
     let _ = fs::remove_dir_all(world.root);
 }
 
@@ -387,16 +271,7 @@ fn without_a_lab_folder_windows_fetches_the_published_package_and_puts_it_on_the
         (180_000, windows::marker::DRIVER_INSTALLED.into()),
         (400_000, windows::marker::FIRST_START.into()),
     ];
-    let info = run(
-        &world,
-        Guest::Windows,
-        Source::File {
-            path: world.big_iso(),
-        },
-        &mut control,
-        false,
-        None,
-    );
+    let info = run(&world, Guest::Windows, Source::File { path: world.big_iso() }, &mut control, false, None);
     assert_eq!(info.state, Phase::Done, "{:?}", info.failure);
     let mut files = control.stick_files.clone();
     files.sort();
@@ -429,10 +304,7 @@ fn an_install_without_its_password_stops_before_the_machine_is_started() {
             None,
         );
         let failure = info.failure.unwrap();
-        assert_eq!(
-            (failure.step, failure.code.as_deref()),
-            (Step::InstallSystem, Some("password_missing"))
-        );
+        assert_eq!((failure.step, failure.code.as_deref()), (Step::InstallSystem, Some("password_missing")));
         assert!(failure.choices.contains(&Choice::TryAgain));
         assert!(control.started.is_empty());
         let _ = fs::remove_dir_all(world.root);
@@ -455,16 +327,9 @@ fn the_machines_file_is_edited_by_key_and_nothing_else_moves() {
 #[test]
 fn firmware_is_found_in_the_first_folder_that_has_both_files_and_its_absence_is_said() {
     let world = World::new("firmware");
-    let (code, vars) =
-        find_firmware(&[world.root.join("empty"), world.root.join("firmware")]).unwrap();
+    let (code, vars) = find_firmware(&[world.root.join("empty"), world.root.join("firmware")]).unwrap();
     assert_eq!((code, vars), (b"code".to_vec(), b"vars".to_vec()));
-    assert_eq!(
-        find_firmware(&[world.root.join("empty")])
-            .unwrap_err()
-            .code
-            .as_deref(),
-        Some("no_firmware")
-    );
+    assert_eq!(find_firmware(&[world.root.join("empty")]).unwrap_err().code.as_deref(), Some("no_firmware"));
     let _ = fs::remove_dir_all(world.root);
 }
 
@@ -474,10 +339,7 @@ fn firmware_is_looked_for_in_the_prefix_and_beside_a_qemu_run_from_its_build_fol
     let installed = world.root.join("prefix/bin/qemu-system-aarch64");
     assert_eq!(
         firmware_dirs_of(&installed),
-        vec![
-            world.root.join("prefix/share/qemu"),
-            world.root.join("prefix/bin/pc-bios")
-        ]
+        vec![world.root.join("prefix/share/qemu"), world.root.join("prefix/bin/pc-bios")]
     );
     // A QEMU in its build folder, as ours is: the firmware is in pc-bios beside it.
     let build = world.root.join("qemu-build");

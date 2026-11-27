@@ -132,13 +132,11 @@ fn connect(path: &Path) -> io::Result<UnixStream> {
         // Anything else is an event QEMU sent meanwhile.
     }
     stream.set_read_timeout(None)?;
-    thread::Builder::new()
-        .name("guesthouse-qmp-drain".into())
-        .spawn(move || {
-            let mut sink = [0u8; 4096];
-            let mut reader = reader;
-            while matches!(reader.read(&mut sink), Ok(n) if n > 0) {}
-        })?;
+    thread::Builder::new().name("guesthouse-qmp-drain".into()).spawn(move || {
+        let mut sink = [0u8; 4096];
+        let mut reader = reader;
+        while matches!(reader.read(&mut sink), Ok(n) if n > 0) {}
+    })?;
     Ok(stream)
 }
 

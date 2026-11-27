@@ -19,20 +19,13 @@ const BOOT_FOLDER: &str = "installer-boot";
 pub(super) const OPTION_ROM: &str = "pvgfb.rom";
 
 /// The keys of `machine.json` that only the installer's start needs.
-const INSTALLER_KEYS: [&str; 5] = [
-    "installer",
-    "answer_disc",
-    "installer_kernel",
-    "installer_initrd",
-    "installer_command_line",
-];
+const INSTALLER_KEYS: [&str; 5] =
+    ["installer", "answer_disc", "installer_kernel", "installer_initrd", "installer_command_line"];
 
 /// The graphics device's option ROM, from the first of QEMU's folders that has one. QEMU keeps a
 /// device's ROMs in its data folder, beside the firmware.
 pub(super) fn find_option_rom(dirs: &[PathBuf]) -> Option<PathBuf> {
-    dirs.iter()
-        .map(|dir| dir.join(OPTION_ROM))
-        .find(|path| path.is_file())
+    dirs.iter().map(|dir| dir.join(OPTION_ROM)).find(|path| path.is_file())
 }
 
 impl RealSteps<'_> {
@@ -57,14 +50,8 @@ impl RealSteps<'_> {
             ),
             (ubuntu::ACCOUNT_FILE, ubuntu::account_file(account, secret)),
             ("meta-data", ubuntu::meta_data(&self.setup.id)),
-            (
-                ubuntu::DRIVER_SERVICE_FILE,
-                ubuntu::DRIVER_SERVICE.to_string(),
-            ),
-            (
-                ubuntu::DRIVER_RUNNER_FILE,
-                ubuntu::DRIVER_RUNNER.to_string(),
-            ),
+            (ubuntu::DRIVER_SERVICE_FILE, ubuntu::DRIVER_SERVICE.to_string()),
+            (ubuntu::DRIVER_RUNNER_FILE, ubuntu::DRIVER_RUNNER.to_string()),
         ];
         for (name, text) in files {
             fs::write(answers.join(name), text).map_err(|e| StepError::new(e.to_string()))?;
@@ -79,11 +66,7 @@ impl RealSteps<'_> {
         let boot = folder.join(BOOT_FOLDER);
         let _ = fs::remove_dir_all(&boot);
         self.control
-            .extract(
-                installer,
-                &[ubuntu::INSTALLER_KERNEL, ubuntu::INSTALLER_INITRD],
-                &boot,
-            )
+            .extract(installer, &[ubuntu::INSTALLER_KERNEL, ubuntu::INSTALLER_INITRD], &boot)
             .map_err(|m| StepError::coded("installer_boot", m))?;
         let kernel = format!("{BOOT_FOLDER}/{}", ubuntu::INSTALLER_KERNEL);
         let initrd = format!("{BOOT_FOLDER}/{}", ubuntu::INSTALLER_INITRD);
@@ -92,10 +75,7 @@ impl RealSteps<'_> {
             &[
                 ("installer_kernel", Some(&kernel)),
                 ("installer_initrd", Some(&initrd)),
-                (
-                    "installer_command_line",
-                    Some(ubuntu::INSTALLER_COMMAND_LINE),
-                ),
+                ("installer_command_line", Some(ubuntu::INSTALLER_COMMAND_LINE)),
             ],
         )
     }
@@ -114,17 +94,14 @@ impl RealSteps<'_> {
     /// answers put in installs it and says how it went; it restarts into the desktop when it
     /// worked and turns the machine off when it did not, so Try Again starts it once more.
     pub(super) fn ubuntu_driver(&mut self, progress: Progress) -> Result<Ended, StepError> {
-        let dir = self
-            .linux_package()
-            .ok_or_else(|| StepError::coded("no_package", ubuntu::DRIVER_PLACEHOLDER))?;
-        let files =
-            driver::package_files_of(&LINUX, &dir).map_err(|m| StepError::coded("no_driver", m))?;
+        let dir =
+            self.linux_package().ok_or_else(|| StepError::coded("no_package", ubuntu::DRIVER_PLACEHOLDER))?;
+        let files = driver::package_files_of(&LINUX, &dir).map_err(|m| StepError::coded("no_driver", m))?;
         let folder = self.folder();
         self.control
             .make_stick(&folder.join("stick.img"), &files)
             .map_err(|m| StepError::coded("stick", m))?;
-        let mut changes: Vec<(&str, Option<&str>)> =
-            INSTALLER_KEYS.iter().map(|key| (*key, None)).collect();
+        let mut changes: Vec<(&str, Option<&str>)> = INSTALLER_KEYS.iter().map(|key| (*key, None)).collect();
         changes.push(("stick", Some("stick.img")));
         set_keys(&folder, &changes)?;
         let _ = fs::remove_dir_all(folder.join(BOOT_FOLDER));
@@ -174,18 +151,10 @@ impl RealSteps<'_> {
             if self.control.machine_state(&self.setup.id).0 != "running" {
                 self.control.start(&self.setup.id).map_err(StepError::new)?;
             }
-            let heard = self.wait_for(
-                FIRST_START_MAX_MS,
-                FIRST_START_MAX_MS,
-                0,
-                progress,
-                |text| text.contains(marker::FIRST_START).then_some(Ok(())),
-            )?;
-            return Ok(if heard.is_some() {
-                Ended::Done
-            } else {
-                Ended::Stopped
-            });
+            let heard = self.wait_for(FIRST_START_MAX_MS, FIRST_START_MAX_MS, 0, progress, |text| {
+                text.contains(marker::FIRST_START).then_some(Ok(()))
+            })?;
+            return Ok(if heard.is_some() { Ended::Done } else { Ended::Stopped });
         }
         self.control.start(&self.setup.id).map_err(StepError::new)?;
         let began = self.control.now_ms();
@@ -201,18 +170,16 @@ impl RealSteps<'_> {
                     }
                 }
                 "failed" | "off" if now - began > POLL_MS => {
-                    return Err(StepError::new(why.unwrap_or_else(|| {
-                        "The machine stopped soon after it started.".into()
-                    })));
+                    return Err(StepError::new(
+                        why.unwrap_or_else(|| "The machine stopped soon after it started.".into()),
+                    ));
                 }
                 _ => up_since = None,
             }
             if now - began >= FIRST_START_MAX_MS {
                 return Err(StepError::coded("timeout", "The machine did not come up."));
             }
-            if !progress(Report::Fraction(
-                ((now - began) as f64 / UBUNTU_UP_MS as f64).min(GUESS_CEILING),
-            )) {
+            if !progress(Report::Fraction(((now - began) as f64 / UBUNTU_UP_MS as f64).min(GUESS_CEILING))) {
                 return Ok(Ended::Stopped);
             }
             self.control.sleep_ms(POLL_MS);

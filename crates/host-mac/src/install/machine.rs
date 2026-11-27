@@ -67,11 +67,7 @@ mod tests {
         let listing = store::list(&machines).unwrap();
         let machine = &listing.machines[0];
         assert_eq!(
-            (
-                machine.name.as_str(),
-                machine.kind.as_str(),
-                machine.graphics.as_str()
-            ),
+            (machine.name.as_str(), machine.kind.as_str(), machine.graphics.as_str()),
             ("Windows 11", "windows", "guarded")
         );
         assert!(machine.startable);
@@ -82,12 +78,9 @@ mod tests {
         );
         assert!(create_machine(&machines, " ", Guest::Ubuntu, 4, 4096).is_err());
         assert_eq!(
-            store::find(
-                &machines,
-                &create_machine(&machines, "Ubuntu", Guest::Ubuntu, 2, 4096).unwrap()
-            )
-            .unwrap()
-            .kind,
+            store::find(&machines, &create_machine(&machines, "Ubuntu", Guest::Ubuntu, 2, 4096).unwrap())
+                .unwrap()
+                .kind,
             "linux"
         );
         let _ = fs::remove_dir_all(root);

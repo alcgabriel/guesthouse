@@ -34,9 +34,7 @@ struct Quirks {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args == ["-device", "help"] {
-        println!(
-            "Misc devices:\nname \"pvg-fwd\", bus PCI, desc \"forwards to the graphics process\""
-        );
+        println!("Misc devices:\nname \"pvg-fwd\", bus PCI, desc \"forwards to the graphics process\"");
         return;
     }
     let _ = std::fs::write("fake-qemu.args", args.join("\n") + "\n");
@@ -52,36 +50,23 @@ fn main() {
         eprintln!("a second line the agent must not use");
         exit(1);
     }
-    let quirks = Quirks {
-        stubborn: has("stubborn") || has("deaf"),
-        deaf: has("deaf"),
-    };
+    let quirks = Quirks { stubborn: has("stubborn") || has("deaf"), deaf: has("deaf") };
     // The graphics process, if the machine is on the guarded path. The connection is held for
     // as long as this process lives, which is how the process knows when QEMU is gone.
     let forwarded: Vec<UnixStream> = args
         .windows(2)
         .filter(|pair| pair[0] == "-device" && pair[1].starts_with("pvg-fwd"))
         .map(|pair| {
-            let path = pair[1]
-                .split(',')
-                .find_map(|part| part.strip_prefix("socket="))
-                .unwrap_or("");
+            let path = pair[1].split(',').find_map(|part| part.strip_prefix("socket=")).unwrap_or("");
             UnixStream::connect(path).unwrap_or_else(|error| {
-                eprintln!(
-                    "fake-qemu: pvg-fwd cannot reach the graphics process at {path}: {error}"
-                );
+                eprintln!("fake-qemu: pvg-fwd cannot reach the graphics process at {path}: {error}");
                 exit(1);
             })
         })
         .collect();
     std::mem::forget(forwarded);
     for sockets in args.windows(2).filter(|pair| pair[0] == "-qmp") {
-        let path = sockets[1]
-            .trim_start_matches("unix:")
-            .split(',')
-            .next()
-            .unwrap_or("")
-            .to_string();
+        let path = sockets[1].trim_start_matches("unix:").split(',').next().unwrap_or("").to_string();
         let _ = std::fs::remove_file(&path);
         let listener = UnixListener::bind(&path).expect("a QMP socket");
         thread::spawn(move || {

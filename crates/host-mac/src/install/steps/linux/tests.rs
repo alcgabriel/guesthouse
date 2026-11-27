@@ -22,11 +22,9 @@ fn install_system(name: &str) -> (PathBuf, FakeGuest, serde_json::Value) {
     .unwrap();
     let qemu = root.join("qemu/pc-bios");
     fs::create_dir_all(&qemu).unwrap();
-    for (file, text) in [
-        ("edk2-aarch64-code.fd", "code"),
-        ("edk2-aarch64-vars.fd", "vars"),
-        (OPTION_ROM, "rom"),
-    ] {
+    for (file, text) in
+        [("edk2-aarch64-code.fd", "code"), ("edk2-aarch64-vars.fd", "vars"), (OPTION_ROM, "rom")]
+    {
         fs::write(qemu.join(file), text).unwrap();
     }
     let mut control = FakeGuest::quick(Guest::Ubuntu);
@@ -63,8 +61,7 @@ fn install_system(name: &str) -> (PathBuf, FakeGuest, serde_json::Value) {
     runner.run(&mut steps);
     info = runner.info;
     assert_eq!(info.failure.unwrap().step, Step::InstallDriver);
-    let file = serde_json::from_str(&fs::read_to_string(machines.join("m/machine.json")).unwrap())
-        .unwrap();
+    let file = serde_json::from_str(&fs::read_to_string(machines.join("m/machine.json")).unwrap()).unwrap();
     (root, control, file)
 }
 
@@ -98,10 +95,7 @@ fn an_option_rom_is_found_beside_the_firmware_or_not_at_all() {
     let root = std::env::temp_dir().join(format!("gh-linux-rom-{}", std::process::id()));
     fs::create_dir_all(root.join("b")).unwrap();
     fs::write(root.join("b").join(OPTION_ROM), "rom").unwrap();
-    assert_eq!(
-        find_option_rom(&[root.join("a"), root.join("b")]),
-        Some(root.join("b").join(OPTION_ROM))
-    );
+    assert_eq!(find_option_rom(&[root.join("a"), root.join("b")]), Some(root.join("b").join(OPTION_ROM)));
     assert_eq!(find_option_rom(&[root.join("a")]), None);
     let _ = fs::remove_dir_all(root);
 }

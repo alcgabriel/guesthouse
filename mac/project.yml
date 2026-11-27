@@ -31,7 +31,7 @@ targets:
         buildPhase: resources
       # The reading side of the frame channel, compiled in from where it lives (MIT, with its
       # headers), not copied.
-      - path: ../scripts/mac/rmhost/rmframes_sub.c
+      - path: rmframes/rmframes_sub.c
         group: rmframes
     dependencies:
       - framework: build/GuesthouseCore.xcframework
@@ -67,7 +67,7 @@ targets:
         # what the entitlements file says.
         CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
         SWIFT_OBJC_BRIDGING_HEADER: App/Guesthouse-Bridging.h
-        HEADER_SEARCH_PATHS: $(SRCROOT)/../scripts/mac/rmhost
+        HEADER_SEARCH_PATHS: $(SRCROOT)/rmframes
   # The background agent: owns running machines so the app is UI only. A plain command line
   # tool; it runs from launchd (--xpc) or as a detached child of the app (--socket).
   guesthouse-agent:

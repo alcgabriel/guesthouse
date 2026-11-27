@@ -39,18 +39,9 @@ pub enum Check {
         running_mb: i64,
     },
     /// The disk can grow from `on_disk_bytes` to `size_bytes`; `free_bytes` is what the Mac has.
-    Disk {
-        machine: String,
-        size_bytes: i64,
-        on_disk_bytes: i64,
-        free_bytes: i64,
-    },
+    Disk { machine: String, size_bytes: i64, on_disk_bytes: i64, free_bytes: i64 },
     /// What to say when creating a machine next to ones that run (a warning, not a stop).
-    Advice {
-        new_mb: i64,
-        running_mb: i64,
-        host_mb: i64,
-    },
+    Advice { new_mb: i64, running_mb: i64, host_mb: i64 },
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,11 +53,7 @@ pub struct Running {
 /// Memory as a person reads it: whole gigabytes, or one decimal.
 pub fn memory_words(mb: i64) -> String {
     let gb = mb as f64 / 1024.0;
-    if (gb - gb.round()).abs() < 0.05 {
-        format!("{} GB", gb.round() as i64)
-    } else {
-        format!("{gb:.1} GB")
-    }
+    if (gb - gb.round()).abs() < 0.05 { format!("{} GB", gb.round() as i64) } else { format!("{gb:.1} GB") }
 }
 
 fn spare_mb(host_mb: i64, running_mb: i64) -> i64 {
@@ -106,12 +93,7 @@ fn memory_problem(
 /// `{"warning": null | "..."}`.
 pub fn judge(check: &Check) -> Value {
     match check {
-        Check::Memory {
-            machine,
-            wanted_mb,
-            host_mb,
-            running,
-        } => {
+        Check::Memory { machine, wanted_mb, host_mb, running } => {
             let running_mb: i64 = running.iter().map(|r| r.memory_mb).sum();
             // Alone, the core's own limit is the one that matters.
             if running_mb <= 0 {
@@ -124,12 +106,7 @@ pub fn judge(check: &Check) -> Value {
             let name = (running.len() == 1).then(|| running[0].name.as_str());
             memory_problem(machine, *wanted_mb, spare, name, running_mb, false)
         }
-        Check::MemoryNow {
-            machine,
-            wanted_mb,
-            available_mb,
-            running_mb,
-        } => {
+        Check::MemoryNow { machine, wanted_mb, available_mb, running_mb } => {
             let Some(available) = available_mb else {
                 return json!({"problem": null});
             };
@@ -139,12 +116,7 @@ pub fn judge(check: &Check) -> Value {
             }
             memory_problem(machine, *wanted_mb, spare, None, *running_mb, true)
         }
-        Check::Disk {
-            machine,
-            size_bytes,
-            on_disk_bytes,
-            free_bytes,
-        } => {
+        Check::Disk { machine, size_bytes, on_disk_bytes, free_bytes } => {
             let needed = (size_bytes - on_disk_bytes).max(0) + DISK_MARGIN_BYTES;
             if *free_bytes >= needed {
                 return json!({"problem": null});
@@ -158,11 +130,7 @@ pub fn judge(check: &Check) -> Value {
                 "needed_gb": needed_gb, "free_gb": free_gb,
             }})
         }
-        Check::Advice {
-            new_mb,
-            running_mb,
-            host_mb,
-        } => {
+        Check::Advice { new_mb, running_mb, host_mb } => {
             if *running_mb <= 0 {
                 return json!({"warning": null});
             }

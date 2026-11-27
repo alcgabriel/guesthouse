@@ -77,23 +77,15 @@ fn request(agent: &Agent, text: &str) -> Response {
 }
 
 fn op(agent: &Agent, op: &str, machine: &str) -> Response {
-    request(
-        agent,
-        &format!(r#"{{"v":1,"id":1,"op":"{op}","machine":"{machine}"}}"#),
-    )
+    request(agent, &format!(r#"{{"v":1,"id":1,"op":"{op}","machine":"{machine}"}}"#))
 }
 
 fn states_of(agent: &Agent) -> Vec<MachineState> {
-    request(agent, r#"{"v":1,"id":1,"op":"list"}"#)
-        .machines
-        .unwrap()
+    request(agent, r#"{"v":1,"id":1,"op":"list"}"#).machines.unwrap()
 }
 
 fn state_of(agent: &Agent, id: &str) -> MachineState {
-    states_of(agent)
-        .into_iter()
-        .find(|state| state.machine == id)
-        .unwrap()
+    states_of(agent).into_iter().find(|state| state.machine == id).unwrap()
 }
 
 /// Reads events until `machine` reaches `state`, and returns the states it went through.
@@ -125,11 +117,7 @@ fn listen(agent: &Agent) -> (Receiver<String>, guesthouse_core::agent::Subscript
 
 fn args_of(support: &Support, id: &str) -> Vec<String> {
     let file = support.run_folder(id).join("fake-qemu.args");
-    fs::read_to_string(file)
-        .unwrap()
-        .lines()
-        .map(String::from)
-        .collect()
+    fs::read_to_string(file).unwrap().lines().map(String::from).collect()
 }
 
 #[test]
@@ -147,19 +135,9 @@ fn start_run_and_shut_down() {
     // QEMU was given the sockets in the run folder and the frame name for this machine.
     let args = args_of(&support, "win");
     let run = support.run_folder("win");
-    assert!(args.contains(&format!(
-        "unix:{},server,nowait",
-        run.join("qmp.sock").display()
-    )));
-    assert!(args.contains(&format!(
-        "unix:{},server,nowait",
-        run.join("input.sock").display()
-    )));
-    assert!(
-        args.last()
-            .unwrap()
-            .contains(r#""frame-export":"guesthouse.win""#)
-    );
+    assert!(args.contains(&format!("unix:{},server,nowait", run.join("qmp.sock").display())));
+    assert!(args.contains(&format!("unix:{},server,nowait", run.join("input.sock").display())));
+    assert!(args.last().unwrap().contains(r#""frame-export":"guesthouse.win""#));
     assert!(run.join("machine.pid").exists());
 
     assert!(op(&agent, "shutdown", "win").ok);
@@ -194,10 +172,7 @@ fn a_start_that_fails_says_why_from_the_first_line() {
     assert!(op(&agent, "start", "bad").ok);
     assert_eq!(expect(&events, "bad", "failed"), ["starting", "failed"]);
     let state = state_of(&agent, "bad");
-    assert_eq!(
-        state.reason.unwrap(),
-        "fake-qemu: could not open the disk image: Operation not permitted"
-    );
+    assert_eq!(state.reason.unwrap(), "fake-qemu: could not open the disk image: Operation not permitted");
     // A failed machine can be started again.
     assert!(op(&agent, "start", "bad").ok);
     expect(&events, "bad", "failed");
@@ -212,10 +187,7 @@ fn no_qemu_or_a_wrong_path_is_a_failure_with_a_reason() {
     assert!(!answer.ok);
     assert!(answer.error.unwrap().contains("Settings"));
     assert_eq!(state_of(&agent, "win").state, "failed");
-    let wrong = request(
-        &agent,
-        r#"{"v":1,"id":2,"op":"start","machine":"win","qemu":"/nowhere/qemu"}"#,
-    );
+    let wrong = request(&agent, r#"{"v":1,"id":2,"op":"start","machine":"win","qemu":"/nowhere/qemu"}"#);
     assert_eq!(wrong.error.unwrap(), "QEMU is not at /nowhere/qemu");
     // A machine whose files are gone is reported before anything runs.
     fs::remove_file(support.0.join("Machines/win/code.fd")).unwrap();
@@ -275,16 +247,10 @@ fn a_machine_that_exits_by_itself_is_stopped_and_a_crash_is_failed() {
     let agent = support.agent();
     let (events, _keep) = listen(&agent);
     assert!(op(&agent, "start", "self").ok);
-    assert_eq!(
-        expect(&events, "self", "off"),
-        ["starting", "running", "off"]
-    );
+    assert_eq!(expect(&events, "self", "off"), ["starting", "running", "off"]);
     assert!(op(&agent, "start", "boom").ok);
     expect(&events, "boom", "failed");
-    assert_eq!(
-        state_of(&agent, "boom").reason.unwrap(),
-        "QEMU exited with status 3"
-    );
+    assert_eq!(state_of(&agent, "boom").reason.unwrap(), "QEMU exited with status 3");
 }
 
 #[test]
@@ -311,11 +277,7 @@ fn a_pid_file_of_something_else_is_not_a_machine() {
     let run = support.run_folder("win");
     fs::create_dir_all(&run).unwrap();
     // This very test process's pid with the wrong start time: a recycled pid.
-    fs::write(
-        run.join("machine.pid"),
-        format!("{} 1.000000\n", std::process::id()),
-    )
-    .unwrap();
+    fs::write(run.join("machine.pid"), format!("{} 1.000000\n", std::process::id())).unwrap();
     let agent = support.agent();
     assert_eq!(state_of(&agent, "win").state, "off");
     assert!(!run.join("machine.pid").exists());
@@ -352,22 +314,15 @@ fn the_socket_carries_answers_and_events_and_the_agent_leaves_when_idle() {
     };
     connection.send(r#"{"v":1,"id":11,"op":"list"}"#).unwrap();
     assert!(wait_for(r#""id":11"#).contains(r#""state":"off""#));
-    connection
-        .send(r#"{"v":1,"id":12,"op":"start","machine":"win"}"#)
-        .unwrap();
+    connection.send(r#"{"v":1,"id":12,"op":"start","machine":"win"}"#).unwrap();
     wait_for(r#""id":12,"ok":true"#);
     wait_for(r#""event":"state","machine":"win","state":"running""#);
-    connection
-        .send(r#"{"v":1,"id":13,"op":"shutdown","machine":"win"}"#)
-        .unwrap();
+    connection.send(r#"{"v":1,"id":13,"op":"shutdown","machine":"win"}"#).unwrap();
     wait_for(r#""state":"off""#);
     drop(connection);
 
     // A second server on the same socket is refused while the first holds the lock.
-    assert!(matches!(
-        server::serve(&agent, &socket),
-        Err(server::ServeError::AlreadyRunning)
-    ));
+    assert!(matches!(server::serve(&agent, &socket), Err(server::ServeError::AlreadyRunning)));
     // With nobody connected and nothing running, the server ends by itself.
     let started = Instant::now();
     serving.join().unwrap().unwrap();

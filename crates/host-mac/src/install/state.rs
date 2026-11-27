@@ -161,17 +161,11 @@ impl InstallInfo {
     }
 
     fn step_mut(&mut self, step: Step) -> &mut StepState {
-        self.steps
-            .iter_mut()
-            .find(|s| s.step == step)
-            .expect("every step of the plan is in the state")
+        self.steps.iter_mut().find(|s| s.step == step).expect("every step of the plan is in the state")
     }
 
     pub fn status_of(&self, step: Step) -> StepStatus {
-        self.steps
-            .iter()
-            .find(|s| s.step == step)
-            .map_or(StepStatus::Pending, |s| s.status)
+        self.steps.iter().find(|s| s.step == step).map_or(StepStatus::Pending, |s| s.status)
     }
 
     /// The next step to do: the first that is neither done nor skipped.
@@ -194,11 +188,8 @@ impl InstallInfo {
     pub fn progress(&mut self, step: Step, done: u64, total: Option<u64>, now_ms: u64) {
         let guest = self.guest;
         let state = self.step_mut(step);
-        let fraction = total
-            .filter(|t| *t > 0)
-            .map_or(state.progress.fraction, |t| {
-                (done as f64 / t as f64).min(1.0)
-            });
+        let fraction =
+            total.filter(|t| *t > 0).map_or(state.progress.fraction, |t| (done as f64 / t as f64).min(1.0));
         let seconds_left = match (state.started_ms, total) {
             (Some(start), Some(_)) if fraction >= MIN_FRACTION_FOR_PACE && now_ms > start => {
                 let elapsed = (now_ms - start) as f64 / 1000.0;
@@ -206,12 +197,8 @@ impl InstallInfo {
             }
             _ => Some(((1.0 - fraction) * usual_seconds(guest, step) as f64).round() as u64),
         };
-        state.progress = Progress {
-            fraction,
-            bytes_done: total.map(|_| done),
-            bytes_total: total,
-            seconds_left,
-        };
+        state.progress =
+            Progress { fraction, bytes_done: total.map(|_| done), bytes_total: total, seconds_left };
         self.refresh();
     }
 
@@ -222,23 +209,14 @@ impl InstallInfo {
         let state = self.step_mut(step);
         let fraction = fraction.clamp(0.0, 1.0);
         let left = ((1.0 - fraction) * usual_seconds(guest, step) as f64).round() as u64;
-        state.progress = Progress {
-            fraction,
-            bytes_done: None,
-            bytes_total: None,
-            seconds_left: Some(left),
-        };
+        state.progress = Progress { fraction, bytes_done: None, bytes_total: None, seconds_left: Some(left) };
         self.refresh();
     }
 
     pub fn finish_step(&mut self, step: Step) {
         let state = self.step_mut(step);
         state.status = StepStatus::Done;
-        state.progress = Progress {
-            fraction: 1.0,
-            seconds_left: Some(0),
-            ..state.progress
-        };
+        state.progress = Progress { fraction: 1.0, seconds_left: Some(0), ..state.progress };
         self.current = self.next_step();
         if self.current.is_none() {
             self.state = Phase::Done;
@@ -253,21 +231,12 @@ impl InstallInfo {
         self.step_mut(step).status = StepStatus::Failed;
         let choices = match step {
             Step::Fetch => vec![Choice::TryAgain, Choice::ChooseInstaller],
-            Step::InstallDriver => vec![
-                Choice::TryAgain,
-                Choice::OpenWithoutDriver,
-                Choice::SendReport,
-            ],
+            Step::InstallDriver => vec![Choice::TryAgain, Choice::OpenWithoutDriver, Choice::SendReport],
             Step::MakeDisk | Step::InstallSystem | Step::FirstStart => {
                 vec![Choice::TryAgain, Choice::SendReport]
             }
         };
-        self.failure = Some(Failure {
-            step,
-            code,
-            reason: reason.to_string(),
-            choices,
-        });
+        self.failure = Some(Failure { step, code, reason: reason.to_string(), choices });
         self.state = Phase::Failed;
         self.current = Some(step);
         self.refresh();
@@ -289,25 +258,17 @@ impl InstallInfo {
 
     /// Take an installer the person chose, in place of downloading one.
     pub fn choose_installer(&mut self, path: &str) -> bool {
-        let chosen = self
-            .failure
-            .as_ref()
-            .is_some_and(|f| f.choices.contains(&Choice::ChooseInstaller));
+        let chosen = self.failure.as_ref().is_some_and(|f| f.choices.contains(&Choice::ChooseInstaller));
         if !chosen {
             return false;
         }
-        self.source = Source::File {
-            path: path.to_string(),
-        };
+        self.source = Source::File { path: path.to_string() };
         self.retry()
     }
 
     /// Leave the graphics driver out and go on to the first start. Only offered after it failed.
     pub fn open_without_driver(&mut self) -> bool {
-        let offered = self
-            .failure
-            .as_ref()
-            .is_some_and(|f| f.choices.contains(&Choice::OpenWithoutDriver));
+        let offered = self.failure.as_ref().is_some_and(|f| f.choices.contains(&Choice::OpenWithoutDriver));
         if !offered {
             return false;
         }
@@ -356,10 +317,9 @@ impl InstallInfo {
                 .iter()
                 .map(|s| match s.status {
                     StepStatus::Done | StepStatus::Skipped => 0,
-                    StepStatus::Running => s
-                        .progress
-                        .seconds_left
-                        .unwrap_or_else(|| usual_seconds(guest, s.step)),
+                    StepStatus::Running => {
+                        s.progress.seconds_left.unwrap_or_else(|| usual_seconds(guest, s.step))
+                    }
                     _ => usual_seconds(guest, s.step),
                 })
                 .sum(),
@@ -373,12 +333,7 @@ impl InstallInfo {
             Phase::Failed => "Needs attention".to_string(),
             Phase::Cancelled => "Install stopped".to_string(),
             Phase::Running => {
-                let shown = self
-                    .steps
-                    .iter()
-                    .filter(|s| s.step != Step::MakeDisk)
-                    .count()
-                    .max(1) as f64;
+                let shown = self.steps.iter().filter(|s| s.step != Step::MakeDisk).count().max(1) as f64;
                 let done: f64 = self
                     .steps
                     .iter()

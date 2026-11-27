@@ -39,10 +39,7 @@ pub fn identify(pid: i32) -> Option<Pid> {
     if info.pbi_status == ZOMBIE {
         return None;
     }
-    Some(Pid {
-        pid,
-        started: format!("{}.{:06}", info.pbi_start_tvsec, info.pbi_start_tvusec),
-    })
+    Some(Pid { pid, started: format!("{}.{:06}", info.pbi_start_tvsec, info.pbi_start_tvusec) })
 }
 
 /// Whether the very process `pid` names is still there.
@@ -65,10 +62,7 @@ pub fn write_file(path: &Path, pid: &Pid) -> io::Result<()> {
 pub fn read_file(path: &Path) -> Option<Pid> {
     let text = fs::read_to_string(path).ok()?;
     let (pid, started) = text.trim().split_once(' ')?;
-    Some(Pid {
-        pid: pid.parse().ok()?,
-        started: started.to_string(),
-    })
+    Some(Pid { pid: pid.parse().ok()?, started: started.to_string() })
 }
 
 #[cfg(test)]
@@ -80,10 +74,7 @@ mod tests {
     fn knows_itself_and_nothing_at_a_free_pid() {
         let me = identify(std::process::id() as i32).unwrap();
         assert!(is_running(&me));
-        assert!(!is_running(&Pid {
-            pid: me.pid,
-            started: "1.000000".into()
-        }));
+        assert!(!is_running(&Pid { pid: me.pid, started: "1.000000".into() }));
         assert!(identify(i32::MAX).is_none());
     }
 

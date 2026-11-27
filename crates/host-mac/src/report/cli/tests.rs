@@ -42,22 +42,11 @@ fn world(name: &str) -> (PathBuf, Places, PathBuf) {
     let support = root.join("support");
     fs::create_dir_all(support.join("Machines/demo")).unwrap();
     fs::create_dir_all(support.join("Run/demo")).unwrap();
-    fs::write(
-        support.join("Machines/demo/machine.json"),
-        r#"{"name":"Demo","kind":"windows"}"#,
-    )
-    .unwrap();
+    fs::write(support.join("Machines/demo/machine.json"), r#"{"name":"Demo","kind":"windows"}"#).unwrap();
     fs::write(support.join("Run/demo/qemu.log"), "started\n").unwrap();
     let out = root.join("out");
     fs::create_dir_all(&out).unwrap();
-    (
-        root.clone(),
-        Places {
-            support,
-            home: root,
-        },
-        out,
-    )
+    (root.clone(), Places { support, home: root }, out)
 }
 
 #[test]
@@ -78,25 +67,11 @@ fn the_options_are_the_linux_tools_where_they_apply() {
     assert_eq!(options.machine.as_deref(), Some("Demo"));
     assert_eq!(options.kind, ProblemKind::Crashed);
     assert!(options.no_guest_serial && options.save_only);
+    assert!(read_options(args(&["--kind", "broken"])).unwrap_err().contains("The kinds are wont-start"));
+    assert!(read_options(args(&["--machine"])).unwrap_err().contains("needs a value"));
+    assert!(read_options(args(&["--nope"])).unwrap_err().contains("isn't an option"));
     assert!(
-        read_options(args(&["--kind", "broken"]))
-            .unwrap_err()
-            .contains("The kinds are wont-start")
-    );
-    assert!(
-        read_options(args(&["--machine"]))
-            .unwrap_err()
-            .contains("needs a value")
-    );
-    assert!(
-        read_options(args(&["--nope"]))
-            .unwrap_err()
-            .contains("isn't an option")
-    );
-    assert!(
-        read_options(args(&["--help"]))
-            .unwrap_err()
-            .starts_with("guesthouse-report: sends a bug report")
+        read_options(args(&["--help"])).unwrap_err().starts_with("guesthouse-report: sends a bug report")
     );
 }
 
@@ -110,10 +85,7 @@ fn nothing_is_sent_unless_yes_is_typed() {
             *sent.borrow_mut() += 1;
             Ok("0a1b2c3d4e".to_owned())
         };
-        let options = Options {
-            machine: Some("demo".into()),
-            ..Options::default()
-        };
+        let options = Options { machine: Some("demo".into()), ..Options::default() };
         let _ = run(options, &places, "0.1.0", &out, &mut term, &sender);
         assert_eq!(*sent.borrow(), 0, "{answer:?} sent it");
         assert!(term.said().contains("Nothing was sent."));
@@ -134,29 +106,17 @@ fn it_shows_what_it_holds_before_asking_then_sends_on_yes_and_says_the_id() {
         ));
         Ok("0a1b2c3d4e".to_owned())
     };
-    let options = Options {
-        machine: Some("Demo".into()),
-        ..Options::default()
-    };
+    let options = Options { machine: Some("Demo".into()), ..Options::default() };
     let _ = run(options, &places, "0.1.0", &out, &mut term, &sender);
     let said = term.said();
-    assert!(
-        said.find("The report holds:").unwrap() < said.find("Sending gives this file").unwrap()
-    );
-    assert_eq!(
-        term.asked.borrow().len(),
-        2,
-        "the description, then the yes"
-    );
+    assert!(said.find("The report holds:").unwrap() < said.find("Sending gives this file").unwrap());
+    assert_eq!(term.asked.borrow().len(), 2, "the description, then the yes");
     assert!(term.asked.borrow()[1].contains("Type yes to send"));
     assert_eq!(sent.borrow().as_slice(), ["gz true"]);
     assert!(said.contains("Sent. The report's ID is 0a1b2c3d4e."));
     assert!(said.contains("issues/new?title=Report%200a1b2c3d4e"));
     assert!(
-        fs::read_dir(&out)
-            .unwrap()
-            .flatten()
-            .any(|e| e.file_name().to_string_lossy().ends_with(".tar.gz")),
+        fs::read_dir(&out).unwrap().flatten().any(|e| e.file_name().to_string_lossy().ends_with(".tar.gz")),
         "a copy is saved here"
     );
     let _ = fs::remove_dir_all(root);
@@ -166,14 +126,8 @@ fn it_shows_what_it_holds_before_asking_then_sends_on_yes_and_says_the_id() {
 fn save_only_writes_the_file_and_asks_nothing_about_sending() {
     let (root, places, out) = world("save");
     let mut term = Script::new(&[]);
-    let options = Options {
-        save_only: true,
-        description: Some("d".into()),
-        ..Options::default()
-    };
-    let _ = run(options, &places, "0.1.0", &out, &mut term, &|_, _| {
-        panic!("nothing is sent")
-    });
+    let options = Options { save_only: true, description: Some("d".into()), ..Options::default() };
+    let _ = run(options, &places, "0.1.0", &out, &mut term, &|_, _| panic!("nothing is sent"));
     assert!(term.asked.borrow().is_empty());
     assert!(term.said().contains("Written to"));
     let _ = fs::remove_dir_all(root);
@@ -183,16 +137,8 @@ fn save_only_writes_the_file_and_asks_nothing_about_sending() {
 fn a_failed_send_says_why_and_where_the_file_is() {
     let (root, places, out) = world("fail");
     let mut term = Script::new(&["", "yes"]);
-    let sender =
-        |_: &Path, _: &str| Err("The report server couldn't be reached: offline".to_owned());
-    let _ = run(
-        Options::default(),
-        &places,
-        "0.1.0",
-        &out,
-        &mut term,
-        &sender,
-    );
+    let sender = |_: &Path, _: &str| Err("The report server couldn't be reached: offline".to_owned());
+    let _ = run(Options::default(), &places, "0.1.0", &out, &mut term, &sender);
     let said = term.said();
     assert!(said.contains("It wasn't sent. The report server couldn't be reached: offline"));
     assert!(said.contains("The report is still in"));
@@ -202,14 +148,7 @@ fn a_failed_send_says_why_and_where_the_file_is() {
 #[test]
 fn an_unknown_machine_is_refused_by_name() {
     let (root, places, _) = world("unknown");
-    assert!(
-        choose(&places.support, Some("Nope"))
-            .unwrap_err()
-            .contains("The machines are: Demo.")
-    );
-    assert_eq!(
-        choose(&places.support, Some("DEMO")).unwrap().unwrap().0,
-        "demo"
-    );
+    assert!(choose(&places.support, Some("Nope")).unwrap_err().contains("The machines are: Demo."));
+    assert_eq!(choose(&places.support, Some("DEMO")).unwrap().unwrap().0, "demo");
     let _ = fs::remove_dir_all(root);
 }

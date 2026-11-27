@@ -171,9 +171,7 @@ fn point_release(name: &str) -> Option<u32> {
         return Some(0);
     }
     let digits = middle.strip_prefix('.')?;
-    (!digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
-        .then(|| digits.parse().ok())
-        .flatten()
+    (!digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())).then(|| digits.parse().ok()).flatten()
 }
 
 fn yaml(text: &str) -> String {
@@ -190,12 +188,8 @@ pub fn mac_time_zone() -> String {
 fn time_zone_of(link: Option<&std::path::Path>) -> String {
     let text = link.and_then(|link| link.to_str()).unwrap_or_default();
     let name = text.rsplit_once("zoneinfo/").map_or("", |(_, name)| name);
-    let plain = name
-        .split('/')
-        .all(|part| !part.is_empty() && !part.starts_with('.'))
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b));
+    let plain = name.split('/').all(|part| !part.is_empty() && !part.starts_with('.'))
+        && name.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b));
     if plain { name } else { "Etc/UTC" }.to_string()
 }
 
@@ -312,11 +306,7 @@ autoinstall:
 
 /// The seed disc's second file: it names the instance.
 pub fn meta_data(machine: &str) -> String {
-    format!(
-        "instance-id: guesthouse-{}\nlocal-hostname: {}\n",
-        machine,
-        yaml(machine).trim_matches('\'')
-    )
+    format!("instance-id: guesthouse-{}\nlocal-hostname: {}\n", machine, yaml(machine).trim_matches('\''))
 }
 
 #[cfg(test)]

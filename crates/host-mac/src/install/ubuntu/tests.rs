@@ -12,10 +12,7 @@ c9aa567e6560b2eddae3af03fc686002e35b6fee96f97fd5df3271e846439fdd *ubuntu-26.04-l
 fn the_image_is_the_plain_arm64_server_disc_with_its_published_checksum() {
     let image = pick_image(SUMS).unwrap();
     assert_eq!(image.name, "ubuntu-26.04-live-server-arm64.iso");
-    assert_eq!(
-        image.sha256,
-        "c9aa567e6560b2eddae3af03fc686002e35b6fee96f97fd5df3271e846439fdd"
-    );
+    assert_eq!(image.sha256, "c9aa567e6560b2eddae3af03fc686002e35b6fee96f97fd5df3271e846439fdd");
     assert_eq!(
         image.url,
         "https://cdimage.ubuntu.com/ubuntu/releases/26.04/release/ubuntu-26.04-live-server-arm64.iso"
@@ -24,16 +21,8 @@ fn the_image_is_the_plain_arm64_server_disc_with_its_published_checksum() {
 
 #[test]
 fn a_list_with_no_such_image_or_a_bad_checksum_is_said_not_guessed() {
-    assert!(
-        pick_image("")
-            .unwrap_err()
-            .contains("no arm64 server image")
-    );
-    assert!(
-        pick_image("abc *ubuntu-26.04-live-server-arm64.iso")
-            .unwrap_err()
-            .contains("not a SHA-256")
-    );
+    assert!(pick_image("").unwrap_err().contains("no arm64 server image"));
+    assert!(pick_image("abc *ubuntu-26.04-live-server-arm64.iso").unwrap_err().contains("not a SHA-256"));
     // The text form of a line, with two spaces, reads too.
     let text = format!("{}  ubuntu-26.04-live-server-arm64.iso", "a".repeat(64));
     assert_eq!(pick_image(&text).unwrap().sha256, "a".repeat(64));
@@ -47,10 +36,7 @@ fn the_answers_install_with_no_questions_and_say_how_it_ended_on_the_serial_port
     // The password comes from the account file on the disc, so no command the installer prints
     // and no log it keeps holds it.
     assert!(text.contains("chpasswd") && text.contains(ACCOUNT_FILE));
-    assert_eq!(
-        account_file("nick", "k7mn-p3xq-ab9d-w4ht"),
-        "nick:k7mn-p3xq-ab9d-w4ht\n"
-    );
+    assert_eq!(account_file("nick", "k7mn-p3xq-ab9d-w4ht"), "nick:k7mn-p3xq-ab9d-w4ht\n");
     assert!(!text.contains("passwd -d"));
     assert!(text.contains(FINISHED) && text.contains(FAILED));
     assert!(text.contains("shutdown: poweroff"));
@@ -61,23 +47,9 @@ fn the_answers_install_with_no_questions_and_say_how_it_ended_on_the_serial_port
 #[test]
 fn the_keyboard_is_the_mac_s_and_us_when_it_is_not_known() {
     use crate::keyboard_layout::Xkb;
-    let german = Some(Xkb {
-        layout: "de",
-        variant: "",
-    });
-    let swiss = Some(Xkb {
-        layout: "ch",
-        variant: "fr",
-    });
-    let text = |keyboard| {
-        user_data(
-            "nick",
-            "guesthouse",
-            "Europe/Berlin",
-            Desktop::Weston,
-            keyboard,
-        )
-    };
+    let german = Some(Xkb { layout: "de", variant: "" });
+    let swiss = Some(Xkb { layout: "ch", variant: "fr" });
+    let text = |keyboard| user_data("nick", "guesthouse", "Europe/Berlin", Desktop::Weston, keyboard);
     assert!(text(german).contains("  keyboard:\n    layout: de\n  storage:"));
     assert!(text(swiss).contains("  keyboard:\n    layout: ch\n    variant: fr\n  storage:"));
     assert!(text(None).contains("  keyboard:\n    layout: us\n  storage:"));
@@ -87,19 +59,10 @@ fn the_keyboard_is_the_mac_s_and_us_when_it_is_not_known() {
 fn the_time_zone_is_the_mac_s_as_its_link_names_it_and_utc_otherwise() {
     use std::path::Path;
     let zone = |link: &str| time_zone_of(Some(Path::new(link)));
-    assert_eq!(
-        zone("/var/db/timezone/zoneinfo/Europe/Berlin"),
-        "Europe/Berlin"
-    );
-    assert_eq!(
-        zone("/usr/share/zoneinfo/America/Argentina/Buenos_Aires"),
-        "America/Argentina/Buenos_Aires"
-    );
+    assert_eq!(zone("/var/db/timezone/zoneinfo/Europe/Berlin"), "Europe/Berlin");
+    assert_eq!(zone("/usr/share/zoneinfo/America/Argentina/Buenos_Aires"), "America/Argentina/Buenos_Aires");
     assert_eq!(zone("/var/db/timezone/zoneinfo/Etc/GMT+1"), "Etc/GMT+1");
-    assert_eq!(
-        zone("/var/db/timezone/zoneinfo/../../etc/passwd"),
-        "Etc/UTC"
-    );
+    assert_eq!(zone("/var/db/timezone/zoneinfo/../../etc/passwd"), "Etc/UTC");
     assert_eq!(zone("/var/db/timezone/zoneinfo/Europe/Ber'lin"), "Etc/UTC");
     assert_eq!(zone("/etc/somewhere"), "Etc/UTC");
     assert_eq!(time_zone_of(None), "Etc/UTC");
@@ -109,10 +72,7 @@ fn the_time_zone_is_the_mac_s_as_its_link_names_it_and_utc_otherwise() {
 
 #[test]
 fn the_seed_names_the_instance() {
-    assert_eq!(
-        meta_data("ubuntu"),
-        "instance-id: guesthouse-ubuntu\nlocal-hostname: ubuntu\n"
-    );
+    assert_eq!(meta_data("ubuntu"), "instance-id: guesthouse-ubuntu\nlocal-hostname: ubuntu\n");
 }
 
 #[test]
@@ -131,9 +91,7 @@ fn the_installer_runs_with_no_questions_and_its_console_on_the_screen() {
 #[test]
 fn the_answers_put_the_drivers_service_into_the_installed_system_before_saying_finished() {
     let text = user_data("nick", "guesthouse", "Europe/Berlin", Desktop::Weston, None);
-    let enable = text
-        .find(&format!("systemctl enable {DRIVER_SERVICE_FILE}"))
-        .unwrap();
+    let enable = text.find(&format!("systemctl enable {DRIVER_SERVICE_FILE}")).unwrap();
     assert!(text.contains("mount -o ro LABEL=CIDATA"));
     assert!(text.contains("/target/usr/local/sbin/guesthouse-driver"));
     assert!(enable < text.find(&format!("echo {FINISHED}")).unwrap());
@@ -171,11 +129,7 @@ fn the_newest_point_release_in_the_list_is_the_one_taken() {
     let image = pick_image(&sums).unwrap();
     assert_eq!(image.name, "ubuntu-26.04.1-live-server-arm64.iso");
     assert_eq!(image.sha256, "d".repeat(64));
-    assert!(
-        image
-            .url
-            .ends_with("/release/ubuntu-26.04.1-live-server-arm64.iso")
-    );
+    assert!(image.url.ends_with("/release/ubuntu-26.04.1-live-server-arm64.iso"));
 }
 
 #[test]
@@ -190,23 +144,15 @@ fn a_point_release_after_that_is_taken_too_and_the_order_in_the_list_does_not_ma
         "ubuntu-26.04.10-live-server-arm64.iso",
         "by number, not by text"
     );
-    let without_ten: String = sums
-        .lines()
-        .filter(|l| !l.contains(".10-"))
-        .map(|l| format!("{l}\n"))
-        .collect();
-    assert_eq!(
-        pick_image(&without_ten).unwrap().name,
-        "ubuntu-26.04.2-live-server-arm64.iso"
-    );
+    let without_ten: String =
+        sums.lines().filter(|l| !l.contains(".10-")).map(|l| format!("{l}\n")).collect();
+    assert_eq!(pick_image(&without_ten).unwrap().name, "ubuntu-26.04.2-live-server-arm64.iso");
 }
 
 #[test]
 fn a_list_of_only_the_release_with_no_point_release_still_gives_the_release() {
     assert_eq!(
-        pick_image(&line('a', "ubuntu-26.04-live-server-arm64.iso"))
-            .unwrap()
-            .name,
+        pick_image(&line('a', "ubuntu-26.04-live-server-arm64.iso")).unwrap().name,
         "ubuntu-26.04-live-server-arm64.iso"
     );
 }
@@ -230,9 +176,7 @@ fn the_answers_name_gnome_or_plasma_for_the_driver_package_and_nothing_for_westo
     assert!(!weston.contains("/etc/guesthouse/desktop"));
     for (desktop, word) in [(Desktop::Gnome, "gnome"), (Desktop::Plasma, "plasma")] {
         let text = user_data("nick", "guesthouse", "Europe/Berlin", desktop, None);
-        let line = text
-            .find(&format!("echo {word} > /target/etc/guesthouse/desktop"))
-            .unwrap();
+        let line = text.find(&format!("echo {word} > /target/etc/guesthouse/desktop")).unwrap();
         assert!(line < text.find(&format!("echo {FINISHED}")).unwrap());
         assert_eq!(Desktop::parse(word), Some(desktop));
     }

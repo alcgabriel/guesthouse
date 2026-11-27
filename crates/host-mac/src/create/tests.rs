@@ -120,10 +120,7 @@ fn a_second_machine_with_the_same_name_is_refused_and_ids_never_collide() {
     let s = Scratch::new();
     create(&s.machines(), &s.request("Win")).unwrap();
     let found = problems(&s.machines(), &s.request("Win"));
-    assert_eq!(
-        found,
-        vec!["A machine called Win already exists.".to_string()]
-    );
+    assert_eq!(found, vec!["A machine called Win already exists.".to_string()]);
     // Different names that make the same id get different folders.
     let first = create(&s.machines(), &s.request("a b")).unwrap();
     let second = create(&s.machines(), &s.request("a-b")).unwrap();
@@ -133,11 +130,7 @@ fn a_second_machine_with_the_same_name_is_refused_and_ids_never_collide() {
 #[test]
 fn ids_are_short_and_plain() {
     let s = Scratch::new();
-    let id = create(
-        &s.machines(),
-        &s.request("Ünïcode Name With A Very Long Title Indeed"),
-    )
-    .unwrap();
+    let id = create(&s.machines(), &s.request("Ünïcode Name With A Very Long Title Indeed")).unwrap();
     assert!(id.len() <= MAX_ID_CHARS, "{id}");
     assert!(id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
 }
@@ -168,14 +161,12 @@ fn rename_keeps_every_other_setting() {
     let s = Scratch::new();
     let id = create(&s.machines(), &s.request("Old")).unwrap();
     let file = s.machines().join(&id).join(MACHINE_FILE);
-    let mut settings: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+    let mut settings: serde_json::Value = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
     settings["modes"] = serde_json::json!(["1024x768@60"]);
     fs::write(&file, settings.to_string()).unwrap();
 
     rename(&s.machines(), &id, " New ").unwrap();
-    let after: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+    let after: serde_json::Value = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
     assert_eq!(after["name"], "New");
     assert_eq!(after["modes"], settings["modes"]);
     assert_eq!(after["cores"], 4);
@@ -187,11 +178,7 @@ fn rename_refuses_empty_taken_and_unknown() {
     let a = create(&s.machines(), &s.request("A")).unwrap();
     create(&s.machines(), &s.request("B")).unwrap();
     assert!(rename(&s.machines(), &a, "").is_err());
-    assert!(
-        rename(&s.machines(), &a, "B")
-            .unwrap_err()
-            .contains("already exists")
-    );
+    assert!(rename(&s.machines(), &a, "B").unwrap_err().contains("already exists"));
     assert!(rename(&s.machines(), "nope", "C").is_err());
     // Keeping its own name is fine.
     rename(&s.machines(), &a, "A").unwrap();
@@ -225,8 +212,7 @@ fn a_new_machine_is_guarded_and_graphics_can_be_moved_and_a_missing_key_reads_as
     assert!(set_graphics(&s.machines(), &id, "magic").is_err());
     // A file from before the setting existed.
     let file = s.machines().join(&id).join(MACHINE_FILE);
-    let mut settings: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+    let mut settings: serde_json::Value = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
     settings.as_object_mut().unwrap().remove("graphics");
     fs::write(&file, settings.to_string()).unwrap();
     assert_eq!(store::find(&s.machines(), &id).unwrap().graphics, "guarded");

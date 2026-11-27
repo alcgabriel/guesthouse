@@ -14,12 +14,7 @@ fn each_state_offers_what_the_page_shows() {
 
 #[test]
 fn a_machine_is_alive_from_starting_until_it_is_off() {
-    for state in [
-        State::Starting,
-        State::Running,
-        State::Stopping,
-        State::StoppingStalled,
-    ] {
+    for state in [State::Starting, State::Running, State::Stopping, State::StoppingStalled] {
         assert!(is_alive(state));
     }
     for state in [State::Off, State::Failed, State::Installing] {
@@ -61,17 +56,8 @@ fn an_install_is_shown_while_it_runs_or_failed_and_once_when_done() {
 
 #[test]
 fn the_json_answers_use_the_shared_names() {
-    assert_eq!(
-        answer(r#"{"rule":"next_step","state":"stopping_stalled"}"#),
-        r#"{"step":"force_off"}"#
-    );
-    assert_eq!(
-        answer(r#"{"rule":"is_alive","state":"stopping"}"#),
-        r#"{"yes":true}"#
-    );
-    assert_eq!(
-        answer(r#"{"rule":"start_check_order"}"#),
-        r#"{"order":["memory","disk","driver"]}"#
-    );
+    assert_eq!(answer(r#"{"rule":"next_step","state":"stopping_stalled"}"#), r#"{"step":"force_off"}"#);
+    assert_eq!(answer(r#"{"rule":"is_alive","state":"stopping"}"#), r#"{"yes":true}"#);
+    assert_eq!(answer(r#"{"rule":"start_check_order"}"#), r#"{"order":["memory","disk","driver"]}"#);
     assert!(answer(r#"{"rule":"next_step","state":"stopped"}"#).contains("error"));
 }

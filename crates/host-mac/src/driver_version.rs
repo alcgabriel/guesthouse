@@ -47,11 +47,8 @@ pub fn record_reported(machine_folder: &Path, version: &str) -> Result<(), Strin
     if !is_version(version) {
         return Err(format!("{version} is not a version (three numbers)."));
     }
-    fs::write(
-        machine_folder.join(REPORTED_FILE),
-        format!("{}\n", version.trim()),
-    )
-    .map_err(|e| format!("Cannot keep the driver's version: {e}"))
+    fs::write(machine_folder.join(REPORTED_FILE), format!("{}\n", version.trim()))
+        .map_err(|e| format!("Cannot keep the driver's version: {e}"))
 }
 
 pub fn state(support: &Path, machine_folder: &Path) -> DriverState {
@@ -68,11 +65,7 @@ pub fn state(support: &Path, machine_folder: &Path) -> DriverState {
     // Nothing reported: a Windows install that did not get its driver in is missing it.
     match state::load(machine_folder) {
         Some(info) if info.guest == Guest::Windows => {
-            let driver = info
-                .steps
-                .iter()
-                .find(|s| s.step == Step::InstallDriver)
-                .map(|s| s.status);
+            let driver = info.steps.iter().find(|s| s.step == Step::InstallDriver).map(|s| s.status);
             match driver {
                 Some(StepStatus::Failed | StepStatus::Skipped) => DriverState::Missing { released },
                 _ => DriverState::Unknown,

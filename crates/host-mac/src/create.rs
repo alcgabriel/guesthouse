@@ -53,25 +53,14 @@ pub struct NewMachine {
 }
 
 /// What is wrong with a processor count and a memory size on a Mac of this size, in plain words.
-pub fn hardware_problems(
-    cores: u32,
-    memory_mb: u64,
-    host_cores: u32,
-    host_memory_mb: u64,
-) -> Vec<String> {
+pub fn hardware_problems(cores: u32, memory_mb: u64, host_cores: u32, host_memory_mb: u64) -> Vec<String> {
     let mut found = Vec::new();
     if cores == 0 || cores > host_cores {
-        found.push(format!(
-            "Processors: choose from 1 to {}, the number this Mac has.",
-            host_cores
-        ));
+        found.push(format!("Processors: choose from 1 to {}, the number this Mac has.", host_cores));
     }
     let most = host_memory_mb.saturating_sub(HOST_RESERVE_MB);
     if memory_mb < MIN_MEMORY_MB {
-        found.push(format!(
-            "Memory: at least {} GB, or Windows will not run well.",
-            MIN_MEMORY_MB / 1024
-        ));
+        found.push(format!("Memory: at least {} GB, or Windows will not run well.", MIN_MEMORY_MB / 1024));
     } else if memory_mb > most {
         found.push(format!(
             "Memory: this Mac has {} GB, and {} GB stay with macOS, so at most {} GB.",
@@ -101,14 +90,8 @@ pub fn problems(machines: &Path, request: &NewMachine) -> Vec<String> {
                 .into(),
         );
     }
-    found.extend(file_problem(
-        "The firmware code file",
-        &request.firmware_code,
-    ));
-    found.extend(file_problem(
-        "The firmware variables file",
-        &request.firmware_vars,
-    ));
+    found.extend(file_problem("The firmware code file", &request.firmware_code));
+    found.extend(file_problem("The firmware variables file", &request.firmware_vars));
     if let Some(rom) = &request.option_rom {
         found.extend(file_problem("The option ROM", rom));
     }
@@ -126,17 +109,10 @@ pub fn name_problem(machines: &Path, own_id: Option<&str>, name: &str) -> Option
         return Some("Give the machine a name.".into());
     }
     if name.chars().count() > MAX_NAME_CHARS {
-        return Some(format!(
-            "The name is longer than {MAX_NAME_CHARS} characters."
-        ));
+        return Some(format!("The name is longer than {MAX_NAME_CHARS} characters."));
     }
     let taken = store::list(machines)
-        .map(|listing| {
-            listing
-                .machines
-                .iter()
-                .any(|m| m.name == name && Some(m.id.as_str()) != own_id)
-        })
+        .map(|listing| listing.machines.iter().any(|m| m.name == name && Some(m.id.as_str()) != own_id))
         .unwrap_or(false);
     taken.then(|| format!("A machine called {name} already exists."))
 }
@@ -153,9 +129,7 @@ fn file_problem(what: &str, path: &Path) -> Option<String> {
 
 fn is_qcow2(path: &Path) -> bool {
     let mut start = [0u8; 4];
-    fs::File::open(path)
-        .and_then(|mut file| file.read_exact(&mut start))
-        .is_ok_and(|()| start == QCOW2_MAGIC)
+    fs::File::open(path).and_then(|mut file| file.read_exact(&mut start)).is_ok_and(|()| start == QCOW2_MAGIC)
 }
 
 /// A folder name for the machine: its name in lowercase letters, digits and dashes, cut short
@@ -164,11 +138,7 @@ fn is_qcow2(path: &Path) -> bool {
 pub(crate) fn pick_id(machines: &Path, name: &str) -> Result<String, String> {
     let mut slug = String::new();
     for c in name.trim().chars() {
-        let c = if c.is_ascii_alphanumeric() {
-            c.to_ascii_lowercase()
-        } else {
-            '-'
-        };
+        let c = if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' };
         if c != '-' || !(slug.is_empty() || slug.ends_with('-')) {
             slug.push(c);
         }
@@ -178,11 +148,7 @@ pub(crate) fn pick_id(machines: &Path, name: &str) -> Result<String, String> {
     let base: String = slug.chars().take(MAX_ID_CHARS).collect();
 
     for number in 1.. {
-        let suffix = if number == 1 {
-            String::new()
-        } else {
-            format!("-{number}")
-        };
+        let suffix = if number == 1 { String::new() } else { format!("-{number}") };
         let mut id = format!("{base}{suffix}");
         // Shorten the part before the number until the sockets fit.
         while !sockets_fit(machines, &id) && id.len() > suffix.len() + 1 {
@@ -204,12 +170,7 @@ pub(crate) fn pick_id(machines: &Path, name: &str) -> Result<String, String> {
 fn sockets_fit(machines: &Path, id: &str) -> bool {
     let run = store::run_folder(machines, id);
     // The longest name of the sockets a machine may be given, guarded or not.
-    socket_problem(&[
-        &run.join("qmp.sock"),
-        &run.join("input.sock"),
-        &run.join("control.sock"),
-    ])
-    .is_none()
+    socket_problem(&[&run.join("qmp.sock"), &run.join("input.sock"), &run.join("control.sock")]).is_none()
 }
 
 /// Makes the machine and returns its id, or every problem found. Nothing is left behind when it
@@ -221,8 +182,7 @@ pub fn create(machines: &Path, request: &NewMachine) -> Result<String, Vec<Strin
     }
     let id = pick_id(machines, &request.name).map_err(|problem| vec![problem])?;
     let folder = machines.join(&id);
-    fs::create_dir_all(machines)
-        .map_err(|e| vec![format!("Cannot make {}: {e}", machines.display())])?;
+    fs::create_dir_all(machines).map_err(|e| vec![format!("Cannot make {}: {e}", machines.display())])?;
     // `create_dir` fails if the folder appeared since the check, so two sheets never share one.
     fs::create_dir(&folder).map_err(|e| vec![format!("Cannot make {}: {e}", folder.display())])?;
     if let Err(problem) = fill(&folder, request) {
@@ -242,12 +202,8 @@ fn fill(folder: &Path, request: &NewMachine) -> Result<(), String> {
         files.push((rom, ROM_FILE));
     }
     for (from, name) in files {
-        clone_or_copy(from, &folder.join(name)).map_err(|e| {
-            format!(
-                "Cannot copy {} into the machine's folder: {e}",
-                from.display()
-            )
-        })?;
+        clone_or_copy(from, &folder.join(name))
+            .map_err(|e| format!("Cannot copy {} into the machine's folder: {e}", from.display()))?;
     }
     let mut settings = serde_json::json!({
         "name": request.name.trim(),
@@ -273,10 +229,9 @@ fn clone_or_copy(from: &Path, to: &Path) -> io::Result<()> {
     {
         use std::ffi::CString;
         use std::os::unix::ffi::OsStrExt;
-        if let (Ok(src), Ok(dst)) = (
-            CString::new(from.as_os_str().as_bytes()),
-            CString::new(to.as_os_str().as_bytes()),
-        ) {
+        if let (Ok(src), Ok(dst)) =
+            (CString::new(from.as_os_str().as_bytes()), CString::new(to.as_os_str().as_bytes()))
+        {
             // SAFETY: both are nul-terminated paths that outlive the call.
             if unsafe { libc::clonefile(src.as_ptr(), dst.as_ptr(), 0) } == 0 {
                 return Ok(());
@@ -335,14 +290,12 @@ pub fn set_hardware(
     }
     let folder = machines.join(store::find(machines, id).map_err(|e| vec![e])?.id);
     let path = folder.join(MACHINE_FILE);
-    let text =
-        fs::read_to_string(&path).map_err(|e| vec![format!("Cannot read {MACHINE_FILE}: {e}")])?;
-    let mut settings: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| vec![format!("{MACHINE_FILE} is not valid: {e}")])?;
+    let text = fs::read_to_string(&path).map_err(|e| vec![format!("Cannot read {MACHINE_FILE}: {e}")])?;
+    let mut settings: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| vec![format!("{MACHINE_FILE} is not valid: {e}")])?;
     settings["cores"] = cores.into();
     settings["memory_mb"] = memory_mb.into();
-    write_settings(&folder, &settings)
-        .map_err(|e| vec![format!("Cannot write {MACHINE_FILE}: {e}")])
+    write_settings(&folder, &settings).map_err(|e| vec![format!("Cannot write {MACHINE_FILE}: {e}")])
 }
 
 #[cfg(test)]

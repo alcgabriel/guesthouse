@@ -58,17 +58,11 @@ impl Fit {
     /// Where the point (`x`, `y`) of the view, from its top left, falls on the tablet. A point
     /// in the bars is taken to the picture's nearest edge. `None` while anything is empty.
     pub fn tablet(self, x: f64, y: f64) -> Option<(u32, u32)> {
-        let sizes = [
-            self.view_width,
-            self.view_height,
-            self.picture_width,
-            self.picture_height,
-        ];
+        let sizes = [self.view_width, self.view_height, self.picture_width, self.picture_height];
         if sizes.iter().any(|size| !size.is_finite() || *size <= 0.0) {
             return None;
         }
-        let scale =
-            (self.view_width / self.picture_width).min(self.view_height / self.picture_height);
+        let scale = (self.view_width / self.picture_width).min(self.view_height / self.picture_height);
         let width = self.picture_width * scale;
         let height = self.picture_height * scale;
         let left = (self.view_width - width) / 2.0;
@@ -128,11 +122,7 @@ impl Input {
             self.scroll_x = 0.0;
             self.scroll_y = 0.0;
         }
-        let step = if precise {
-            POINTS_PER_WHEEL_STEP
-        } else {
-            LINES_PER_WHEEL_STEP
-        };
+        let step = if precise { POINTS_PER_WHEEL_STEP } else { LINES_PER_WHEEL_STEP };
         self.scroll_x += dx;
         self.scroll_y += dy;
         let mut events = Vec::new();
@@ -189,18 +179,8 @@ impl Input {
 
     /// Lets go of every key and button still held, last pressed first.
     pub fn release_all(&mut self) -> Vec<Value> {
-        let mut events: Vec<Value> = self
-            .keys
-            .drain(..)
-            .rev()
-            .map(|k| key_event(k, false))
-            .collect();
-        events.extend(
-            self.buttons
-                .drain(..)
-                .rev()
-                .map(|b| button_event(b.name(), false)),
-        );
+        let mut events: Vec<Value> = self.keys.drain(..).rev().map(|k| key_event(k, false)).collect();
+        events.extend(self.buttons.drain(..).rev().map(|b| button_event(b.name(), false)));
         self.scroll_x = 0.0;
         self.scroll_y = 0.0;
         events
@@ -230,12 +210,8 @@ mod tests {
     use super::*;
 
     /// A 1080p picture in a square view: bars above and below.
-    const SQUARE: Fit = Fit {
-        view_width: 1000.0,
-        view_height: 1000.0,
-        picture_width: 1920.0,
-        picture_height: 1080.0,
-    };
+    const SQUARE: Fit =
+        Fit { view_width: 1000.0, view_height: 1000.0, picture_width: 1920.0, picture_height: 1080.0 };
 
     #[test]
     fn tablet_maps_the_picture_not_the_bars() {
@@ -250,12 +226,8 @@ mod tests {
 
     #[test]
     fn tablet_with_bars_at_the_sides() {
-        let wide = Fit {
-            view_width: 2000.0,
-            view_height: 500.0,
-            picture_width: 800.0,
-            picture_height: 500.0,
-        };
+        let wide =
+            Fit { view_width: 2000.0, view_height: 500.0, picture_width: 800.0, picture_height: 500.0 };
         // The picture is 800 wide, from x 600 to 1400.
         assert_eq!(wide.tablet(600.0, 0.0), Some((0, 0)));
         assert_eq!(wide.tablet(1000.0, 250.0), Some((16384, 16384)));
@@ -264,10 +236,7 @@ mod tests {
 
     #[test]
     fn no_tablet_position_without_a_picture() {
-        let empty = Fit {
-            picture_width: 0.0,
-            ..SQUARE
-        };
+        let empty = Fit { picture_width: 0.0, ..SQUARE };
         assert_eq!(empty.tablet(1.0, 1.0), None);
     }
 
@@ -314,18 +283,12 @@ mod tests {
         let mut input = Input::default();
         assert_eq!(
             input.scroll(0.0, 1.0, false),
-            [
-                button_event("wheel-up", true),
-                button_event("wheel-up", false)
-            ]
+            [button_event("wheel-up", true), button_event("wheel-up", false)]
         );
         assert!(input.scroll(0.0, -30.0, true).is_empty());
         assert_eq!(
             input.scroll(0.0, -30.0, true),
-            [
-                button_event("wheel-down", true),
-                button_event("wheel-down", false)
-            ]
+            [button_event("wheel-down", true), button_event("wheel-down", false)]
         );
         assert_eq!(input.scroll(-2.0, 0.0, false).len(), 4);
     }
@@ -338,11 +301,7 @@ mod tests {
         input.button(Button::Right, true);
         assert_eq!(
             input.release_all(),
-            [
-                key_event("c", false),
-                key_event("ctrl", false),
-                button_event("right", false)
-            ]
+            [key_event("c", false), key_event("ctrl", false), button_event("right", false)]
         );
         assert!(input.release_all().is_empty());
     }

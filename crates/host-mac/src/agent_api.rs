@@ -56,10 +56,7 @@ pub extern "C" fn guesthouse_agent_new() -> *mut Agent {
 /// # Safety
 /// `agent` came from `guesthouse_agent_new`; `line` is a nul-terminated string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn guesthouse_agent_handle(
-    agent: *const Agent,
-    line: *const c_char,
-) -> *mut c_char {
+pub unsafe extern "C" fn guesthouse_agent_handle(agent: *const Agent, line: *const c_char) -> *mut c_char {
     // SAFETY: as the caller promises.
     let (agent, line) = unsafe { (agent.as_ref(), from_c(line)) };
     match (agent, line) {
@@ -118,10 +115,7 @@ pub unsafe extern "C" fn guesthouse_agent_events(agent: *const Agent) -> *mut Ev
     };
     let (sender, lines) = mpsc::channel();
     let subscription = agent.subscribe(sender);
-    Box::into_raw(Box::new(Events {
-        lines,
-        _subscription: subscription,
-    }))
+    Box::into_raw(Box::new(Events { lines, _subscription: subscription }))
 }
 
 /// The next state change, or null after `timeout_ms` with none.
@@ -129,18 +123,12 @@ pub unsafe extern "C" fn guesthouse_agent_events(agent: *const Agent) -> *mut Ev
 /// # Safety
 /// `events` came from `guesthouse_agent_events` and is used by one thread.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn guesthouse_events_next(
-    events: *mut Events,
-    timeout_ms: u32,
-) -> *mut c_char {
+pub unsafe extern "C" fn guesthouse_events_next(events: *mut Events, timeout_ms: u32) -> *mut c_char {
     // SAFETY: as the caller promises.
     let Some(events) = (unsafe { events.as_ref() }) else {
         return std::ptr::null_mut();
     };
-    match events
-        .lines
-        .recv_timeout(Duration::from_millis(timeout_ms.into()))
-    {
+    match events.lines.recv_timeout(Duration::from_millis(timeout_ms.into())) {
         Ok(line) => to_c(line),
         Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => std::ptr::null_mut(),
     }

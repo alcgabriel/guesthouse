@@ -76,8 +76,7 @@ fn hide_values(line: &str, keys: &[&str], mark: &str, needs_separator: bool) -> 
     let mut out = String::with_capacity(line.len());
     let mut at = 0;
     while at < line.len() {
-        let starts_word =
-            at == 0 || !(bytes[at - 1].is_ascii_alphanumeric() || bytes[at - 1] == b'_');
+        let starts_word = at == 0 || !(bytes[at - 1].is_ascii_alphanumeric() || bytes[at - 1] == b'_');
         let hit = keys
             .iter()
             .filter(|key| starts_word && lower[at..].starts_with(**key))
@@ -92,9 +91,7 @@ fn hide_values(line: &str, keys: &[&str], mark: &str, needs_separator: bool) -> 
         out.push_str(&line[at..after_key]);
         let mut cursor = after_key;
         let mut separated = false;
-        while cursor < bytes.len()
-            && matches!(bytes[cursor], b' ' | b'\t' | b':' | b'=' | b'"' | b'\'')
-        {
+        while cursor < bytes.len() && matches!(bytes[cursor], b' ' | b'\t' | b':' | b'=' | b'"' | b'\'') {
             separated |= matches!(bytes[cursor], b':' | b'=');
             cursor += 1;
         }
@@ -142,9 +139,7 @@ fn mark_word(word: &str) -> String {
 fn is_fingerprint(word: &str) -> bool {
     let bytes: Vec<&str> = word.split(':').collect();
     let with_colons = bytes.len() >= FINGERPRINT_BYTES
-        && bytes
-            .iter()
-            .all(|byte| byte.len() == 2 && byte.chars().all(|c| c.is_ascii_hexdigit()));
+        && bytes.iter().all(|byte| byte.len() == 2 && byte.chars().all(|c| c.is_ascii_hexdigit()));
     let plain = word.len() >= FINGERPRINT_BYTES * 2 && word.chars().all(|c| c.is_ascii_hexdigit());
     with_colons || plain
 }
@@ -153,8 +148,7 @@ fn is_generated_password(word: &str) -> bool {
     let groups: Vec<&str> = word.split('-').collect();
     groups.len() == PASSWORD_GROUPS
         && groups.iter().all(|group| {
-            group.len() == PASSWORD_GROUP_LENGTH
-                && group.chars().all(|c| PASSWORD_ALPHABET.contains(c))
+            group.len() == PASSWORD_GROUP_LENGTH && group.chars().all(|c| PASSWORD_ALPHABET.contains(c))
         })
 }
 
