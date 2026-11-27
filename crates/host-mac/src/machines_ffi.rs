@@ -273,7 +273,14 @@ fn tell_screen(
             "QEMU's own device takes no size from the app; only the guest can change it".into(),
         ));
     }
-    crate::screen_size::send(id, &launch.host_control, wanted)
+    let told = crate::screen_size::send(id, &launch.host_control, wanted)?;
+    if let Told::Applied(mode) = &told {
+        // A Linux machine starts in it next time (store::default_modes). A folder that cannot be
+        // written to only loses that: the size was applied all the same.
+        let folder = std::path::Path::new(&machine.folder);
+        let _ = store::remember_screen_mode(folder, &machine.kind, mode);
+    }
+    Ok(told)
 }
 
 /// Asks machine `id`'s graphics process how it is doing, over its control socket. Returns the

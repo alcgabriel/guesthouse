@@ -2,7 +2,7 @@
 //! `machine.json` with the machine's settings. The store lists what is there and works out what
 //! starting a machine needs from it.
 
-use crate::launch::{DEFAULT_MODES, DEFAULT_SCALE, Graphics, InstallerBoot, Launch};
+use crate::launch::{DEFAULT_MODES, DEFAULT_SCALE, Graphics, InstallerBoot, LINUX, Launch};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
@@ -236,6 +236,62 @@ fn installer_boot(folder: &Path, settings: &Settings) -> Option<InstallerBoot> {
     })
 }
 
+/// The file in a Linux machine's folder that keeps the last mode its screen window had, which the
+/// graphics process took.
+pub const SCREEN_MODE_FILE: &str = "screen-mode";
+
+/// The modes of a machine whose file names none. Windows' are run.sh's, the smallest first, as
+/// they always were. A Linux guest's desktop comes up in the first: the size its screen window
+/// last had, then the others largest first, so it starts at a size worth showing before the
+/// window, if any, gives its own.
+fn default_modes(folder: &Path, kind: &str) -> Vec<String> {
+    let mut modes: Vec<String> = DEFAULT_MODES.iter().map(|mode| mode.to_string()).collect();
+    if kind != LINUX {
+        return modes;
+    }
+    modes.reverse();
+    let last = fs::read_to_string(folder.join(SCREEN_MODE_FILE)).unwrap_or_default();
+    let last = last.trim();
+    if is_mode(last) {
+        modes.retain(|mode| mode != last);
+        modes.insert(0, last.to_string());
+    }
+    modes
+}
+
+/// Whether `text` is a mode a guest can be given: `WxH@R`, at least 320 by 200 and at most what
+/// the graphics process offers (`screen_size::MOST_PIXELS`).
+fn is_mode(text: &str) -> bool {
+    let number = |text: &str| -> Option<u32> {
+        (!text.is_empty() && text.len() <= 5 && text.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| text.parse().ok())
+            .flatten()
+    };
+    let Some((size, hertz)) = text.split_once('@') else {
+        return false;
+    };
+    let Some((width, height)) = size.split_once('x') else {
+        return false;
+    };
+    let (most_width, most_height) = crate::screen_size::MOST_PIXELS;
+    matches!(
+        (number(width), number(height), number(hertz)),
+        (Some(w), Some(h), Some(r)) if (320..=most_width).contains(&w)
+            && (200..=most_height).contains(&h)
+            && (1..=240).contains(&r)
+    )
+}
+
+/// Keeps `mode`, which the graphics process of the Linux machine in `folder` took for its screen
+/// window, as the first mode of its next start. Nothing for other machines, or for a mode that
+/// is not one.
+pub fn remember_screen_mode(folder: &Path, kind: &str, mode: &str) -> io::Result<()> {
+    if kind != LINUX || !is_mode(mode) {
+        return Ok(());
+    }
+    fs::write(folder.join(SCREEN_MODE_FILE), format!("{mode}\n"))
+}
+
 /// What starting needs, when the machine names its firmware files.
 fn launch_for(folder: &Path, id: &str, settings: &Settings) -> Option<Launch> {
     let code = settings.firmware_code.as_deref()?;
@@ -244,7 +300,7 @@ fn launch_for(folder: &Path, id: &str, settings: &Settings) -> Option<Launch> {
     let modes = settings
         .modes
         .clone()
-        .unwrap_or_else(|| DEFAULT_MODES.iter().map(|mode| mode.to_string()).collect());
+        .unwrap_or_else(|| default_modes(folder, &settings.kind));
     Some(Launch {
         graphics: settings.graphics,
         kind: settings.kind.clone(),
@@ -547,6 +603,64 @@ mod tests {
             modes,
             ["640x480@60", "1024x768@60", "1280x800@60", "1920x1080@60"]
         );
+    }
+
+    #[test]
+    fn a_linux_machine_starts_largest_first_and_then_at_its_window_s_last_mode() {
+        let store = scratch();
+        let machines = store.join("Machines");
+        add_machine(
+            &machines,
+            "deb",
+            r#"{"name": "D", "kind": "linux", "cores": 1, "memory_mb": 1, "disk": "d",
+                "firmware_code": "c", "firmware_vars": "v"}"#,
+        );
+        let modes = |machines: &Path| {
+            list(machines)
+                .unwrap()
+                .machines
+                .remove(0)
+                .launch
+                .unwrap()
+                .modes
+        };
+        assert_eq!(
+            modes(&machines),
+            ["1920x1080@60", "1280x800@60", "1024x768@60", "640x480@60"]
+        );
+        let folder = machines.join("deb");
+        remember_screen_mode(&folder, "linux", "2560x1416@60").unwrap();
+        assert_eq!(
+            modes(&machines),
+            [
+                "2560x1416@60",
+                "1920x1080@60",
+                "1280x800@60",
+                "1024x768@60",
+                "640x480@60"
+            ]
+        );
+        // One of the list moves to the front, once.
+        remember_screen_mode(&folder, "linux", "1280x800@60").unwrap();
+        assert_eq!(
+            modes(&machines),
+            ["1280x800@60", "1920x1080@60", "1024x768@60", "640x480@60"]
+        );
+        // What is no mode is neither written nor read.
+        remember_screen_mode(&folder, "linux", "banana").unwrap();
+        assert_eq!(modes(&machines)[0], "1280x800@60");
+        fs::write(folder.join(SCREEN_MODE_FILE), "99999x1@60\n").unwrap();
+        assert_eq!(modes(&machines)[0], "1920x1080@60");
+    }
+
+    #[test]
+    fn a_windows_machine_keeps_run_sh_s_modes_and_no_screen_mode_file() {
+        let store = scratch();
+        let folder = store.join("win");
+        fs::create_dir_all(&folder).unwrap();
+        remember_screen_mode(&folder, "windows", "2560x1416@60").unwrap();
+        assert!(!folder.join(SCREEN_MODE_FILE).exists());
+        assert_eq!(default_modes(&folder, "windows"), DEFAULT_MODES);
     }
 
     #[test]
