@@ -82,7 +82,7 @@ pub enum Request {
     /// Without `on` it changes nothing and answers the same. It works whether the machine runs or
     /// not; a running machine opens or closes at once. Turning it off never cuts Guesthouse's own
     /// window onto the machine. `pairing` opens (or closes) pairing for `pairing_seconds`, the
-    /// shared crate's default when not said; this service refuses it for now.
+    /// shared crate's default when not said.
     Share {
         name: String,
         #[serde(default)]
