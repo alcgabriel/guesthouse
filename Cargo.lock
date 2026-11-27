@@ -1237,6 +1237,13 @@ name = "guesthouse-p9"
 version = "0.11.0"
 
 [[package]]
+name = "guesthouse-pvg-sys"
+version = "0.11.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "guesthouse-relay"
 version = "0.11.0"
 dependencies = [
