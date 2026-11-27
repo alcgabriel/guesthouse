@@ -312,6 +312,22 @@ mod tests {
     }
 
     #[test]
+    fn the_finished_line_is_read_as_today_and_the_answer_file_writes_it() {
+        assert_eq!(INSTALL_FINISHED, b"nvfwd-install-finished");
+        assert!(installed(b"nvfwd-install-finished"));
+        assert!(installed(b"nvfwd-install-finished\r\n"));
+        assert!(installed(b"nvfwd-install-finished and more\n"));
+        assert!(installed(b"\x1b[0m booting\nnvfwd-install-finished\n"));
+        assert!(!installed(b" nvfwd-install-finished\n"));
+        assert!(!installed(b"nvfwd-install-finishe\n"));
+        assert!(!installed(b"guesthouse-install-finished\n"));
+        assert!(!installed(b"booting\rnvfwd-install-finished\n"));
+        let template = include_str!("../../../../linux/setup/seed/user-data.template");
+        let line = format!("echo {} > /dev/ttyS0", String::from_utf8_lossy(INSTALL_FINISHED));
+        assert!(template.contains(&line));
+    }
+
+    #[test]
     fn a_machine_with_its_gpu_turned_off_tells_the_guest_why() {
         let scratch = Scratch::new();
         let context = scratch_context(&scratch);
