@@ -19,6 +19,7 @@
 
 pub mod announce;
 pub mod ctl;
+pub mod ctl_wire;
 pub mod install;
 pub mod pairing;
 pub mod policy;
