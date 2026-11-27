@@ -366,6 +366,19 @@ mod windows {
         /// Announces `service`, pointing at this computer's own host name, and waits for Windows to
         /// say how it went. Nothing stays announced when this fails.
         pub fn register(service: &Service) -> Result<Self, Failure> {
+            let registration = Self::start(service)?;
+            registration.wait(REGISTER_WAIT, |life| life.settled().is_some());
+            let settled = registration.shared.life().settled();
+            match settled {
+                Some(Ok(())) => Ok(registration),
+                // Dropping it takes back what Windows announced, under the name Windows gave.
+                Some(Err(failure)) => Err(failure),
+                None => Err(Failure::NoAnswer),
+            }
+        }
+
+        /// Asks Windows to announce `service`, and returns before it answers.
+        fn start(service: &Service) -> Result<Self, Failure> {
             let host = host_name()?;
             let full_name = service.full_name();
             let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -392,14 +405,7 @@ mod windows {
                 registration.forget();
                 return Err(Failure::Refused(status));
             }
-            registration.wait(REGISTER_WAIT, |life| life.settled().is_some());
-            let settled = registration.shared.life().settled();
-            match settled {
-                Some(Ok(())) => Ok(registration),
-                // Dropping it takes back what Windows announced, under the name Windows gave.
-                Some(Err(failure)) => Err(failure),
-                None => Err(Failure::NoAnswer),
-            }
+            Ok(registration)
         }
 
         /// The instance's full name, as Windows announces it.
@@ -472,6 +478,33 @@ mod windows {
         fn drop(&mut self) {
             self.withdraw();
         }
+    }
+
+    /// Withdrawing before Windows has answered, on this PC's own responder: the registration is
+    /// cancelled, and neither its name nor a `NAME(1)` stays announced.
+    /// `cargo test -p guesthouse-hcs --lib withdrawn_before -- --ignored --nocapture`
+    #[test]
+    #[ignore = "announces on this PC's networks for a few seconds"]
+    fn withdrawn_before_windows_answered_nothing_stays() {
+        const LOOK: Duration = Duration::from_secs(3);
+        let service = Service {
+            instance: "Guesthouse cancel test".into(),
+            kind: "_remoteman._udp".into(),
+            port: 65103,
+            txt: vec![("v".into(), "0".into())],
+        };
+        let mut registration = Registration::start(&service).expect("Windows takes the registration");
+        assert!(registration.shared.life().waiting(), "Windows has not answered yet");
+        registration.withdraw();
+        assert!(!registration.shared.life().waiting(), "the cancel was answered");
+        println!("after the cancel: {:?}", registration.shared.life());
+        registration.withdraw();
+        drop(registration);
+        let seen = browse("_remoteman._udp", LOOK).expect("a browse");
+        println!("browse: {seen:?}");
+        assert!(!seen.iter().any(|name| name.starts_with("Guesthouse cancel test")), "{seen:?}");
+        let found = resolve(&service.full_name(), LOOK).expect("a resolve");
+        assert_eq!(found, None);
     }
 
     /// `HOST.local`, this computer's own host name, which its responder answers for.

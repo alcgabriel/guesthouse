@@ -29,7 +29,8 @@ fn main() -> std::process::ExitCode {
     let mut ok = true;
     for (name, port, fingerprint) in MACHINES {
         let announcement = Announcement::new(name, port, fingerprint, None).expect("a valid announcement");
-        let mut announcer = DnsSd::new();
+        // As `Lan::with_announcer` takes it.
+        let mut announcer: Box<dyn Announcer + Send> = Box::new(DnsSd::new());
         let began = Instant::now();
         let result = announcer.announce(&announcement);
         println!("announce {name:?} on {port}: {result:?} after {:?}", began.elapsed());

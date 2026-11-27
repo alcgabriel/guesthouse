@@ -8,9 +8,9 @@
 //! responder answers for, and each network gets this PC's address on it. So the announcement's
 //! one address, and the per-machine host name the Linux host gives, have no place here.
 //!
-//! Windows answers on every network this PC is on, Hyper-V's virtual switches too, where the relay
-//! listening on every address answers as well. Nothing narrows that, as the Linux host's interface
-//! names do: a guest on Guesthouse's own network sees the announcement and can reach the port.
+//! Windows answers on every network this PC is on: it was seen answering on a Hyper-V virtual
+//! switch, with this PC's address there. Nothing narrows that, as the Linux host's interface names
+//! do, so guests on this PC's virtual networks may list the machine too.
 
 use guesthouse_hcs::dns_sd::Service;
 use guesthouse_remote_view_core::announce::{Announcement, SERVICE_TYPE};
