@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-/// One device and the socket that speaks for it towards the loopback port.
+/// One device and the socket that speaks for it towards the guest's port.
 pub(crate) struct Client {
     peer: SocketAddr,
     pub(crate) upstream: UdpSocket,
@@ -122,7 +122,7 @@ fn start(shared: &Arc<Shared>, peer: SocketAddr) -> io::Result<Arc<Client>> {
     Ok(client)
 }
 
-/// The thread of one device: answers from the loopback port go back to it. When the device has been
+/// The thread of one device: answers from the guest's port go back to it. When the device has been
 /// quiet for too long it takes itself out of the table and ends.
 ///
 /// A datagram that arrives from the device in the moment between this thread deciding to end and
@@ -131,6 +131,9 @@ fn carry_out(shared: &Arc<Shared>, client: &Arc<Client>) {
     let mut buffer = vec![0u8; 65_535];
     loop {
         match client.upstream.recv_from(&mut buffer) {
+            Ok((_, from)) if shared.config.only_upstream_answers && from != shared.config.upstream => {
+                shared.stats.stranger();
+            }
             Ok((length, _)) => match shared.lan.send_to(&buffer[..length], client.peer) {
                 Ok(_) => {
                     client.down_packets.fetch_add(1, Relaxed);
@@ -148,6 +151,8 @@ fn carry_out(shared: &Arc<Shared>, client: &Arc<Client>) {
                 }
             }
             Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            // Windows says here that an earlier send was refused, as `ConnectionReset`, when nothing
+            // listens on the guest's port. The socket still works, and the next datagram may find it.
             Err(_) => shared.stats.error(),
         }
     }

@@ -15,7 +15,6 @@ const POLL: Duration = Duration::from_millis(500);
 const PARTIAL: &str = "part";
 /// The SHA-256 a finished file was checked against, beside it, so a later use needn't read it again.
 const CHECKED: &str = "sha256";
-const MIB: u64 = 1024 * 1024;
 
 pub use guesthouse_catalog_core::android::ANDROID_IMAGE_NAME;
 /// Ubuntu's release folder, its checksum list and the disc's name, and the Android image, are in
@@ -67,14 +66,9 @@ pub fn sha256(file: &Path) -> Result<String> {
     text.split_whitespace().next().map(str::to_owned).ok_or_else(|| Failure(said(&output)))
 }
 
-/// A size in GiB or MiB, as said before a download.
-pub fn size_text(bytes: u64) -> String {
-    if bytes >= 1024 * MIB {
-        format!("{:.1} GB", bytes as f64 / (1024 * MIB) as f64)
-    } else {
-        format!("{} MB", bytes.div_ceil(MIB))
-    }
-}
+/// A size in GiB or MiB, as said before a download: every host's formatters are in
+/// `guesthouse_basics::words`.
+pub use guesthouse_basics::words::size_in_gb_or_mb_up as size_text;
 
 /// Downloads `url` to `to`, going on from what an earlier try left, and tells `step` how far it is as
 /// "`what`: N%".

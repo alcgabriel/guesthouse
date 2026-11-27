@@ -438,3 +438,36 @@ fn a_link_in_a_machines_folder_stops_a_move() {
     assert!(refused_with(&answers).contains("is a link"), "{answers:?}");
     assert!(names(&drive).is_empty());
 }
+
+/// The remote view's switch is the service's, kept at home with the settings: a move takes it
+/// nowhere, and it's on, with its port, after a move out and back and a service that starts again.
+#[test]
+fn a_moved_machine_keeps_its_remote_view_switch_at_home() {
+    let setup = setup("move-view", Pretend::default());
+    let service = &setup.service;
+    let drive = drive(&setup);
+    ask(service, Request::Create { machine: new_machine(&setup, "win") });
+    let disk = service.machines().store.disk("win");
+    Record { installed: true, ..Record::default() }.save(&disk).unwrap();
+    let share = Request::Share { name: "win".into(), on: Some(true), pairing: None, pairing_seconds: None };
+    assert!(matches!(ask(service, share).as_slice(), [Answer::Share { .. }]));
+    let home = setup.root.join("machines").join("win");
+
+    assert_eq!(ask(service, Request::Move { name: "win".into(), folder: drive.clone() }), [Answer::Ok]);
+    wait_for_event(service, "win", "Moved its disks to");
+    assert!(names(&home).contains(&"remote-view.json".to_owned()));
+    assert!(!names(&drive.join("win")).contains(&"remote-view.json".to_owned()));
+    let again = Service::new(Store::new(setup.root.join("machines")), Pretend::default());
+    let listed = |service: &Arc<Service<Pretend>>| {
+        let machine = &status(service)[0];
+        (machine.remote_view, machine.remote_port)
+    };
+    assert_eq!(listed(&again), (true, Some(7792)));
+    drop(again);
+
+    let back = Request::Move { name: "win".into(), folder: PathBuf::new() };
+    assert_eq!(ask(service, back), [Answer::Ok]);
+    wait_for_event(service, "win", &format!("Moved its disks to {}", home.display()));
+    let again = Service::new(Store::new(setup.root.join("machines")), Pretend::default());
+    assert_eq!(listed(&again), (true, Some(7792)));
+}

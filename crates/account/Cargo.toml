@@ -1,0 +1,11 @@
+[package]
+name = "guesthouse-account-core"
+description = "The rules for a guest's account: which names and passwords each host takes for a guest's user, kept as each host has them. Nothing here calls the system, so every host can build on it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
