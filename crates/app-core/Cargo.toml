@@ -40,6 +40,8 @@ path = "src/bin/remote_view.rs"
 guesthouse-backend-nvidia.workspace = true
 # Whether a newer release is out, as every host decides it.
 guesthouse-update-check.workspace = true
+# The export file's format, which every host can read and write.
+guesthouse-carry-core.workspace = true
 # Reads a recorded Intel card, for a lab run on a PC without one. It opens nothing.
 guesthouse-backend-intel.workspace = true
 # Only for its slot names, so the app and the daemon can never disagree about what a VM owns.

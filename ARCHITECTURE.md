@@ -36,6 +36,7 @@ They're in `crates/`, listed here from the bottom up. Each depends only on crate
 | `daemon` | Slots, shared memory, sockets, the viewer's socket, and the main loop. |
 | `replay` | Replays a recording and compares every reply. |
 | `nvapi-shim` | `nvapi64.dll` for a Windows guest on an NVIDIA card. It goes in System32 in place of NVIDIA's and hands NVIDIA's every call, answering only the two that NVIDIA's refuses on a paravirtualized card, so NGX, and with it DLSS, finds the card. Built for Windows only; on Linux only its tests build. Off with `HKLM\SOFTWARE\Guesthouse` `NvapiShimOff` = 1 in the guest, and `NvapiShimLog` = 1 logs what it does to `guesthouse-nvapi-shim.log` in the caller's temporary folder. |
+| `carry` | The file a machine is exported in and imported from: a first line that says what it is, then each file with its path, size, bytes and SHA-256, read as untrusted. `app-core` exports and imports with it. Its package is `guesthouse-carry-core`. |
 | `relay` | A UDP relay from a port on the network to a loopback port, with a socket and a thread of its own towards the loopback port for each device, so one device's burst of video never holds up another's. `guesthouse-remote-view` in `app-core` runs it for a machine. |
 | `app-core` | The desktop app's work with no UI: machines, tasks, setup, a VM's start, `guesthouse-task`, `guesthouse-share` and `guesthouse-vm`. |
 | `app` | The desktop app's GTK 4 and libadwaita pages. |
