@@ -1,0 +1,64 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Before GDM starts, as root: waits for the pvg card (so GNOME Shell does not
+# take the firmware's screen, which pvg removes), and writes GNOME's scale as
+# a dconf default: the one the host gives by fw_cfg
+# (opt/com.ruxn.guesthouse/scale, 1 or 2), else 1 for a first mode narrower
+# than 2000 pixels, 2 for a wider one. Never fails the unit.
+say() { echo "guesthouse-gnome: $*"; }
+card=
+for i in $(seq 100); do
+	for c in /sys/class/drm/card[0-9]*; do
+		case $c in *-*) continue ;; esac
+		if [ "$(basename "$(readlink "$c/device/driver" 2>/dev/null)")" = pvg ]; then
+			card=$(basename "$c")
+			break 2
+		fi
+	done
+	[ $i = 1 ] && modprobe pvg 2>/dev/null
+	sleep 0.1
+done
+[ -n "$card" ] || say "no card of pvg's in /sys/class/drm"
+
+modprobe qemu_fw_cfg 2>/dev/null
+# The Mac's keyboard layout as the app gives it (opt/com.ruxn.guesthouse/keyboard,
+# XKB's layout and variant: "de", "ch fr"); German, as before, when it gives none.
+layout=de
+variant=
+kb=/sys/firmware/qemu_fw_cfg/by_name/opt/com.ruxn.guesthouse/keyboard/raw
+if [ -r "$kb" ]; then
+	read -r l v < "$kb"
+	case "$l$v" in '' | *[!a-z]*) say "the host's keyboard \"$l $v\" is no layout" ;; *) layout=$l variant=$v ;; esac
+fi
+scale=
+fw=/sys/firmware/qemu_fw_cfg/by_name/opt/com.ruxn.guesthouse/scale/raw
+if [ -r "$fw" ]; then
+	scale=$(tr -d ' \n' < "$fw")
+	case $scale in 1 | 2) from="the host's fw_cfg" ;; *) scale= ;; esac
+fi
+if [ -z "$scale" ]; then
+	width=
+	for connector in /sys/class/drm/"${card:-card0}"-*; do
+		[ "$(cat "$connector/status" 2>/dev/null)" = connected ] || continue
+		width=$(head -1 "$connector/modes" 2>/dev/null)
+		width=${width%%x*}
+		[ -n "$width" ] && break
+	done
+	case $width in
+	'' | *[!0-9]*) scale=1; from="no mode read" ;;
+	*) if [ "$width" -lt 2000 ]; then scale=1; else scale=2; fi; from="the first mode's width $width" ;;
+	esac
+fi
+db=/etc/dconf/db/guesthouse.d
+mkdir -p "$db"
+new=$(printf '[org/gnome/desktop/interface]\nscaling-factor=uint32 %s\n' "$scale")
+keys=$(printf "[org/gnome/desktop/input-sources]\nsources=[('xkb', '%s')]\n" "$layout${variant:++$variant}")
+if [ "$new" != "$(cat "$db/00-scale" 2>/dev/null)" ] || [ "$keys" != "$(cat "$db/00-keyboard" 2>/dev/null)" ] ||
+	[ ! -f /etc/dconf/db/guesthouse ]; then
+	echo "$new" > "$db/00-scale"
+	echo "$keys" > "$db/00-keyboard"
+	dconf update
+fi
+say "card ${card:-none}, scale $scale from $from, keyboard $layout${variant:+ $variant}"
+exit 0

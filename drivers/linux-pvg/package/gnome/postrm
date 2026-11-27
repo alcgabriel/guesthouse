@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+case $1 in
+remove | purge)
+	rm -f /etc/dconf/db/guesthouse
+	rmdir /etc/dconf/db/guesthouse.d 2> /dev/null || true
+	command -v dconf > /dev/null && dconf update || true
+	;;
+esac

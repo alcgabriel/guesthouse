@@ -1,0 +1,13 @@
+Package: pvg-dkms
+Version: @VERSION@
+Architecture: all
+Maintainer: Guesthouse contributors <144541403+s3k000@users.noreply.github.com>
+Depends: dkms (>= 3), linux-headers-generic | linux-headers-virtual | linux-headers
+Section: kernel
+Priority: optional
+Description: Guesthouse: kernel driver for the Mac's graphics device (DKMS)
+ The driver pvg for Apple's ParavirtualizedGraphics device, as the Mac app
+ gives it to a Linux guest: display, buffers and the command rings our Vulkan
+ driver uses. DKMS builds it for each installed kernel.
+ .
+ Built from @SOURCE@.

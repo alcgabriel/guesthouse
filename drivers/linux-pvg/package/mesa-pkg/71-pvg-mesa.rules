@@ -1,0 +1,3 @@
+# Guesthouse: our Mesa's EGL vendor is offered to glvnd when a card of the
+# pvg driver comes (/usr/lib/pvg-mesa/egl-vendor).
+ACTION=="add", SUBSYSTEM=="drm", KERNEL=="card[0-9]*", DRIVERS=="pvg", RUN+="/usr/lib/pvg-mesa/egl-vendor on"

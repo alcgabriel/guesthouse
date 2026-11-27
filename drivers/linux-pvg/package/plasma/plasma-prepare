@@ -1,0 +1,105 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Usage: plasma-prepare ACCOUNT. Before SDDM starts, as root: waits for the
+# pvg card (so KWin does not take the firmware's screen, which pvg removes),
+# and gives KWin the scale the host gives by fw_cfg
+# (opt/com.ruxn.guesthouse/scale, 1 or 2; else 1 for a first mode narrower
+# than 2000 pixels, 2 for a wider one) in the account's
+# ~/.config/kwinoutputconfig.json: written when it is not there, its scale
+# changed only while it is still the one written here last (an account's own
+# choice in the settings wins). Never fails the unit.
+account=$1
+say() { echo "guesthouse-plasma: $*"; }
+modprobe qemu_fw_cfg 2>/dev/null
+# The Mac's keyboard layout as the app gives it (opt/com.ruxn.guesthouse/keyboard,
+# XKB's layout and variant: "de", "ch fr"); German, as before, when it gives none.
+layout=de
+variant=
+kb=/sys/firmware/qemu_fw_cfg/by_name/opt/com.ruxn.guesthouse/keyboard/raw
+if [ -r "$kb" ]; then
+	read -r l v < "$kb"
+	case "$l$v" in '' | *[!a-z]*) say "the host's keyboard \"$l $v\" is no layout" ;; *) layout=$l variant=$v ;; esac
+fi
+# Plasma's default layout, for every account that has not chosen its own.
+printf '[Layout]\nLayoutList=%s\nVariantList=%s\nUse=true\n' "$layout" "$variant" > /etc/xdg/kxkbrc
+say "keyboard $layout${variant:+ $variant}"
+card=
+for i in $(seq 100); do
+	for c in /sys/class/drm/card[0-9]*; do
+		case $c in *-*) continue ;; esac
+		if [ "$(basename "$(readlink "$c/device/driver" 2>/dev/null)")" = pvg ]; then
+			card=$(basename "$c")
+			break 2
+		fi
+	done
+	[ $i = 1 ] && modprobe pvg 2>/dev/null
+	sleep 0.1
+done
+[ -n "$card" ] || { say "no card of pvg's in /sys/class/drm"; exit 0; }
+
+modprobe qemu_fw_cfg 2>/dev/null
+scale=
+fw=/sys/firmware/qemu_fw_cfg/by_name/opt/com.ruxn.guesthouse/scale/raw
+if [ -r "$fw" ]; then
+	scale=$(tr -d ' \n' < "$fw")
+	case $scale in 1 | 2) from="the host's fw_cfg" ;; *) scale= ;; esac
+fi
+connector=
+for c in /sys/class/drm/"$card"-*; do
+	[ "$(cat "$c/status" 2>/dev/null)" = connected ] || continue
+	connector=${c##*/"$card"-}
+	if [ -z "$scale" ]; then
+		width=$(head -1 "$c/modes" 2>/dev/null)
+		width=${width%%x*}
+		case $width in
+		'' | *[!0-9]*) scale=1; from="no mode read" ;;
+		*) if [ "$width" -lt 2000 ]; then scale=1; else scale=2; fi; from="the first mode's width $width" ;;
+		esac
+	fi
+	break
+done
+[ -n "$connector" ] || { say "no connected output on $card"; exit 0; }
+home=$(getent passwd "$account" | cut -d: -f6)
+[ -d "$home" ] || { say "no home for $account"; exit 0; }
+install -d -o "$account" -g "$(id -gn "$account")" "$home/.config"
+python3 - "$home/.config/kwinoutputconfig.json" "$connector" "$scale" /var/lib/guesthouse/plasma-scale <<'PY'
+import json, os, sys, uuid
+path, connector, scale, last_path = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
+last = open(last_path).read().strip() if os.path.exists(last_path) else ""
+# The fields KWin 6.6 writes for an output; with fewer it takes none of them.
+output = {"allowDdcCi": True, "allowSdrSoftwareBrightness": True, "autoBrightnessCurve": [0] * 6,
+          "autoRotation": "InTabletMode", "automaticBrightness": False, "brightness": 1,
+          "colorPowerTradeoff": "PreferEfficiency", "colorProfileSource": "sRGB", "connectorName": connector,
+          "customModes": [], "detectedDdcCi": False, "edrPolicy": "always", "highDynamicRange": False,
+          "iccProfilePath": "", "maxBitsPerColor": 0, "overscan": 0, "rgbRange": "Automatic", "scale": scale,
+          "sdrBrightness": 200, "sdrGamutWideness": 0, "sharpness": 0, "transform": "Normal",
+          "uuid": str(uuid.uuid4()), "vrrPolicy": "Never", "wideColorGamut": False}
+setup = {"lidClosed": False, "outputs": [{"enabled": True, "outputIndex": 0, "position": {"x": 0, "y": 0},
+                                          "priority": 0, "replicationSource": ""}]}
+try:
+    config = json.load(open(path))
+except (OSError, ValueError):
+    config = None
+if config is None:
+    config = [{"name": "outputs", "data": [output]}, {"name": "setups", "data": [setup]}]
+    said = "written"
+else:
+    said = "left as the account set it"
+    for group in config:
+        if group.get("name") != "outputs":
+            continue
+        for entry in group.get("data", []):
+            if entry.get("connectorName") == connector and str(entry.get("scale")) in (last, str(scale)):
+                if entry.get("scale") != scale:
+                    entry["scale"] = scale
+                    said = "scale changed"
+                else:
+                    said = "as it was"
+json.dump(config, open(path, "w"), indent=4)
+open(last_path, "w").write(f"{scale}\n")
+print(said)
+PY
+chown "$account:$(id -gn "$account")" "$home/.config/kwinoutputconfig.json"
+say "card $card, output $connector, scale $scale from $from"
+exit 0

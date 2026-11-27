@@ -1,0 +1,18 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# weston as the account, with what desktop-prepare wrote and our Mesa's
+# settings. ~/.config/weston.ini takes the place of /run/guesthouse/weston.ini.
+set -a
+. /run/guesthouse/session.env
+[ -f /etc/guesthouse/mesa.env ] && . /etc/guesthouse/mesa.env
+set +a
+export LANG=${LANG:-C.UTF-8}
+export GSK_RENDERER=cairo QT_QUICK_BACKEND=software
+config=--config=/run/guesthouse/weston.ini
+[ -f "$HOME/.config/weston.ini" ] && config=
+drm=
+[ -n "$GUESTHOUSE_CARD" ] && drm=--drm-device=$GUESTHOUSE_CARD
+# --idle-time=0: with no input weston would blank its output after 300 s and
+# send its clients no more frames.
+exec weston --backend=drm --renderer="$GUESTHOUSE_RENDERER" --socket=wayland-0 --idle-time=0 $drm $config

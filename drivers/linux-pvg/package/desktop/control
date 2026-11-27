@@ -1,0 +1,14 @@
+Package: guesthouse-desktop
+Version: @VERSION@
+Architecture: all
+Maintainer: Guesthouse contributors <144541403+s3k000@users.noreply.github.com>
+Depends: pvg-mesa (= @VERSION@), pvg-dkms (= @VERSION@), weston, foot, fonts-dejavu-core, xkb-data, kbd, mesa-utils, vulkan-tools, glmark2-es2-wayland
+Section: x11
+Priority: optional
+Description: Guesthouse: a weston desktop on the Mac's graphics device
+ weston with its GL renderer through our Mesa (Zink on KosmicKrisp), started
+ at boot for the account the install made, on the pvg device, at the scale
+ the Mac app gives, with a German keyboard and foot as its terminal. Says
+ "guesthouse: first start ok" on the serial port once it is up after an
+ install. The test clients es2gears_wayland, weston-simple-egl, vkcube and
+ glmark2-es2-wayland come with it.

@@ -1,0 +1,13 @@
+# Guesthouse: before SDDM, the pvg card and KWin's scale from the Mac app for
+# the account (the instance's name).
+[Unit]
+Description=Guesthouse Plasma: the pvg card and the scale for %i before SDDM
+Before=sddm.service display-manager.service
+After=systemd-udev-settle.service systemd-modules-load.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/guesthouse/plasma-prepare %i
+
+[Install]
+WantedBy=graphical.target

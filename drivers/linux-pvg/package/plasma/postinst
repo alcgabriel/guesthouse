@@ -1,0 +1,23 @@
+#!/bin/sh
+# Plasma in place of weston for the desktop's account: SDDM signs it in at
+# boot, weston's unit is turned off. It starts at the next boot.
+set -e
+[ "$1" = configure ] || exit 0
+account=$(head -1 /etc/guesthouse/desktop-user 2>/dev/null || true)
+if [ -z "$account" ] || ! id "$account" > /dev/null 2>&1; then
+	echo "guesthouse-plasma: no account in /etc/guesthouse/desktop-user" >&2
+	exit 0
+fi
+echo plasma > /etc/guesthouse/desktop
+systemctl disable "guesthouse-desktop@$account.service" 2> /dev/null || true
+mkdir -p /etc/sddm.conf.d
+printf '# Guesthouse: Plasma for the install'"'"'s account at boot.\n[Autologin]\nUser=%s\nSession=plasma\nRelogin=false\n' \
+	"$account" > /etc/sddm.conf.d/guesthouse.conf
+# SDDM is the display manager (GDM may be there from GNOME before).
+echo /usr/bin/sddm > /etc/X11/default-display-manager
+systemctl disable gdm3.service 2> /dev/null || true
+systemctl daemon-reload || true
+systemctl enable -f sddm.service || true
+systemctl enable "guesthouse-plasma-prepare@$account.service" "guesthouse-plasma-up@$account.service" || true
+systemctl set-default graphical.target > /dev/null 2>&1 || true
+echo "guesthouse-plasma: Plasma for $account from the next boot"

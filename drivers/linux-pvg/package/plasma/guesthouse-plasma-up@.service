@@ -1,0 +1,12 @@
+# Guesthouse: "guesthouse: first start ok" and "desktop up" on the serial
+# port once Plasma is up for the account (the instance's name).
+[Unit]
+Description=Guesthouse Plasma: say on the serial port when the desktop of %i is up
+After=sddm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/guesthouse/first-start %i
+
+[Install]
+WantedBy=graphical.target

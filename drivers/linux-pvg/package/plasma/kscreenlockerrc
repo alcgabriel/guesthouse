@@ -1,0 +1,4 @@
+# Guesthouse: the screen is a window on the Mac; no lock after a pause.
+[Daemon]
+Autolock=false
+LockOnResume=false

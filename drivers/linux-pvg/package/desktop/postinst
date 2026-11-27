@@ -1,0 +1,29 @@
+#!/bin/sh
+# Enables the desktop for the account the install made: the one named in
+# /etc/guesthouse/desktop-user, else the first with a uid from 1000 on and a
+# home under /home. It starts at the next boot.
+set -e
+[ "$1" = configure ] || exit 0
+account=
+[ -s /etc/guesthouse/desktop-user ] && account=$(head -1 /etc/guesthouse/desktop-user)
+if [ -z "$account" ]; then
+	account=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $6 ~ /^\/home\// { print $1; exit }')
+fi
+if [ -z "$account" ] || ! id "$account" > /dev/null 2>&1; then
+	echo "guesthouse-desktop: no account to start the desktop for; name one in /etc/guesthouse/desktop-user" >&2
+	exit 0
+fi
+echo "$account" > /etc/guesthouse/desktop-user
+for group in video render input; do
+	getent group "$group" > /dev/null && usermod -a -G "$group" "$account"
+done
+systemctl daemon-reload || true
+# With guesthouse-gnome or guesthouse-plasma a display manager starts the
+# desktop for the account, not weston.
+chosen=$(cat /etc/guesthouse/desktop 2>/dev/null || true)
+if [ "$chosen" = gnome ] || [ "$chosen" = plasma ]; then
+	echo "guesthouse-desktop: $chosen is the desktop; weston stays off"
+	exit 0
+fi
+systemctl enable "guesthouse-desktop@$account.service" || true
+echo "guesthouse-desktop: weston for $account from the next boot"

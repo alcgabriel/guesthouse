@@ -1,0 +1,33 @@
+#!/bin/sh
+# GNOME in place of weston for the desktop's account: GDM signs it in at
+# boot, weston's unit is turned off. It starts at the next boot.
+set -e
+[ "$1" = configure ] || exit 0
+account=$(head -1 /etc/guesthouse/desktop-user 2>/dev/null || true)
+if [ -z "$account" ] || ! id "$account" > /dev/null 2>&1; then
+	echo "guesthouse-gnome: no account in /etc/guesthouse/desktop-user" >&2
+	exit 0
+fi
+echo gnome > /etc/guesthouse/desktop
+systemctl disable "guesthouse-desktop@$account.service" 2> /dev/null || true
+# GDM's own file: sign the account in, Wayland on.
+conf=/etc/gdm3/custom.conf
+[ -f "$conf" ] || printf '[daemon]\n' > "$conf"
+sed -i -e '/^AutomaticLoginEnable *=/d' -e '/^AutomaticLogin *=/d' -e '/^WaylandEnable *=/d' "$conf"
+sed -i "/^\[daemon\]/a AutomaticLoginEnable=true\nAutomaticLogin=$account\nWaylandEnable=true" "$conf"
+# No first-login assistant.
+home=$(getent passwd "$account" | cut -d: -f6)
+if [ -d "$home" ]; then
+	install -d -o "$account" -g "$(id -gn "$account")" "$home/.config"
+	[ -e "$home/.config/gnome-initial-setup-done" ] ||
+		install -o "$account" -g "$(id -gn "$account")" -m 644 /dev/null "$home/.config/gnome-initial-setup-done"
+fi
+/usr/libexec/guesthouse/gnome-prepare > /dev/null 2>&1 || dconf update || true
+# GDM is the display manager (SDDM may be there from Plasma before).
+echo /usr/sbin/gdm3 > /etc/X11/default-display-manager
+systemctl disable sddm.service 2> /dev/null || true
+systemctl daemon-reload || true
+systemctl enable -f gdm3.service || true
+systemctl enable guesthouse-gnome-prepare.service "guesthouse-gnome-up@$account.service" || true
+systemctl set-default graphical.target > /dev/null 2>&1 || true
+echo "guesthouse-gnome: GNOME for $account from the next boot"
