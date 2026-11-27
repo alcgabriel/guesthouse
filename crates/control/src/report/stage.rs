@@ -12,11 +12,8 @@ use crate::System;
 
 /// The tester's own words, scrubbed, and the facts that sort the report, named as every host names them.
 pub use guesthouse_report_core::manifest::{DESCRIPTION_FILE, SUMMARY_FILE};
-/// The most of one file a report takes at first. A report that is too big to send is made again
-/// with half as much of each file.
-pub const FIRST_LIMIT: usize = 4 * 1024 * 1024;
-/// How many times a report that is too big is made again, each with half as much.
-pub const MOST_REPACKS: u32 = 6;
+/// How much of each file a report takes, and how it's made again when it's too big.
+pub use guesthouse_report_core::trim::{FIRST_LIMIT, MOST_REPACKS, halved};
 /// The longest a file's name may be, folder and all.
 const LONGEST_NAME: usize = 120;
 
@@ -161,11 +158,6 @@ pub fn size_words(bytes: u64) -> String {
     } else {
         format!("{:.1} MB", size / (KB * KB))
     }
-}
-
-/// What a report is made again with when it was too big: half as much of each file.
-pub fn halved(per_file: usize) -> usize {
-    (per_file / 2).max(1024)
 }
 
 #[cfg(test)]

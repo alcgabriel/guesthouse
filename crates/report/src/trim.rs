@@ -2,6 +2,17 @@
 //! every file of a report this way. The Linux host keeps a log's start and the lines of its middle
 //! a daemon's log marks as worth it too, with its own `trim`, which knows the daemon's log.
 
+/// The most of one file the Windows host's report takes at first. A report that is too big to send
+/// is made again with half as much of each file. The Linux host starts at 16 MiB and has its own.
+pub const FIRST_LIMIT: usize = 4 * 1024 * 1024;
+/// How many times the Windows host makes a report that is too big again, each with half as much.
+pub const MOST_REPACKS: u32 = 6;
+
+/// What a report is made again with when it was too big: half as much of each file.
+pub fn halved(per_file: usize) -> usize {
+    (per_file / 2).max(1024)
+}
+
 /// The text as it is if it fits in `most_bytes`, and otherwise its last part that fits, cut at a
 /// character and, where a line starts inside that part, at the start of that line. A line before it
 /// says how many bytes are left out at the start. That line is not counted in `most_bytes`.
