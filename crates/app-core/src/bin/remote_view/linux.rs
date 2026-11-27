@@ -40,7 +40,7 @@ fn run(settings: &Settings) -> std::io::Result<()> {
 
 fn serve_until_done(settings: &Settings, processes: &Path) -> std::io::Result<()> {
     let listener = remote_view::listener(&settings.run_folder)?;
-    let lan = Arc::new(Mutex::new(Lan::with_announcer(settings, Box::new(Mdns::default()))));
+    let lan = Arc::new(Mutex::new(Lan::with_announcer(&settings.lan(), Box::new(Mdns::default()))));
     // The card the setting asks for, when it changes while the machine runs, for the loop to take.
     let new_card: Arc<Mutex<Option<Option<String>>>> = Arc::default();
     {

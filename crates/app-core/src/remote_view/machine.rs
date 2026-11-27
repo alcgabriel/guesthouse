@@ -11,6 +11,8 @@
 //! What the guest's host cannot keep is kept here: how long pairing stays open, and the host-wide
 //! clipboard and files held off while a device is let in (`held`, in a file beside the switch, so an
 //! app that died with pairing open closes it and gives them back at its next launch: [`launched`]).
+//! Pairing itself is driven by the shared `session` driver in `guesthouse-remote-view-core`, which
+//! this gives the agent, the log, that file and the clock.
 
 use super::{Request, Settings, end, pid, start};
 use crate::actions::guest_upload::put_big_file_with;
@@ -25,15 +27,14 @@ use guesthouse_daemon::slot::Slot;
 use guesthouse_remote_view_core::ctl::{self, Ack, Words, parse_ack};
 use guesthouse_remote_view_core::encoder_for;
 use guesthouse_remote_view_core::install::{self, Check, INSTALLED, Pin};
-use guesthouse_remote_view_core::pairing::{Event, HostWide, Millis, Pairing};
+use guesthouse_remote_view_core::pairing::{Event, HostWide, Millis};
 use guesthouse_remote_view_core::policy::Policy;
+use guesthouse_remote_view_core::session::{Driver, Guest, Sessions, StepEvent, Unanswered};
 use guesthouse_remote_view_core::share::{ShareInfo, ShareState, pairing_seconds};
-use guesthouse_remote_view_core::status::{Reply, Status, parse_reply};
+use guesthouse_remote_view_core::status::{Reply, parse_reply};
 use guesthouse_remote_view_core::switch::{SWITCH_FILE, Switch};
-use guesthouse_remote_view_core::view::{Facts, share_info};
-use std::collections::HashMap;
 use std::fs;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::process::Child;
 use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
 use std::thread;
@@ -51,8 +52,6 @@ const INSTALL_SECONDS: u64 = 180;
 /// minute after its service starts.
 const UPDATES_OFF_TRIES: u32 = 6;
 const UPDATES_OFF_PAUSE: Duration = Duration::from_secs(3);
-/// How old a reading may be before [`info`] has another taken behind it.
-const STALE: Duration = Duration::from_secs(2);
 /// Where the downloaded installer is kept, in the fetched parts' folder.
 const PARTS_FOLDER: &str = "remoteman";
 /// Where a build that ships the installer has it, in the program's folder.
@@ -102,9 +101,8 @@ pub fn set_allowed(context: &Context, machine: &Machine, on: bool) -> Result<Swi
         .filter(|other| other.id != machine.id)
         .filter_map(|other| port(context, other))
         .collect();
-    let switch = read_switch(context, machine)
-        .turned(on, &taken, |port| UdpSocket::bind((Ipv4Addr::UNSPECIFIED, port)).is_ok())
-        .map_err(Failure)?;
+    let switch =
+        read_switch(context, machine).turned(on, &taken, guesthouse_relay::udp_port_free).map_err(Failure)?;
     write_switch(context, machine, &switch)?;
     Ok(switch)
 }
@@ -363,123 +361,74 @@ pub fn bring_up(
     open_helper(context, machine, slot, port, fingerprint)
 }
 
-/// This PC's address on its network, which a device on it types in: the one the system would send
-/// from to the internet, if that is on a real network. Nothing is sent to find it out.
-pub fn lan_address() -> Option<IpAddr> {
-    let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok()?;
-    socket.connect((Ipv4Addr::new(192, 0, 2, 1), 9)).ok()?;
-    let address = socket.local_addr().ok()?.ip();
-    (!address.is_loopback() && !address.is_unspecified()).then_some(address)
-}
-
 // ---- Pairing and the state shown ----
 
-#[derive(Default)]
-struct Session {
-    pairing: Option<Pairing>,
-    reading: Option<Status>,
-    read_at: Option<SystemTime>,
-    reason: Option<String>,
-    /// A reading or a clock is running behind [`info`].
-    busy: bool,
-    fingerprint: Option<String>,
+/// The shared driver's way into a running machine: `ctl` through the agent, this host's log, and
+/// `held` in its file beside the switch.
+struct AgentGuest<'a> {
+    context: &'a Context,
+    machine: &'a Machine,
+    slot: Slot,
 }
 
-fn sessions() -> MutexGuard<'static, HashMap<String, Session>> {
-    static SESSIONS: OnceLock<Mutex<HashMap<String, Session>>> = OnceLock::new();
-    SESSIONS.get_or_init(Mutex::default).lock().unwrap_or_else(PoisonError::into_inner)
+impl Guest for AgentGuest<'_> {
+    /// The agent gives nothing for a guest that did not answer, which reads as the host saying
+    /// nothing, as it always has.
+    fn ctl(&self, words: &Words) -> std::result::Result<String, Unanswered> {
+        Ok(run_ctl(self.context, self.machine, self.slot, words))
+    }
+
+    fn log(&self, line: &str) {
+        let _ = write_log(self.context, &format!("remote view: {line}"));
+    }
+
+    fn held(&self) -> Option<HostWide> {
+        read_held(self.context, self.machine)
+    }
+
+    fn keep_held(&self, held: Option<HostWide>) {
+        write_held(self.context, self.machine, held);
+    }
+}
+
+fn sessions() -> &'static Sessions {
+    static SESSIONS: OnceLock<Sessions> = OnceLock::new();
+    SESSIONS.get_or_init(Sessions::default)
 }
 
 fn now_ms() -> Millis {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_millis() as Millis)
 }
 
-/// Feeds one event to the machine's pairing, sends the commands it gives in order, keeps `held`, and
-/// reads the host again when asked to. Gives why the event was refused.
+/// Runs `work` with the shared driver for a running machine.
+fn drive<R>(context: &Context, machine: &Machine, slot: Slot, work: impl FnOnce(&Driver) -> R) -> R {
+    let (guest, policy) = (AgentGuest { context, machine, slot }, Policy::linux());
+    work(&Driver { sessions: sessions(), machine: &machine.id, policy: &policy, guest: &guest, now: &now_ms })
+}
+
 fn step(context: &Context, machine: &Machine, slot: Slot, event: StepEvent) -> Option<String> {
-    let mut pairing = {
-        let mut all = sessions();
-        let session = all.entry(machine.id.clone()).or_default();
-        session.pairing.get_or_insert_with(|| fresh_pairing(context, machine)).clone()
-    };
-    let mut events = vec![event];
-    let mut refused = None;
-    while let Some(event) = events.pop() {
-        let reading;
-        let step = match &event {
-            StepEvent::Plain(event) => pairing.step(now_ms(), *event),
-            StepEvent::Read => {
-                reading = read(context, machine, slot);
-                let Some(status) = &reading else { continue };
-                pairing.step(now_ms(), Event::Reading(status))
-            }
-        };
-        pairing = step.pairing;
-        refused = refused.or(step.refused);
-        for words in &step.commands {
-            let said = run_ctl(context, machine, slot, words);
-            if let Ack::Refused(why) = parse_ack(&said) {
-                let _ = write_log(context, &format!("remote view: ctl {}: {why}", words.join(" ")));
-            }
-        }
-        write_held(context, machine, pairing.held());
-        if step.read_now || !step.commands.is_empty() {
-            events.push(StepEvent::Read);
-        }
-    }
-    sessions().entry(machine.id.clone()).or_default().pairing = Some(pairing);
-    refused
-}
-
-enum StepEvent {
-    Plain(Event<'static>),
-    Read,
-}
-
-/// A pairing for this run of the app: whatever an earlier run held is owed back.
-fn fresh_pairing(context: &Context, machine: &Machine) -> Pairing {
-    Pairing::new(Policy::linux()).step(0, Event::Started { held: read_held(context, machine) }).pairing
-}
-
-/// Reads the host's status, and keeps it.
-fn read(context: &Context, machine: &Machine, slot: Slot) -> Option<Status> {
-    let said = run_ctl(context, machine, slot, &ctl::status());
-    let mut all = sessions();
-    let session = all.entry(machine.id.clone()).or_default();
-    session.read_at = Some(SystemTime::now());
-    match parse_reply(&said) {
-        Reply::Status(status) => {
-            session.reason = None;
-            session.fingerprint = status.fingerprint.clone().or(session.fingerprint.take());
-            session.reading = Some(*status.clone());
-            Some(*status)
-        }
-        Reply::Stopping => None,
-        Reply::Error(why) => {
-            session.reason = Some(why);
-            None
-        }
-    }
+    drive(context, machine, slot, |driver| driver.step(event))
 }
 
 /// Reads the host and lets the clock go on, then keeps doing so once a second for as long as pairing
 /// is open or a device waits. Runs behind [`info`], one at a time per machine.
 fn refresh_behind(context: &Context, machine: &Machine, slot: Slot) {
-    {
-        let mut all = sessions();
-        let session = all.entry(machine.id.clone()).or_default();
-        if session.busy {
-            return;
-        }
+    let already = sessions().with(&machine.id, |session| {
+        let busy = session.busy;
         session.busy = true;
+        busy
+    });
+    if already {
+        return;
     }
     let (context, machine) = (context.clone(), machine.clone());
     thread::spawn(move || {
         loop {
-            step(&context, &machine, slot, StepEvent::Read);
-            step(&context, &machine, slot, StepEvent::Plain(Event::Tick));
-            let poll =
-                sessions().get(&machine.id).and_then(|s| s.pairing.as_ref()).and_then(Pairing::poll_ms);
+            let poll = drive(&context, &machine, slot, |driver| {
+                driver.step(StepEvent::Read);
+                driver.step(StepEvent::Plain(Event::Tick));
+                driver.poll_ms()
+            });
             match poll {
                 Some(ms) if running_slot(&context, &machine) == Some(slot) => {
                     thread::sleep(Duration::from_millis(ms))
@@ -487,7 +436,7 @@ fn refresh_behind(context: &Context, machine: &Machine, slot: Slot) {
                 _ => break,
             }
         }
-        sessions().entry(machine.id.clone()).or_default().busy = false;
+        sessions().with(&machine.id, |session| session.busy = false);
     });
 }
 
@@ -497,8 +446,6 @@ pub fn info(context: &Context, machine: &Machine) -> ShareInfo {
     reap();
     let switch = read_switch(context, machine);
     let slot = running_slot(context, machine);
-    let mut all = sessions();
-    let session = all.entry(machine.id.clone()).or_default();
     let helper = slot.and_then(|slot| helper_status(context, slot));
     let state = match (switch.allow_remote_view, slot, &helper) {
         (false, ..) => ShareState::Off,
@@ -507,18 +454,13 @@ pub fn info(context: &Context, machine: &Machine) -> ShareInfo {
         (true, Some(_), Some(helper)) if helper.state == ShareState::Failed => ShareState::Failed,
         (true, Some(_), _) => ShareState::Starting,
     };
-    let reason = helper.as_ref().and_then(|helper| helper.reason.clone()).or(session.reason.clone());
-    let pairing = session.pairing.clone().unwrap_or_else(|| Pairing::new(Policy::linux()));
-    let facts = Facts {
-        machine: &machine.id,
-        state,
-        port: switch.remote_port,
-        fingerprint: session.fingerprint.as_deref(),
-        reason: reason.as_deref(),
-    };
-    let shown = share_info(&facts, session.reading.as_ref(), &pairing);
-    let stale = session.read_at.is_none_or(|at| at.elapsed().unwrap_or(STALE) >= STALE);
-    drop(all);
+    let reason = helper.and_then(|helper| helper.reason);
+    let (shown, stale) = sessions().with(&machine.id, |session| {
+        (
+            session.shown(&machine.id, &Policy::linux(), state, switch.remote_port, reason),
+            session.stale(now_ms()),
+        )
+    });
     if let (true, Some(slot)) = (switch.allow_remote_view && stale, slot) {
         refresh_behind(context, machine, slot);
     }
@@ -548,14 +490,12 @@ pub fn share(
     if !was || pid(context, Some(slot)).is_none() || !helper_listening(context, slot) {
         let ask = |script: &str, seconds: u64| context.ask_guest(machine, script, seconds, Some(slot));
         if let Err(failure) = bring_up(context, machine, slot, &ask) {
-            sessions().entry(machine.id.clone()).or_default().reason = Some(failure.0.clone());
+            sessions().with(&machine.id, |session| session.reason = Some(failure.0.clone()));
             return Err(failure);
         }
     }
     if pairing {
-        // The host has to have been read before pairing can open.
-        step(context, machine, slot, StepEvent::Read);
-        if let Some(why) = step(context, machine, slot, StepEvent::Plain(Event::Open { seconds })) {
+        if let Some(why) = drive(context, machine, slot, |driver| driver.open_pairing(seconds)) {
             return Err(Failure(why));
         }
         refresh_behind(context, machine, slot);
@@ -598,12 +538,7 @@ fn device_command(
 ) -> Result<ShareInfo> {
     let words = words.map_err(Failure)?;
     let slot = running_slot(context, machine).ok_or_else(|| Failure::new("The machine is not running."))?;
-    match parse_ack(&run_ctl(context, machine, slot, &words)) {
-        Ack::Done(_) | Ack::NotKept(_) => {}
-        Ack::Refused(why) => return Err(Failure(why)),
-        Ack::Stopping => return Err(Failure::new("remoteman's host is stopping.")),
-    }
-    read(context, machine, slot);
+    drive(context, machine, slot, |driver| driver.device(&words)).map_err(Failure)?;
     Ok(info(context, machine))
 }
 
@@ -635,16 +570,14 @@ pub fn launched(context: &Context) {
     let (machines, _) = load_all(context);
     for machine in machines.iter().filter(|machine| allowed(context, machine)) {
         if let Some(slot) = running_slot(context, machine) {
-            sessions().entry(machine.id.clone()).or_default().pairing = Some(fresh_pairing(context, machine));
-            step(context, machine, slot, StepEvent::Read);
+            drive(context, machine, slot, |driver| driver.started());
         }
     }
 }
 
 /// When the app quits: pairing closes everywhere, and what it held is given back.
 pub fn quitting(context: &Context) {
-    let ids: Vec<String> = sessions().keys().cloned().collect();
-    for id in ids {
+    for id in sessions().machines() {
         let Ok(machine) = load(context, &id) else { continue };
         if let Some(slot) = running_slot(context, &machine) {
             step(context, &machine, slot, StepEvent::Plain(Event::Shutdown));
@@ -663,7 +596,15 @@ pub fn stopped(context: &Context, machine: &Machine, slot: Option<Slot>) {
 mod tests {
     use super::*;
     use crate::testing::{Scratch, scratch_context};
+    use guesthouse_remote_view_core::pairing::Pairing;
+    use guesthouse_remote_view_core::session::fresh_pairing;
+    use guesthouse_remote_view_core::status::Status;
     use std::cell::RefCell;
+
+    /// A pairing for a run of the app, as [`AgentGuest`] gives the driver one: from the held file.
+    fn fresh(context: &Context, machine: &Machine) -> Pairing {
+        fresh_pairing(Policy::linux(), read_held(context, machine))
+    }
 
     fn machine(context: &Context, id: &str, kind: Kind) -> Machine {
         let machine = Machine { kind, ..Machine::new(id, id, "/d", "/v") };
@@ -813,6 +754,26 @@ mod tests {
         assert_eq!(encoder_for(r"PCI\VEN_8086"), "d3d12");
     }
 
+    /// The shared driver keeps `held` in the file beside the switch, and its lines go in this host's
+    /// log with the same words as before it was shared.
+    #[test]
+    fn the_driver_keeps_held_in_the_file_and_logs_as_this_host_does() {
+        let scratch = Scratch::new();
+        let context = scratch_context(&scratch);
+        let windows = machine(&context, "win", Kind::Windows);
+        let guest = AgentGuest { context: &context, machine: &windows, slot: crate::slots::number(0) };
+        let both = HostWide { clipboard: true, files: true };
+        guest.keep_held(Some(both));
+        assert!(held_file(&context, &windows).is_file());
+        assert_eq!(guest.held(), Some(both));
+        guest.keep_held(None);
+        assert!(!held_file(&context, &windows).exists());
+        assert_eq!(guest.held(), None);
+        guest.log("ctl pair on: no");
+        let log = fs::read_to_string(context.paths.log_file()).unwrap_or_default();
+        assert!(log.contains("remote view: ctl pair on: no"), "{log}");
+    }
+
     /// The app died with pairing open and the host-wide clipboard and files held off. At the next
     /// launch the pairing that was found open is closed, and both are given back.
     #[test]
@@ -824,7 +785,7 @@ mod tests {
 
         // The first run: it reads, opens pairing (holding clipboard and files), writes down `held`,
         // and dies there.
-        let first = fresh_pairing(&context, &windows).step(1, Event::Reading(&idle)).pairing;
+        let first = fresh(&context, &windows).step(1, Event::Reading(&idle)).pairing;
         let opened = first.step(2, Event::Open { seconds: 120 });
         assert!(opened.commands.contains(&ctl::host_allow("clipboard", false).unwrap()));
         write_held(&context, &windows, opened.pairing.held());
@@ -832,7 +793,7 @@ mod tests {
 
         // The next launch: what the host says now is pairing still open, clipboard and files off.
         let left_open = status(r#"{"pairing":true,"clipboard":false,"files":false,"devices":[]}"#);
-        let next = fresh_pairing(&context, &windows).step(10_000, Event::Reading(&left_open));
+        let next = fresh(&context, &windows).step(10_000, Event::Reading(&left_open));
         assert!(next.commands.contains(&ctl::pair_close()), "{:?}", next.commands);
         assert!(next.commands.contains(&ctl::host_allow("clipboard", true).unwrap()));
         assert!(next.commands.contains(&ctl::host_allow("files", true).unwrap()));

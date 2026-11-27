@@ -1,0 +1,11 @@
+{
+  "card": "NVIDIA GeForce RTX 4080",
+  "contact": "someone@example.org",
+  "description": "It went black. 画面が真っ黒になりました。",
+  "driver": "32.0.15.8097",
+  "host": "windows",
+  "kind": "crashed",
+  "machine": "windows",
+  "os": "Windows 11 Pro 24H2 build 26100",
+  "version": "0.13.0"
+}

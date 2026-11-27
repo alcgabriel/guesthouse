@@ -24,21 +24,12 @@ const HOST_MINIMUM_GIB: u64 = 2;
 
 pub type Fields = Map<String, Value>;
 
-/// Replaces the file in one step, so a crash can't leave half of it.
-pub fn write_json(path: &Path, fields: &impl Serialize) -> Result<()> {
-    let text =
-        serde_json::to_string_pretty(fields).map_err(|error| crate::Failure::new(error.to_string()))?;
-    fs::create_dir_all(path.parent().unwrap_or(Path::new("/")))?;
-    let new = with_suffix(path, ".new");
-    fs::write(&new, text + "\n")?;
-    fs::rename(&new, path)?;
-    Ok(())
-}
+pub use guesthouse_basics::json_file::with_suffix;
 
-pub fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
-    let mut text = path.as_os_str().to_owned();
-    text.push(suffix);
-    text.into()
+/// Replaces the file in one step, so a crash can't leave half of it. Every host shares how, in
+/// `guesthouse_basics::json_file`; an error's words are the same as they were here.
+pub fn write_json(path: &Path, fields: &impl Serialize) -> Result<()> {
+    Ok(guesthouse_basics::json_file::write_json(path, fields)?)
 }
 
 /// A file of fields, which is empty when missing or bad. None of what these hold can stop the app.

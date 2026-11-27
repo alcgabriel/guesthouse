@@ -1,5 +1,6 @@
-//! Times in UTC, written by hand so nothing needs a calendar crate. The service writes each machine's
-//! events with one, and the app names a report's folder with one.
+//! Times in UTC, written by hand so nothing needs a calendar crate. The Windows service writes each
+//! machine's events with one, and the Windows app names a report's folder with one. The Linux host
+//! names its reports in local time with its own calendar crate.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

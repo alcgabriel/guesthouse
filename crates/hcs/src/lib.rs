@@ -15,11 +15,14 @@
 //! - `drivers`: the copy of a card's driver a guest needs, put on its disk while the machine is off.
 //! - `hvsock`: Hyper-V sockets, which reach a guest with no network. Its IDs build everywhere.
 //! - `host`: whether this process is elevated, which HCS needs, and Ctrl+C.
+//! - `dns_sd`: announcing a service through Windows' own mDNS responder. What to do after each of
+//!   its answers builds everywhere.
 //!
 //! The JSON shapes, the order a machine gets its GPU in, and where a guest looks for its host's
 //! driver were first worked out in App Sandbox, as `THIRD-PARTY.md` says.
 
 pub mod adapters;
+pub mod dns_sd;
 pub mod hvsock;
 pub mod schema;
 
