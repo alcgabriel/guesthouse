@@ -17,8 +17,8 @@ pub(crate) fn bound(address: SocketAddr) -> io::Result<UdpSocket> {
 
 /// A socket for one device. Towards a loopback port, as QEMU's forward is, it is on loopback too, so
 /// that nothing from the network can reach it. Towards a guest with an address of its own it has to be
-/// on a network the guest can answer on, so it takes whichever the system routes by. It then answers to
-/// anything that reaches its port, as nothing checks who an answer came from.
+/// on a network the guest can answer on, so it takes whichever the system routes by. Anything on that
+/// network can then send to it, so the relay passes on only what comes from the guest's port.
 ///
 /// It is not connected to the upstream port, because QEMU can answer from a different port than the
 /// one it listens on, as it does when the guest's port is forwarded twice. A connected socket would

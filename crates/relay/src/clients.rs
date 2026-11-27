@@ -131,6 +131,9 @@ fn carry_out(shared: &Arc<Shared>, client: &Arc<Client>) {
     let mut buffer = vec![0u8; 65_535];
     loop {
         match client.upstream.recv_from(&mut buffer) {
+            Ok((_, from)) if shared.config.only_upstream_answers && from != shared.config.upstream => {
+                shared.stats.stranger();
+            }
             Ok((length, _)) => match shared.lan.send_to(&buffer[..length], client.peer) {
                 Ok(_) => {
                     client.down_packets.fetch_add(1, Relaxed);

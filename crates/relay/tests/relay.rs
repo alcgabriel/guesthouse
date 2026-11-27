@@ -62,6 +62,32 @@ fn answers_from_a_socket_other_than_the_forwarded_port_still_reach_the_device() 
 }
 
 #[test]
+fn checked_answers_from_anywhere_but_the_guests_port_are_dropped_and_counted() {
+    // As for a guest with an address of its own, whose device sockets are on every network.
+    let (relay, forward) = relay_with(|config| config.only_upstream_answers = true);
+    let device = socket();
+    device.send_to(b"input", relay.local_addr()).unwrap();
+    let (_, source) = receive(&forward);
+    socket().send_to(b"stranger", source).unwrap();
+    wait_until("the stranger to be counted", || relay.counters().refused_stranger == 1);
+    forward.send_to(b"video", source).unwrap();
+    assert_eq!(receive(&device).0, b"video", "the stranger's datagram never reached the device");
+    device.send_to(b"more input", relay.local_addr()).unwrap();
+    assert_eq!(receive(&forward), (b"more input".to_vec(), source), "the device carries on");
+    // The answer is counted once its send has returned, which can be just after the device has it.
+    wait_until("the answer to be counted", || relay.counters().down_packets == 1);
+    let counters = relay.counters();
+    assert_eq!((counters.down_packets, counters.refused_stranger, counters.errors), (1, 1, 0));
+}
+
+#[test]
+fn only_a_guest_off_loopback_has_its_answers_checked() {
+    let listen = "127.0.0.1:0".parse().unwrap();
+    assert!(!Config::new(listen, "127.0.0.1:7791".parse().unwrap()).only_upstream_answers);
+    assert!(Config::new(listen, "172.20.0.5:7791".parse().unwrap()).only_upstream_answers);
+}
+
+#[test]
 fn each_device_has_a_socket_of_its_own_and_gets_only_its_answers() {
     let (relay, forward) = relay_with(|_| {});
     let (first, second) = (socket(), socket());

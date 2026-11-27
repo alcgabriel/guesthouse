@@ -408,9 +408,16 @@ mod tests {
         let (length, from) = guest.recv_from(&mut buffer).unwrap();
         assert_eq!(&buffer[..length], b"input");
         assert!(!from.ip().is_loopback(), "the device's socket is not on loopback: {from}");
+        // Something else on the network finds the device's socket first.
+        UdpSocket::bind((address, 0)).unwrap().send_to(b"stranger", from).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while lan.status().counters.refused_stranger == 0 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(lan.status().counters.refused_stranger, 1);
         guest.send_to(b"video", from).unwrap();
         let (length, _) = device.recv_from(&mut buffer).unwrap();
-        assert_eq!(&buffer[..length], b"video");
+        assert_eq!(&buffer[..length], b"video", "only the guest's answer reached the device");
         lan.stop();
     }
 }

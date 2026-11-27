@@ -123,7 +123,14 @@ mod tests {
     fn counters_keep_their_names_on_the_wire() {
         assert_eq!(
             serde_json::to_string(&Counters::default()).unwrap(),
-            r#"{"up_packets":0,"up_bytes":0,"down_packets":0,"down_bytes":0,"clients_started":0,"clients_expired":0,"refused_full":0,"errors":0}"#
+            r#"{"up_packets":0,"up_bytes":0,"down_packets":0,"down_bytes":0,"clients_started":0,"clients_expired":0,"refused_full":0,"refused_stranger":0,"errors":0}"#
         );
+    }
+
+    #[test]
+    fn counters_from_a_relay_that_did_not_count_strangers_read_as_none() {
+        let older = r#"{"up_packets":1,"up_bytes":2,"down_packets":3,"down_bytes":4,"clients_started":5,"clients_expired":6,"refused_full":7,"errors":8}"#;
+        let counters: Counters = serde_json::from_str(older).unwrap();
+        assert_eq!((counters.refused_full, counters.refused_stranger, counters.errors), (7, 0, 8));
     }
 }
