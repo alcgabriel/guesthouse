@@ -31,13 +31,23 @@ pub const INSTALLER_INITRD: &str = "casper/initrd";
 
 /// The installer's kernel line. `autoinstall`, because the installer asks before it writes the
 /// disk when it found its answers only on a seed (subiquity's install controller, read
-/// 2026-11-27); `ds=nocloud` for the seed disc. Its console is the screen only: on the serial port
-/// the installer would print each late command, the password's too, into `serial.log`, and the
-/// kernel makes the serial port a console of its own from the firmware's ACPI table (SPCR)
-/// unless told not to (`acpi=nospcr`). What follows `---` the installed system keeps: its
-/// console on the serial port as well, so its starts can be followed in `serial.log`.
+/// 2026-11-27); `ds=nocloud` for the seed disc; its console on the screen (the image runs a copy
+/// of the installer on the serial port as well, which prints each late command into
+/// `serial.log`, so no late command holds the password). What follows `---` the installed system
+/// keeps: its console on the serial port as well, so its starts can be followed in `serial.log`.
 pub const INSTALLER_COMMAND_LINE: &str =
-    "autoinstall ds=nocloud acpi=nospcr console=tty0 --- console=ttyAMA0,115200 console=tty0";
+    "autoinstall ds=nocloud console=tty0 --- console=ttyAMA0,115200 console=tty0";
+
+/// The answer disc's file with the account's name and password, as `chpasswd` reads them. The
+/// late commands copy it into the installed system for `chpasswd` and remove it, so the password
+/// is neither in `user-data` (which the installer keeps in the installed system's logs) nor in a
+/// command the installer prints, as the public repo's Linux host keeps it out.
+pub const ACCOUNT_FILE: &str = "guesthouse-account";
+
+/// The account file's text.
+pub fn account_file(account: &str, password: &str) -> String {
+    format!("{account}:{password}\n")
+}
 
 /// What the guest says about the driver and its first start: the same words as Windows'.
 pub use super::windows::marker;
@@ -146,9 +156,10 @@ fn yaml(text: &str) -> String {
 }
 
 /// The autoinstall answers: no questions, the largest disk, an account named after the Mac's user
-/// and the password it was given (set at the end, so the first console sign-in uses it), the
-/// driver's service from the answer disc, and what is said on the serial port when it ends.
-pub fn user_data(account: &str, password: &str, hostname: &str) -> String {
+/// whose password is set at the end from the answer disc's account file (`ACCOUNT_FILE`), so the
+/// first console sign-in uses it, the driver's service from the answer disc, and what is said on
+/// the serial port when it ends.
+pub fn user_data(account: &str, hostname: &str) -> String {
     format!(
         "#cloud-config
 autoinstall:
@@ -182,9 +193,10 @@ autoinstall:
     - tail -n 100 /var/log/installer/subiquity-server-debug.log > /dev/ttyAMA0 || true
     - echo {failed} > /dev/ttyAMA0
   late-commands:
-    - 'curtin in-target --target=/target -- sh -c \"echo ''{user}:{password}'' | chpasswd\"'
     - mkdir -p /run/guesthouse-answers
     - mount -o ro LABEL=CIDATA /run/guesthouse-answers
+    - install -m 0600 /run/guesthouse-answers/{account_file} /target/root/{account_file}
+    - 'curtin in-target --target=/target -- sh -c \"chpasswd < /root/{account_file} && rm -f /root/{account_file}\"'
     - install -D -m 0755 /run/guesthouse-answers/{runner} /target/usr/local/sbin/guesthouse-driver
     - install -D -m 0644 /run/guesthouse-answers/{service} /target/etc/systemd/system/{service}
     - curtin in-target --target=/target -- systemctl enable {service}
@@ -193,7 +205,7 @@ autoinstall:
 ",
         host = hostname,
         user = account,
-        password = password,
+        account_file = ACCOUNT_FILE,
         failed = FAILED,
         finished = FINISHED,
         runner = DRIVER_RUNNER_FILE,

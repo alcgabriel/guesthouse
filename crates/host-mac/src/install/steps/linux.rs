@@ -44,10 +44,8 @@ impl RealSteps<'_> {
         secret: &str,
     ) -> Result<(), StepError> {
         let files = [
-            (
-                "user-data",
-                ubuntu::user_data(account, secret, &self.setup.id),
-            ),
+            ("user-data", ubuntu::user_data(account, &self.setup.id)),
+            (ubuntu::ACCOUNT_FILE, ubuntu::account_file(account, secret)),
             ("meta-data", ubuntu::meta_data(&self.setup.id)),
             (
                 ubuntu::DRIVER_SERVICE_FILE,

@@ -40,10 +40,16 @@ fn a_list_with_no_such_image_or_a_bad_checksum_is_said_not_guessed() {
 
 #[test]
 fn the_answers_install_with_no_questions_and_say_how_it_ended_on_the_serial_port() {
-    let text = user_data("nick", "k7mn-p3xq-ab9d-w4ht", "guesthouse");
+    let text = user_data("nick", "guesthouse");
     assert!(text.starts_with("#cloud-config\nautoinstall:"));
     assert!(text.contains("username: nick"));
-    assert!(text.contains("chpasswd") && text.contains("nick:k7mn-p3xq-ab9d-w4ht"));
+    // The password comes from the account file on the disc, so no command the installer prints
+    // and no log it keeps holds it.
+    assert!(text.contains("chpasswd") && text.contains(ACCOUNT_FILE));
+    assert_eq!(
+        account_file("nick", "k7mn-p3xq-ab9d-w4ht"),
+        "nick:k7mn-p3xq-ab9d-w4ht\n"
+    );
     assert!(!text.contains("passwd -d"));
     assert!(text.contains(FINISHED) && text.contains(FAILED));
     assert!(text.contains("shutdown: poweroff"));
@@ -64,18 +70,16 @@ fn the_driver_step_says_plainly_what_is_missing() {
 }
 
 #[test]
-fn the_installer_runs_with_no_questions_and_says_no_command_on_the_serial_port() {
+fn the_installer_runs_with_no_questions_and_its_console_on_the_screen() {
     assert!(INSTALLER_COMMAND_LINE.starts_with("autoinstall ds=nocloud "));
     let (installer, installed) = INSTALLER_COMMAND_LINE.split_once(" --- ").unwrap();
-    // The installer prints its late commands on its consoles, and one of them holds the password.
     assert!(!installer.contains("ttyAMA0"));
-    assert!(installer.contains("acpi=nospcr"));
     assert!(installed.contains("console=ttyAMA0,115200"));
 }
 
 #[test]
 fn the_answers_put_the_drivers_service_into_the_installed_system_before_saying_finished() {
-    let text = user_data("nick", "k7mn-p3xq-ab9d-w4ht", "guesthouse");
+    let text = user_data("nick", "guesthouse");
     let enable = text
         .find(&format!("systemctl enable {DRIVER_SERVICE_FILE}"))
         .unwrap();
