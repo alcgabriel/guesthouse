@@ -7,3 +7,4 @@
 //! The records the checks are about, and the checks that take them whole, stay with each host.
 
 pub mod linux_host;
+pub mod windows_host;

@@ -1017,6 +1017,7 @@ dependencies = [
 name = "guesthouse-control"
 version = "0.11.0"
 dependencies = [
+ "guesthouse-settings-core",
  "guesthouse-update-check",
  "serde",
  "serde_json",
