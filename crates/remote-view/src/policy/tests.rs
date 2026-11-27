@@ -12,9 +12,9 @@ fn a_linux_host_holds_the_switches_and_hides_nothing() {
 }
 
 #[test]
-fn a_windows_host_never_holds_and_hides_the_viewer_in_any_case() {
+fn a_windows_host_holds_the_switches_as_linux_does_and_hides_the_viewer_in_any_case() {
     let policy = Policy::windows(&VIEWER.to_uppercase());
-    assert!(!policy.hold_host_wide);
+    assert!(policy.hold_host_wide);
     assert!(policy.hides(VIEWER) && policy.hides(&VIEWER.to_uppercase()));
     assert!(!policy.hides(OTHER));
 }

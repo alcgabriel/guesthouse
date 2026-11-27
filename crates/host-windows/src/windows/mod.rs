@@ -193,6 +193,7 @@ fn refresh_windows_disk(
     card: Option<&Card>,
     nvapi_wrapper: bool,
     shares: &[Share],
+    hosts: Option<&str>,
     sink: &dyn Sink,
 ) -> Result<(), String> {
     let setup = screen_setup();
@@ -218,7 +219,7 @@ fn refresh_windows_disk(
         .map_err(|error| format!("{}: {error}", report.display()))?;
     give_share(&windows.root, shares, sink)?;
     match setup {
-        Some(setup) => give_screen(disk, &windows.root, &setup, card, sink),
+        Some(setup) => give_screen(disk, &windows.root, &setup, card, hosts, sink),
         None => {
             keep_trust(disk, &windows.root, sink);
             Ok(())
@@ -290,6 +291,7 @@ fn give_screen(
     root: &Path,
     setup: &Path,
     card: Option<&Card>,
+    hosts: Option<&str>,
     sink: &dyn Sink,
 ) -> Result<(), String> {
     let folder = root.join(screen::GUEST_FOLDER);
@@ -303,6 +305,13 @@ fn give_screen(
     give_trust(&folder, root, &viewer)?;
     write("encoder.txt", card.map_or("auto", |card| screen::encoder_for(&card.instance_id)))?;
     write("screen.ps1", screen::SCRIPT)?;
+    // Who may reach remoteman's port. Without it the guest leaves its rules as they are.
+    match hosts {
+        Some(text) => write(screen::HOSTS_FILE, text)?,
+        None => {
+            let _ = std::fs::remove_file(folder.join(screen::HOSTS_FILE));
+        }
+    }
     let account = disk.with_extension("account.txt");
     if let Ok(text) = std::fs::read_to_string(&account) {
         write("logon.txt", &text)?;

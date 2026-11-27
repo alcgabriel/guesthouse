@@ -171,7 +171,8 @@ fn a_run_that_starts_on_a_machine_left_pairing_gives_back_what_the_last_run_held
 }
 
 /// A host with no file for `held`, with Guesthouse's own viewer on its list, runs the same
-/// driver: nothing host-wide is touched, and the viewer is no device.
+/// driver: the host-wide switches are held as on Linux, with nothing kept, and the viewer is no
+/// device.
 #[test]
 fn a_windows_host_with_nowhere_to_keep_held_runs_the_same_driver() {
     let status = format!(
@@ -182,7 +183,7 @@ fn a_windows_host_with_nowhere_to_keep_held_runs_the_same_driver() {
     let clock = || 1_000;
     let driver = driver(&sessions, &policy, &guest, &clock);
     assert_eq!(driver.open_pairing(60), None);
-    assert_eq!(guest.0.sent(), ["pair on"]);
+    assert_eq!(guest.0.sent(), ["allow clipboard off", "allow files off", "pair on"]);
     assert!(guest.0.kept.borrow().is_empty());
     let shown = sessions
         .with("win", |session| session.shown("win", &policy, ShareState::Listening, Some(7793), None));

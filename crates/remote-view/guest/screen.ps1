@@ -140,6 +140,36 @@ function Get-SetupArguments([string]$Folder, [string]$Encoder, [string]$Log) {
     '--silent', '--trust', "`"$(Join-Path $Folder 'trusted')`"", '--encoder', $Encoder, '--no-pair', '--log', "`"$Log`""
 }
 
+# Who may reach remoteman's port: this PC alone. hosts.txt, which the host writes at each boot, says
+# the network the machine is on and this PC's addresses, a line each. On the shared network this PC
+# is the guest's default gateway too, which has its address only once the machine has started. With
+# no file, from a host before this, or nothing in it, the rules are left as they are.
+function Get-ScreenHosts([string]$Folder, [string[]]$Gateways) {
+    $file = Join-Path $Folder 'hosts.txt'
+    if (-not (Test-Path -LiteralPath $file)) { return @() }
+    $lines = @(Get-Content -LiteralPath $file | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($lines.Count -eq 0) { return @() }
+    $address = '^\d{1,3}(\.\d{1,3}){3}$'
+    $allowed = @($lines | Select-Object -Skip 1 | Where-Object { $_ -match $address })
+    switch ($lines[0]) {
+        'shared' { $allowed += @($Gateways | Where-Object { $_ -match $address -and $_ -ne '0.0.0.0' }) }
+        'bridged' { }
+        default { return @() }
+    }
+    return @($allowed | Select-Object -Unique)
+}
+
+# Lets only $Allowed reach the port by each rule named, Guesthouse's own and the one remoteman's
+# installer makes, which it makes open again each time it runs.
+function Limit-ScreenRules([string[]]$Allowed, [string[]]$Names) {
+    if (@($Allowed).Count -eq 0) { return }
+    foreach ($name in $Names) {
+        if (Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue) {
+            Set-NetFirewallRule -DisplayName $name -RemoteAddress $Allowed -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 $encoder = (Get-Content -LiteralPath (Join-Path $screen 'encoder.txt') -Raw).Trim()
 $wanted = Get-InstallNote $screen
 $installedFile = Join-Path $screen 'installed.txt'
@@ -190,13 +220,16 @@ $rule = 'Guesthouse screen'
 if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
     New-NetFirewallRule -DisplayName $rule -Direction Inbound -Action Allow -Protocol UDP -LocalPort 7791 -Profile Any | Out-Null
 }
+$gateways = @(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | ForEach-Object { $_.NextHop })
+Limit-ScreenRules (Get-ScreenHosts $screen $gateways) @('remoteman host', $rule)
 foreach ($network in Get-NetConnectionProfile -ErrorAction SilentlyContinue) {
     Send-Line "screen: network $($network.InterfaceAlias) is $($network.NetworkCategory)"
 }
 foreach ($found in Get-NetFirewallRule -DisplayName 'remoteman host', $rule -ErrorAction SilentlyContinue) {
     $ports = $found | Get-NetFirewallPortFilter
     $program = ($found | Get-NetFirewallApplicationFilter).Program
-    Send-Line "screen: firewall rule $($found.DisplayName): enabled $($found.Enabled), $($found.Action), $($ports.Protocol) $($ports.LocalPort), program $program, profiles $($found.Profile)"
+    $from = @(($found | Get-NetFirewallAddressFilter).RemoteAddress) -join ' '
+    Send-Line "screen: firewall rule $($found.DisplayName): enabled $($found.Enabled), $($found.Action), $($ports.Protocol) $($ports.LocalPort), from $from, program $program, profiles $($found.Profile)"
 }
 # The host's command line, the trust list, the rule and the sign-in, all kept now.
 Save-ToDisk
@@ -231,6 +264,24 @@ if ($fingerprint) {
 # whether anything listens on its port, so the host sees how it starts while it does: what it wrote
 # to the guest's disk is lost when the machine is stopped at once.
 $watchSeconds = 180
+# Lines of remoteman's host that name a person's device or a file it sent are left out: they would
+# reach the machine's log and its bug reports. Each is known by its message, which tracing writes
+# before the fields that name the device.
+function Test-NamesDevice([string]$Line) {
+    $messages = @(
+        ': client name=',
+        'this computer is locked: the device is asked for the password',
+        'this computer was locked: unlocked for a paired device',
+        'a wrong password for unlocking this computer',
+        'a device came while sharing is off: turned away',
+        "a device's permission changed by the owner",
+        'a file from the device',
+        'a new device: asking on the desktop',
+        'the owner answered'
+    )
+    foreach ($message in $messages) { if ($Line.Contains($message)) { return $true } }
+    return $false
+}
 $logs = @{ (Join-Path $state 'host.log') = 0; (Join-Path $state 'service.log') = 0 }
 foreach ($log in @($logs.Keys)) {
     if (Test-Path -LiteralPath $log) { $logs[$log] = @(Get-Content -LiteralPath $log).Count }
@@ -240,7 +291,9 @@ for ($second = 0; $second -lt $watchSeconds; $second += 5) {
         if (-not (Test-Path -LiteralPath $log)) { continue }
         $lines = @(Get-Content -LiteralPath $log)
         $name = Split-Path -Leaf $log
-        foreach ($line in $lines | Select-Object -Skip $logs[$log]) { Send-Line "screen: $name $line" }
+        foreach ($line in $lines | Select-Object -Skip $logs[$log]) {
+            if (-not (Test-NamesDevice $line)) { Send-Line "screen: $name $line" }
+        }
         $logs[$log] = $lines.Count
     }
     if ($second % 30 -eq 0) {
