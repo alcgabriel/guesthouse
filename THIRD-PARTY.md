@@ -31,6 +31,13 @@ Everything in this repo is under GPL-2.0-or-later, apart from what's listed here
 - The Linux guest's driver package, which `drivers/linux-pvg/package/make-package.sh` makes, carries a build of [Mesa](https://mesa3d.org) from a branch of ours (KosmicKrisp with a bridge to our driver, and Zink), under the MIT licence, with some parts under other licences, as Mesa's `docs/license.rst` lists. None of Mesa is in this repo.
 - `linux/layer/zink_on_nvidia.c` and `linux/cast/glx_dri3.c` are mine, under the MIT licence, so that their fixes can go to Mesa.
 - The Windows guest's share program, `crates/share-windows/`, loads [WinFsp](https://winfsp.dev) at run time and doesn't link it or carry it. The layouts of the structures and the callback table in `crates/share-windows/src/ffi.rs`, and its sizes and field offsets, are those of the pre-generated bindings in `winfsp_wrs_sys` 0.4.1 by Scille, under the MIT licence, whose notice is below. They in turn are WinFsp's own headers' (`winfsp/fsctl.h` and `winfsp/winfsp.h`, GPLv3 with the FLOSS exception), which are the source of the layouts. The structures are written out again here, in Rust, with their own names. The Hyper-V socket address and the Plan 9 attach arguments follow App Sandbox's `tools/agent/p9copy.c` (MIT, its notice is below).
+- The Windows graphics driver for the Mac host, `drivers/windows-pvg/`, is under its own licences, in its own `LICENSE`: the kernel driver under the GPL 2, the user-mode driver's own files, `winemetal.dll`'s and the wire library under the MIT licence.
+- `drivers/windows-pvg/dxmt-win/dxmt-faa73e4.diff` and `airconv-faa73e4.diff` are my changes to [DXMT](https://github.com/3Shain/dxmt) (Copyright (c) 2023-2026 Feifan He for CodeWeavers), at its commit `faa73e4a0686e432ce5d3bb99a02b5363d76885c`, under DXMT's licence, the GNU Lesser General Public License, version 2.1 or later (`drivers/windows-pvg/LICENSE-LGPL-2.1`). The driver package carries DXMT's Direct3D 11 and DXGI built from that commit with the patch, as `ruxnd3d11.dll` and `ruxndxgi.dll`, and `winemetal.dll` has DXMT's shader compiler, airconv, linked in. None of DXMT is in this repo apart from the patches. Each release of the package offers DXMT's source at that commit with the patch beside it, at https://files.ruxn.com/p/guesthouse/ and in the release on GitHub. `ruxnumd.dll` loads DXMT's two DLLs at run time, so they can be swapped for your own build, and `winemetal.dll` is built from this folder by `dxmt-win/build.sh`, so it can be linked again with a changed airconv.
+- airconv needs LLVM 15.0.7, which `drivers/windows-pvg/dxmt-win/airconv-build.sh` fetches from [LLVM's release](https://github.com/llvm/llvm-project/releases/tag/llvmorg-15.0.7) and builds with `llvm15-mingw.diff`, a change of mine to it. LLVM's libraries are linked into `winemetal.dll`. LLVM is under the Apache License 2.0 with LLVM Exceptions, in `drivers/windows-pvg/LICENSE-LLVM`, and the package carries that text.
+- The user-mode parts are built with [llvm-mingw](https://github.com/mstorsjo/llvm-mingw), and link its libc++, libunwind and compiler-rt (Apache License 2.0 with LLVM Exceptions) and the [mingw-w64](https://www.mingw-w64.org) runtime's startup code (under the permissive licences in mingw-w64's `COPYING.MinGW-w64-runtime.txt`, whose notices the package carries). None of it is in this repo.
+- The kernel driver's DDI table, its VidPN steps, its handling of the POST display and the answers its full driver gives the graphics kernel follow `viogpudo` and `viogpu3d` of [viogpu-wddm](https://github.com/utmapp/viogpu-wddm) (Copyright (C) 2019-2022 Red Hat, Inc., and Copyright 2019-2025 Red Hat, Inc. and/or its affiliates), under the 3-clause and 2-clause BSD licences. They are written again in C for one display, and none of its code is copied, but each file whose steps follow it says so. Its notices are below.
+- The user-mode driver's adapter entry points, its caps answers, its DXGI tiers and kernel context, its residency requests and its translation of resource flags follow Triton in [UTM's Mesa branch neptune](https://github.com/utmapp/mesa/tree/neptune) (`src/virtio/neptune/triton/`, Copyright 2026 Turing Software LLC), under the MIT licence. None of its code is copied, and each file that follows it says so. Its notice is below.
+- The kernel driver builds against Microsoft's Windows Driver Kit and links its `displib.lib`, `libcntpr.lib` and `BufferOverflowFastFailK.lib`, and the user-mode parts build against the Windows SDK's headers. Those are under Microsoft's licence, which you accept when you fetch them, and none of them is in this repo.
 
 The guest's modules build against NVIDIA's headers and `nvidia-drm` from NVIDIA's own source, which you get yourself. A driver image carries the host's own driver files into a VM on your machine. None of that is in this repo.
 
@@ -465,6 +472,85 @@ SOFTWARE.
 MIT License
 
 Copyright (c) Scille (the winfsp_wrs_sys authors, @Scille/parsec-dev and @Scille/rust-code-owners)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## viogpu-wddm
+
+```
+Copyright (C) 2019-2022 Red Hat, Inc.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met :
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and / or other materials provided with the distribution.
+3. Neither the names of the copyright holders nor the names of their contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+```
+
+```
+Copyright 2019-2025 Red Hat, Inc. and/or its affiliates.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.```
+
+## Triton
+
+```
+Copyright 2026 Turing Software LLC
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

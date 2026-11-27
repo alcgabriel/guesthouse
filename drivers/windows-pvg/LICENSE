@@ -1,0 +1,41 @@
+This folder is not all under the repo's GPL-2.0-or-later. Each file says
+its licence in its SPDX line. In short:
+
+- ruxnwddm/, apart from the umd_* files: the kernel driver and its tools,
+  under the GNU General Public License, version 2 (GPL-2.0), in LICENSE in
+  the repo's root.
+- ruxnwddm/umd_*.c, umd.h and umd_inner.h (the user-mode driver), dxmt-win/
+  (winemetal and its tests), dxmt-win/helpers/ and wire/: the MIT licence,
+  below.
+- dxmt-win/dxmt-faa73e4.diff and airconv-faa73e4.diff are changes to DXMT,
+  under DXMT's licence, the GNU Lesser General Public License, version 2.1
+  or later, in LICENSE-LGPL-2.1. dxmt-win/llvm15-mingw.diff is a change to
+  LLVM, under the Apache License 2.0 with LLVM Exceptions, in LICENSE-LLVM.
+- release/: GPL-2.0-or-later, as the rest of the repo.
+
+The driver package's Direct3D side as a whole (ruxnumd.dll, winemetal.dll,
+ruxnd3d11.dll and ruxndxgi.dll) is under the LGPL-2.1-or-later, because
+DXMT's two DLLs and its shader compiler, which is linked into winemetal.dll,
+are. winemetal.dll also has LLVM 15 linked in, under LICENSE-LLVM.
+
+The MIT licence:
+
+Copyright (c) 2026 RUXN LLC and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
