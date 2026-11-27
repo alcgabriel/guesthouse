@@ -45,7 +45,7 @@ pub(crate) unsafe fn take_co_task(text: PWSTR) -> Option<String> {
 
 /// # Safety
 /// `text` is null or a zero-ended string.
-unsafe fn read(text: PWSTR) -> Option<String> {
+pub(crate) unsafe fn read(text: PWSTR) -> Option<String> {
     if text.is_null() {
         return None;
     }
