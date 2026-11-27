@@ -18,8 +18,8 @@ use std::time::Duration;
 use guesthouse_control::client::Unreached;
 use guesthouse_control::report::{ProblemKind, issue_link};
 use guesthouse_control::{
-    Answer, Bridging, Card, CardInfo, Event, Forward, Machine, MachineSettings, NetworkMode, NewMachine,
-    Share, State, System, forwards_refusal, shares_refusal, user_problem, valid_name,
+    Answer, Bridging, Card, CardInfo, Event, Forward, HyperV, Machine, MachineSettings, NetworkMode,
+    NewMachine, Share, State, System, forwards_refusal, shares_refusal, user_problem, valid_name,
 };
 use windows_reactor::*;
 
@@ -592,6 +592,14 @@ pub struct Main {
     /// Whether the person is being asked to confirm bridging the selected machine, which can drop
     /// this PC's own network for a few seconds.
     pub bridge_ask: bool,
+    /// Whether the person is being asked to confirm turning on Windows' Hyper-V feature.
+    pub hyper_v_ask: bool,
+    /// Whether the app's request to turn it on is going on now.
+    pub hyper_v_asking: bool,
+    /// Whether the person is being asked to confirm restarting Windows, to finish it.
+    pub restart_ask: bool,
+    /// Whether Home's line about the restart has been closed, until the app next opens.
+    pub restart_line_closed: bool,
     pub making: Option<Making>,
     /// The console's window, while one is open. There's one at a time.
     pub console: Option<OpenConsole>,
@@ -783,6 +791,20 @@ pub enum Message {
     ReleaseNotes(String),
     /// Open the licences of what Guesthouse is built with.
     Licences,
+    /// Turn on Windows' Hyper-V feature, which asks first.
+    TurnOnHyperV,
+    /// The answer to the question about turning it on.
+    HyperVAnswered(ContentDialogResult),
+    /// Turning it on has got further: the status says how far.
+    HyperVNote,
+    /// How turning it on ended: `None` when it worked.
+    HyperVDone(Option<String>),
+    /// Restart Windows, which asks first.
+    RestartWindows,
+    /// The answer to the question about restarting.
+    RestartAnswered(ContentDialogResult),
+    /// Home's line about the restart was closed.
+    RestartLineClosed,
     /// One of the Remote View group's controls.
     RemoteView(Ask),
     /// The service's answer to what was asked of the remote view, and which machine's it was.
@@ -841,6 +863,41 @@ impl Main {
     /// What the service says of bridging a machine onto this PC's network.
     pub fn bridging(&self) -> Option<&Bridging> {
         self.status().map(|status| &status.bridging)
+    }
+
+    /// Where Windows' Hyper-V feature stands, as the service last said, if it said.
+    pub fn hyper_v(&self) -> HyperV {
+        self.bridging().map(|bridging| bridging.hyper_v.clone()).unwrap_or_default()
+    }
+
+    /// Asks the service to turn Hyper-V on, once the person has said yes. A preview pretends it
+    /// worked at once, and asks nothing.
+    fn turn_on_hyper_v(&mut self) {
+        if self.hyper_v_asking {
+            return;
+        }
+        if !self.live {
+            if let Ok(status) = &mut self.seen {
+                status.bridging.hyper_v = HyperV::RestartPending;
+                status.bridging.reason = Some(crate::hyper_v::HOME_LINE.to_owned());
+            }
+            let (words, bad) = crate::hyper_v::ended_words(None);
+            self.tell(words, bad);
+            return;
+        }
+        self.hyper_v_asking = true;
+        bridge::enable_hyper_v(self.window.clone());
+    }
+
+    /// Restarts Windows, once the person has said yes twice. A preview never does.
+    fn restart_windows(&mut self) {
+        if !self.live {
+            self.tell("A preview doesn't restart Windows.", false);
+            return;
+        }
+        if let Err(words) = crate::system::restart_windows() {
+            self.tell(words, true);
+        }
     }
 
     /// The networks a machine's settings offer, in the list's order: the shared one, then each
@@ -1675,6 +1732,10 @@ impl Component for Main {
             news: None,
             deleting: None,
             bridge_ask: false,
+            hyper_v_ask: false,
+            hyper_v_asking: false,
+            restart_ask: false,
+            restart_line_closed: false,
             updates: Updates::new(installed, guesthouse_control::WINDOWS_VERSION),
             updater: Arc::new(crate::system::Network::new(
                 crate::preferences::folder().filter(|_| live && installed).as_deref(),
@@ -2077,6 +2138,26 @@ impl Component for Main {
                     self.tell(words, true);
                 }
             }
+            Message::TurnOnHyperV => self.hyper_v_ask = true,
+            Message::HyperVAnswered(result) => {
+                if std::mem::take(&mut self.hyper_v_ask) && result == ContentDialogResult::Primary {
+                    self.turn_on_hyper_v();
+                }
+            }
+            // The status says how far it has got, from any window.
+            Message::HyperVNote => {}
+            Message::HyperVDone(reason) => {
+                self.hyper_v_asking = false;
+                let (words, bad) = crate::hyper_v::ended_words(reason.as_deref());
+                self.tell(words, bad);
+            }
+            Message::RestartWindows => self.restart_ask = true,
+            Message::RestartAnswered(result) => {
+                if std::mem::take(&mut self.restart_ask) && result == ContentDialogResult::Primary {
+                    self.restart_windows();
+                }
+            }
+            Message::RestartLineClosed => self.restart_line_closed = true,
             Message::RemoteView(ask) => self.ask_remote_view(ask),
             Message::RemoteViewAnswered(id, ask, answer) if id == self.looking_id => {
                 self.remote_view_answered(ask, answer)

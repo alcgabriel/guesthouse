@@ -8,7 +8,8 @@
 # It checks the names the app's controls are found by, that Home's cards go into a machine's page and
 # Back comes out, that the sections show what they hold, that the app's Settings opens from the gear
 # on every page that has it and Back comes out to where it was opened from, and that the title bar's
-# buttons are where the pointer would find them and not under the bar's drag region, wide and narrow.
+# buttons are where the pointer would find them and not under the bar's drag region, wide and narrow,
+# and what the Network section says and asks in each case of Windows' Hyper-V feature.
 # A preview never writes the person's settings or Windows' Run key, whatever is switched.
 param([Parameter(Mandatory)][string]$Exe)
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
@@ -48,6 +49,13 @@ function Find([string]$name) {
   $script:Root.FindFirst([Windows.Automation.TreeScope]::Descendants, $c)
 }
 function Has([string]$name) { [bool](Find $name) }
+# Whether any control's name has these words in it, for a line that names machines or a reason.
+function Says([string]$part) {
+  foreach ($e in $script:Root.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)) {
+    if ($e.Current.Name.Contains($part)) { return $true }
+  }
+  $false
+}
 function Act([string]$name, $pattern) {
   $e = Find $name; $o = $null
   if ($e -and $e.TryGetCurrentPattern($pattern, [ref]$o)) { $o; return }
@@ -267,6 +275,61 @@ Check (Has "Adapter to bridge onto") "Bridged offers the adapters"
 Check ((Find "Save").Current.IsEnabled) "and Save is there for it"
 Check (Choose "Shared") "Shared can be chosen again"
 Check (-not (Has "Adapter to bridge onto")) "and the adapters go"
+Stop-Preview $p
+
+# Bridging where Windows' Hyper-V feature is off: Turn on asks first and says what changes, Cancel
+# changes nothing, and the preview's pretend turning on waits for a restart, which asks again. The
+# walk never says yes to a restart, and a preview never restarts Windows or asks the service.
+$p = Start-Preview $Exe net-off Network
+Check (Has "Turn on Hyper-V") "Hyper-V off offers Turn on Hyper-V"
+Check ((Find "Turn on Hyper-V").Current.IsEnabled) "which can be pressed with every machine stopped"
+Check (-not (Find "Bridged").Current.IsEnabled) "and Bridged can't be chosen yet"
+Check (Press "Turn on Hyper-V") "Turn on Hyper-V can be pressed"
+Check (Has "Turn on Hyper-V?") "it asks first"
+Check (Says "Microsoft-Hyper-V") "naming the feature"
+Check (Says "Turn Windows features on or off") "and how to undo it"
+Check (Says "VMware Workstation and VirtualBox") "and what Microsoft says it may change for other virtualization apps"
+Check (Press "Cancel") "Cancel can be pressed"
+Check ((Has "Turn on Hyper-V") -and -not (Has "Turn on Hyper-V?")) "and nothing changed"
+Check (Press "Turn on Hyper-V") "Turn on Hyper-V again"
+Check (Press "Turn on") "Turn on can be pressed in the question"
+Check (Says "Windows has to restart before a machine can be bridged") "it waits for a restart"
+Check (Has "Restart Windows now") "with Restart now"
+Check (Press "Restart Windows now") "Restart now can be pressed"
+Check (Has "Restart Windows now?") "it asks again"
+Check (Says "Nothing is closed without asking") "saying nothing is forced"
+Check (Press "Cancel") "Cancel, as the walk never restarts anything"
+Check (-not (Has "Restart Windows now?")) "and the question has gone"
+Stop-Preview $p
+
+$p = Start-Preview $Exe net-held Network
+Check (-not (Find "Turn on Hyper-V").Current.IsEnabled) "running machines hold turning Hyper-V on up"
+Check (Says "Stop ubuntu and office first") "which says which ones"
+Stop-Preview $p
+
+$p = Start-Preview $Exe net-turning Network
+Check (Says "Turning on Hyper-V, 40% done.") "turning it on says how far it has got"
+Check (-not (Has "Turn on Hyper-V")) "with nothing to press meanwhile"
+Stop-Preview $p
+
+$p = Start-Preview $Exe net-failed Network
+Check (Says "Hyper-V couldn't be turned on.") "a try that failed says so"
+Check (Says "DISM's log is") "with DISM's log"
+Check (Has "Try turning on Hyper-V again") "and can be tried again"
+Stop-Preview $p
+
+$p = Start-Preview $Exe net-home Network
+Check (Says "Not available in Windows Home") "Windows Home says bridging isn't there"
+Check (-not (Has "Turn on Hyper-V")) "with nothing to turn on"
+Stop-Preview $p
+
+$p = Start-Preview $Exe net-firmware Network
+Check (Says "off in the firmware") "virtualization off in the firmware is said"
+Check (-not (Has "Turn on Hyper-V")) "with nothing to turn on"
+Stop-Preview $p
+
+$p = Start-Preview $Exe home-restart
+Check (Says "Windows has to restart before a machine can be bridged") "Home says a restart is waited for"
 Stop-Preview $p
 
 # An Ubuntu machine has no Remote View.

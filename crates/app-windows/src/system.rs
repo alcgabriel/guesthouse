@@ -1,6 +1,6 @@
 //! What the app asks of Windows itself, beyond the window: the file dialog, the clipboard, Remote
-//! Desktop, the icon's file, cancelling a read on the pipe, what opens at sign-in, and the file
-//! drop, for a newer Guesthouse. Every `unsafe` call of the app is
+//! Desktop, the icon's file, cancelling a read on the pipe, what opens at sign-in, the file drop,
+//! for a newer Guesthouse, and restarting Windows when the person says. Every `unsafe` call of the app is
 //! here, but for the console's, which are in console.rs.
 
 use std::os::windows::io::AsRawHandle;
@@ -693,6 +693,61 @@ pub fn icon_file() -> Option<String> {
 /// Where a panic is written, as the app has no console.
 pub fn panic_file() -> PathBuf {
     std::env::temp_dir().join("guesthouse-app").join("panic.txt")
+}
+
+/// Asks Windows to restart, as Start's own Restart does: each app is asked to close, and one with
+/// unsaved work can hold the restart up until the person says, as nothing is forced. The Guesthouse
+/// service is asked to stop as Windows shuts down, which asks its running machines to shut down
+/// first. Called only once the person has said yes twice, and never by a preview.
+pub fn restart_windows() -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE, LUID};
+    use windows_sys::Win32::Security::{
+        AdjustTokenPrivileges, LUID_AND_ATTRIBUTES, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED,
+        TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY,
+    };
+    use windows_sys::Win32::System::Shutdown::{
+        EWX_REBOOT, ExitWindowsEx, SHTDN_REASON_FLAG_PLANNED, SHTDN_REASON_MAJOR_OPERATINGSYSTEM,
+        SHTDN_REASON_MINOR_RECONFIG,
+    };
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+    let mut token: HANDLE = std::ptr::null_mut();
+    // SAFETY: the pseudo-handle for this process needs no closing, and `token` is a place for the
+    // token's handle.
+    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &mut token) }
+        == 0
+    {
+        return Err("Windows didn't let the app ask for a restart. Restart from Start instead.".to_owned());
+    }
+    // A user may restart the PC, but the privilege that lets a program ask for it is off until it's
+    // turned on.
+    let name: Vec<u16> = "SeShutdownPrivilege".encode_utf16().chain(Some(0)).collect();
+    let mut luid = LUID { LowPart: 0, HighPart: 0 };
+    // SAFETY: the name ends in a zero and `luid` is a place for the value.
+    let found = unsafe { LookupPrivilegeValueW(std::ptr::null(), name.as_ptr(), &mut luid) } != 0;
+    let privileges = TOKEN_PRIVILEGES {
+        PrivilegeCount: 1,
+        Privileges: [LUID_AND_ATTRIBUTES { Luid: luid, Attributes: SE_PRIVILEGE_ENABLED }],
+    };
+    // SAFETY: the token is open for adjusting, and `privileges` is a whole TOKEN_PRIVILEGES.
+    let adjusted = found
+        && unsafe {
+            AdjustTokenPrivileges(token, 0, &privileges, 0, std::ptr::null_mut(), std::ptr::null_mut())
+        } != 0
+        // SAFETY: a plain question about the call just made.
+        && unsafe { GetLastError() } == 0;
+    // SAFETY: the token's handle is ours and isn't used after this.
+    unsafe { CloseHandle(token) };
+    if !adjusted {
+        return Err(
+            "Windows didn't let this user restart it from the app. Restart from Start instead.".to_owned()
+        );
+    }
+    let reason = SHTDN_REASON_MAJOR_OPERATINGSYSTEM | SHTDN_REASON_MINOR_RECONFIG | SHTDN_REASON_FLAG_PLANNED;
+    // SAFETY: a plain request. Without EWX_FORCE or EWX_FORCEIFHUNG, no app is closed unasked.
+    if unsafe { ExitWindowsEx(EWX_REBOOT, reason) } == 0 {
+        return Err("Windows didn't start the restart. Restart from Start instead.".to_owned());
+    }
+    Ok(())
 }
 
 #[cfg(test)]

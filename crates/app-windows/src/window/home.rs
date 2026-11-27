@@ -54,6 +54,19 @@ pub fn page(main: &Main, context: &ViewContext<Main>) -> View {
             ))
             .into(),
     );
+    // Until Windows restarts to finish turning on Hyper-V, as the Network section says too.
+    if main.hyper_v() == guesthouse_control::HyperV::RestartPending && !main.restart_line_closed {
+        parts.push(
+            InfoBar::new()
+                .is_open(true)
+                .is_closable(true)
+                .severity(InfoBarSeverity::Warning)
+                .title(crate::hyper_v::HOME_LINE)
+                .message(crate::hyper_v::RESTART_MORE)
+                .on_closed(context.message(Message::RestartLineClosed))
+                .into(),
+        );
+    }
     let columns = main.layout.columns;
     let cards: Vec<View> = machines
         .iter()

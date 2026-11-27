@@ -263,6 +263,38 @@ pub fn create(machine: NewMachine, window: Window) {
     }
 }
 
+/// Asks the service to turn Windows' Hyper-V feature on, on a thread of its own as it takes
+/// minutes, sending the window how far it has got and then how it ended: `None` when it worked.
+pub fn enable_hyper_v(window: Window) {
+    let failed = window.clone();
+    let spawned = thread::Builder::new().name("hyper-v".into()).spawn(move || {
+        let mut ended = None;
+        let streamed = client::stream(&Request::EnableHyperV, |answer| match answer {
+            Answer::Event { .. } => window.tell(Message::HyperVNote),
+            Answer::Done { reason } => {
+                ended = Some(reason);
+                false
+            }
+            Answer::Refused { reason } => {
+                ended = Some(Some(reason));
+                false
+            }
+            _ => true,
+        });
+        let ended = match (ended, streamed) {
+            (Some(reason), _) => reason,
+            (None, Err(unreached)) => Some(unreached.words().to_owned()),
+            (None, Ok(())) => {
+                Some("The service stopped before it said how turning on Hyper-V ended.".to_owned())
+            }
+        };
+        let _ = window.tell(Message::HyperVDone(ended));
+    });
+    if let Err(error) = spawned {
+        let _ = failed.tell(Message::HyperVDone(Some(format!("The app couldn't ask the service: {error}"))));
+    }
+}
+
 /// A machine's events, coming in on a thread of their own. Dropping it ends them.
 pub struct Watch {
     stop: Arc<AtomicBool>,

@@ -231,7 +231,10 @@ pub fn network(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> V
         ],
         Some(toggle("Network", draft.network, open, context.callback(Message::SetNetwork))),
     );
-    parts.push(group(vec![network, connects_through(main, draft, open && draft.network, context)]));
+    parts.push(group(vec![
+        network,
+        connects_through(main, machine.system, draft, open && draft.network, context),
+    ]));
     parts.push(forwards(draft, open && draft.network, context));
     if machine.system == System::Windows
         && let (Some(viewing), Some(facts)) = (&main.viewing, main.remote_view_facts())
@@ -250,7 +253,13 @@ pub fn network(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> V
 
 /// Which network the machine's card is on: the shared one, or bridged onto one of this PC's
 /// adapters, chosen from those it has.
-fn connects_through(main: &Main, draft: &Draft, enabled: bool, context: &ViewContext<Main>) -> View {
+fn connects_through(
+    main: &Main,
+    system: System,
+    draft: &Draft,
+    enabled: bool,
+    context: &ViewContext<Main>,
+) -> View {
     let choices = main.network_choices();
     let bridged_at = match draft.network_mode {
         NetworkMode::Bridged { .. } => choices.iter().position(|mode| *mode == draft.network_mode),
@@ -316,15 +325,22 @@ fn connects_through(main: &Main, draft: &Draft, enabled: bool, context: &ViewCon
                 .into(),
         );
     }
-    let mut notes = vec![
-        "Bridging needs Windows' Hyper-V feature. The first time, this PC's own network can drop for a few seconds."
-            .to_owned(),
-    ];
+    let mut notes: Vec<String> = Vec::new();
     match main.bridging() {
         Some(bridging) if !bridging.available => {
-            notes.push(
-                bridging.reason.clone().unwrap_or_else(|| "This PC can't bridge a machine.".to_owned()),
-            );
+            match crate::hyper_v::shown(
+                &bridging.hyper_v,
+                system,
+                &crate::hyper_v::holding_up(main.machines()),
+                main.hyper_v_asking,
+                bridging.reason.as_deref(),
+            ) {
+                Some(shown) => parts.push(hyper_v_part(&shown, context)),
+                // On, but the adapters couldn't be read.
+                None => notes.push(
+                    bridging.reason.clone().unwrap_or_else(|| "This PC can't bridge a machine.".to_owned()),
+                ),
+            }
         }
         Some(bridging) if bridging.adapters.is_empty() => {
             notes.push(
@@ -333,6 +349,9 @@ fn connects_through(main: &Main, draft: &Draft, enabled: bool, context: &ViewCon
             );
         }
         _ => {}
+    }
+    if can_bridge {
+        notes.push("The first time, this PC's own network can drop for a few seconds.".to_owned());
     }
     if let NetworkMode::Bridged { adapter } = &draft.network_mode {
         let wifi = main.bridging().is_some_and(|bridging| {
@@ -348,6 +367,62 @@ fn connects_through(main: &Main, draft: &Draft, enabled: bool, context: &ViewCon
     }
     parts.extend(notes.iter().map(|note| caption(note).into()));
     StackPanel::new().spacing(10.0).margin(Thickness::new(0.0, 14.0, 0.0, 16.0)).children(parts).into()
+}
+
+/// What Windows' Hyper-V feature stands at, which bridging is made on, while a machine can't be
+/// bridged: its line, more under it, a ring while it's being turned on, and what can be done. Its
+/// background says whether it waits for the person (a restart) or went wrong.
+fn hyper_v_part(shown: &crate::hyper_v::Shown, context: &ViewContext<Main>) -> View {
+    use crate::hyper_v::{Action, Tone};
+    let line = if shown.tone == Tone::Bad { bad(&shown.line) } else { strong(&shown.line) };
+    let mut words: Vec<View> = vec![line.text_wrapping(TextWrapping::Wrap).into()];
+    if let Some(more) = &shown.more {
+        words.push(caption(more).into());
+    }
+    // A grid, so the words wrap at the card's width.
+    let mut top: Vec<View> = Vec::new();
+    if shown.busy {
+        top.push(ring(16.0).vertical_alignment(VerticalAlignment::Top).into());
+    }
+    top.push(StackPanel::new().grid_column(1).spacing(2.0).children(words).into());
+    let mut parts: Vec<View> = vec![
+        Grid::new()
+            .columns([GridLength::Auto, GridLength::STAR])
+            .column_spacing(if shown.busy { 10.0 } else { 0.0 })
+            .children(top)
+            .into(),
+    ];
+    if let Some((action, can)) = shown.action {
+        let message = match action {
+            Action::TurnOn | Action::TryAgain => Message::TurnOnHyperV,
+            Action::Restart => Message::RestartWindows,
+        };
+        let name = match action {
+            Action::TryAgain => "Try turning on Hyper-V again",
+            Action::Restart => "Restart Windows now",
+            Action::TurnOn => action.label(),
+        };
+        parts.push(
+            button(action.label(), context.message(message), true)
+                .is_enabled(can)
+                .automation_name(name)
+                .horizontal_alignment(HorizontalAlignment::Left)
+                .into(),
+        );
+    }
+    Border::new()
+        .corner_radius(10.0)
+        .background(match shown.tone {
+            Tone::Caution => ThemeBrush::SystemCautionBackground,
+            Tone::Bad => ThemeBrush::SystemCriticalBackground,
+            Tone::Plain => ThemeBrush::SubtleSecondary,
+        })
+        .border_brush(ThemeBrush::CardStroke)
+        .border_thickness(1.0)
+        .padding(Thickness::new(14.0, 12.0, 14.0, 14.0))
+        .automation_name("Hyper-V")
+        .content(StackPanel::new().spacing(10.0).children(parts))
+        .into()
 }
 
 /// An adapter to bridge onto, as the list says it.
