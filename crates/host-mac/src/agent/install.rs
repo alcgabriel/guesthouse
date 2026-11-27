@@ -218,10 +218,10 @@ impl Agent {
         if let Some(password) = &tools.password {
             password::check(&password.0)?;
         }
-        if let Some(word) = &tools.desktop {
-            if crate::install::ubuntu::Desktop::parse(word).is_none() {
-                return Err(format!("{word} is not a desktop this can install."));
-            }
+        if let Some(word) = &tools.desktop
+            && crate::install::ubuntu::Desktop::parse(word).is_none()
+        {
+            return Err(format!("{word} is not a desktop this can install."));
         }
         let sizes = tools.sizes;
         let (cores, memory_mb, _) = default_sizes(
