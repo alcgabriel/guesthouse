@@ -932,6 +932,7 @@ dependencies = [
  "guesthouse-carry-core",
  "guesthouse-catalog-core",
  "guesthouse-daemon",
+ "guesthouse-download-core",
  "guesthouse-guest-names-core",
  "guesthouse-idle-core",
  "guesthouse-jail",
@@ -1114,6 +1115,13 @@ name = "guesthouse-daemon-shell"
 version = "0.11.0"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "guesthouse-download-core"
+version = "0.11.0"
+dependencies = [
+ "guesthouse-basics",
 ]
 
 [[package]]

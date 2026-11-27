@@ -11,10 +11,14 @@ use std::thread::sleep;
 use std::time::Duration;
 
 const POLL: Duration = Duration::from_millis(500);
-/// The partial download beside where the file goes.
-const PARTIAL: &str = "part";
-/// The SHA-256 a finished file was checked against, beside it, so a later use needn't read it again.
-const CHECKED: &str = "sha256";
+#[cfg(test)]
+use guesthouse_download_core::linux_host::PARTIAL;
+/// A download's file names, the words curl is given, the reading of what it says, how far a download
+/// is, the check of its SHA-256 and the sentences, as the Linux host has them in every host's
+/// `guesthouse_download_core`.
+use guesthouse_download_core::linux_host::{
+    self as rules, CHECKING, CURL_WORDS, GO_ON_WORDS, HEAD_WORD, checked_marker, partial_file,
+};
 
 pub use guesthouse_catalog_core::android::ANDROID_IMAGE_NAME;
 /// Ubuntu's release folder, its checksum list and the disc's name, and the Android image, are in
@@ -28,42 +32,34 @@ const UBUNTU_FOLDER: &str = "ubuntu";
 const ANDROID_FOLDER: &str = "android";
 
 fn said(output: &std::process::Output) -> String {
-    String::from_utf8_lossy(&output.stderr).trim().to_owned()
+    rules::said(&output.stderr)
 }
 
 fn curl() -> Command {
     let mut command = Command::new("curl");
-    command.args(["--fail", "--location", "--silent", "--show-error", "--retry", "3"]);
+    command.args(CURL_WORDS);
     command.stdin(Stdio::null());
     command
 }
 
 /// A small text file's contents, such as a checksum list.
 pub fn text_at(url: &str) -> Result<String> {
-    let output =
-        curl().arg(url).output().map_err(|error| Failure(format!("curl could not be started: {error}")))?;
+    let output = curl().arg(url).output().map_err(|error| Failure(rules::not_started(error)))?;
     if !output.status.success() {
-        return Err(Failure(format!("{url} could not be read: {}", said(&output))));
+        return Err(Failure(rules::unreadable(url, &said(&output))));
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// A file's size as its server says it, if it does.
 pub fn size_at(url: &str) -> Option<u64> {
-    let output = curl().args(["--head", url]).output().ok()?;
-    let headers = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
-    // After redirects, the last length given is the file's.
-    headers
-        .lines()
-        .filter_map(|line| line.strip_prefix("content-length:"))
-        .filter_map(|value| value.trim().parse().ok())
-        .next_back()
+    let output = curl().args([HEAD_WORD, url]).output().ok()?;
+    rules::content_length(&output.stdout)
 }
 
 pub fn sha256(file: &Path) -> Result<String> {
     let output = Command::new("sha256sum").arg(file).stdin(Stdio::null()).output()?;
-    let text = String::from_utf8_lossy(&output.stdout);
-    text.split_whitespace().next().map(str::to_owned).ok_or_else(|| Failure(said(&output)))
+    rules::sha256sum_sum(&output.stdout).ok_or_else(|| Failure(said(&output)))
 }
 
 /// A size in GiB or MiB, as said before a download: every host's formatters are in
@@ -74,20 +70,17 @@ pub use guesthouse_basics::words::size_in_gb_or_mb_up as size_text;
 /// "`what`: N%".
 fn download(url: &str, to: &Path, bytes: Option<u64>, what: &str, step: &dyn Fn(&str)) -> Result<()> {
     let mut child = curl()
-        .args(["--continue-at", "-", "--output"])
+        .args(GO_ON_WORDS)
         .arg(to)
         .arg(url)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| Failure(format!("curl could not be started: {error}")))?;
+        .map_err(|error| Failure(rules::not_started(error)))?;
     let mut shown = None;
     while child.try_wait()?.is_none() {
         let have = fs::metadata(to).map_or(0, |found| found.len());
-        let text = match bytes {
-            Some(total) => format!("{what}: {}%", (have * 100 / total.max(1)).min(100)),
-            None => format!("{what}: {}", size_text(have)),
-        };
+        let text = rules::progress(what, have, bytes);
         if shown.as_ref() != Some(&text) {
             step(&text);
             shown = Some(text);
@@ -98,12 +91,13 @@ fn download(url: &str, to: &Path, bytes: Option<u64>, what: &str, step: &dyn Fn(
     if ended.status.success() {
         return Ok(());
     }
-    Err(Failure(format!("{what} stopped: {}", said(&ended))))
+    Err(Failure(rules::stopped(what, &said(&ended))))
 }
 
 /// Whether `file` is there and was already checked against `wanted`.
 fn already_checked(file: &Path, wanted: &str) -> bool {
-    file.is_file() && fs::read_to_string(file.with_extension(CHECKED)).is_ok_and(|sum| sum.trim() == wanted)
+    file.is_file()
+        && fs::read_to_string(checked_marker(file)).is_ok_and(|sum| rules::marker_says(&sum, wanted))
 }
 
 /// Fetches `url` to `file` unless it's already there and checked, and keeps it only if its SHA-256 is
@@ -113,16 +107,16 @@ pub fn fetch_checked(url: &str, wanted: &str, file: &Path, what: &str, step: &dy
         return Ok(());
     }
     fs::create_dir_all(file.parent().unwrap_or(Path::new("")))?;
-    let partial = file.with_extension(PARTIAL);
+    let partial = partial_file(file);
     step(what);
     download(url, &partial, size_at(url), what, step)?;
-    step("Checking the download");
-    if sha256(&partial)? != wanted {
+    step(CHECKING);
+    if !rules::sum_is_wanted(&sha256(&partial)?, wanted) {
         let _ = fs::remove_file(&partial);
-        return Err(Failure(format!("{what} gave a file that isn't the one it should be. Try again.")));
+        return Err(Failure(rules::wrong_file(what)));
     }
     fs::rename(&partial, file)?;
-    fs::write(file.with_extension(CHECKED), wanted)?;
+    fs::write(checked_marker(file), wanted)?;
     Ok(())
 }
 
@@ -154,9 +148,7 @@ pub fn ubuntu_disc_here(paths: &Paths) -> Option<PathBuf> {
         .ok()?
         .flatten()
         .map(|entry| entry.path())
-        .filter(|path| {
-            path.extension().is_some_and(|ext| ext == "iso") && path.with_extension(CHECKED).is_file()
-        })
+        .filter(|path| path.extension().is_some_and(|ext| ext == "iso") && checked_marker(path).is_file())
         .collect();
     found.sort();
     found.pop()

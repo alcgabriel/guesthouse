@@ -1,0 +1,15 @@
+[package]
+name = "guesthouse-download-core"
+description = "The plain half of fetching a file, as each host does it: the names of a download's files at every stage, when a file already here is trusted, the words curl is given and what it says back, how far a download is, the check of its SHA-256 and every sentence. Nothing here calls the system or the network, so every host can build on it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# The size said while a download comes, as every host's formatters have it.
+guesthouse-basics.workspace = true
