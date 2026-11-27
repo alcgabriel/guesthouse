@@ -1,0 +1,15 @@
+Package: pvg-mesa
+Version: @VERSION@
+Architecture: arm64
+Maintainer: Guesthouse contributors <144541403+s3k000@users.noreply.github.com>
+Depends: @DEPENDS@, libgbm1, libegl1, libgles2, libgl1, libvulkan1
+Section: libs
+Priority: optional
+Description: Guesthouse: Vulkan and GL for the Mac's graphics device
+ Mesa with KosmicKrisp and a bridge to the pvg kernel driver as the Vulkan
+ driver, and Zink over it for EGL, GLES, GL with GLX, and GBM, installed in
+ /opt/pvg-mesa beside Ubuntu's Mesa. GBM's backend for the pvg device, the
+ Vulkan driver file, and glvnd's vendor file while a card of pvg's is there
+ make it the one used on that device; without it Ubuntu's Mesa answers.
+ .
+ Built from @SOURCE@.

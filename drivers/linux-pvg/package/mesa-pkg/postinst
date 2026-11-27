@@ -1,0 +1,13 @@
+#!/bin/sh
+# Offers our EGL vendor to glvnd now if a card of pvg's is there; at each
+# boot udev's rule does it when the card comes.
+set -e
+[ "$1" = configure ] || exit 0
+udevadm control --reload || true
+/usr/lib/pvg-mesa/egl-vendor off
+for card in /sys/class/drm/card[0-9]*; do
+	case $card in *-*) continue ;; esac
+	if [ "$(basename "$(readlink "$card/device/driver" 2>/dev/null)")" = pvg ]; then
+		/usr/lib/pvg-mesa/egl-vendor on
+	fi
+done

@@ -1,0 +1,23 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Usage: egl-vendor on|off. glvnd asks our EGL vendor first and does not go
+# on to Ubuntu's when it fails, so ours is offered only while a card of
+# pvg's is there. The package puts /etc/glvnd/egl_vendor.d/10_pvg.json as a
+# link to /run/pvg-mesa/10_pvg.json, which glvnd passes over while it leads
+# nowhere; "on" (udev's rule 71-pvg-mesa.rules, when such a card comes)
+# makes that a link to our vendor file. /run is new at each boot, so a boot
+# without the device has Ubuntu's Mesa alone.
+case $1 in
+on)
+	mkdir -p /run/pvg-mesa
+	ln -sfn /opt/pvg-mesa/share/glvnd/egl_vendor.d/10_pvg.json /run/pvg-mesa/10_pvg.json
+	;;
+off)
+	rm -f /run/pvg-mesa/10_pvg.json
+	;;
+*)
+	echo "usage: egl-vendor on|off" >&2
+	exit 2
+	;;
+esac
