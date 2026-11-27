@@ -1,0 +1,7 @@
+#!/bin/sh
+# Builds and installs the module for the running kernel and the newest one,
+# as Debian's dh_dkms does.
+set -e
+if [ "$1" = configure ]; then
+	/usr/lib/dkms/common.postinst pvg @VERSION@ "" "" "$2"
+fi
