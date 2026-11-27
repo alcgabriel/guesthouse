@@ -68,6 +68,11 @@ private struct ScreenContent: View {
                 }
             }
             .frame(minWidth: 320, minHeight: 180)
+            // A window opened while the machine starts settles before its graphics process can
+            // take a size, so the size is given again once the first picture comes.
+            .onChange(of: session.state) { _, state in
+                if state == .showing, let settled { sizeSettled(settled) }
+            }
             .navigationTitle(machine.name)
             .navigationSubtitle(subtitle)
             .toolbar { ScreenToolbar(machine: machine, session: session) }

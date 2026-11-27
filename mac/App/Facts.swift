@@ -49,19 +49,23 @@ struct FactCards: View {
 
     // MARK: Screen
 
-    /// Following the window needs the guest to be told the size, which it cannot be yet, so the
-    /// card says the size the machine really has (see `notes/mac-app-screen-size.md`).
+    /// Whether the machine's screen follows its window: on the protected path, with the Hardware
+    /// tab's switch on (see `notes/mac-app-screen-size.md`). QEMU's own device takes no size.
+    private var follows: Bool {
+        machine.graphics != "qemu" && ScreenPrefs.follows(machine.id)
+    }
+
     private var screenValue: String {
-        String(localized: "A fixed size")
+        follows ? String(localized: "Follows its window") : String(localized: "A fixed size")
     }
 
     private var screenNote: String {
         if status.isAlive, let session = library.screens[machine.id], let size = session.pictureSize {
-            return String(localized: "Now \(String(size.width)) × \(String(size.height)), \(ScreenStatus.rateText(framesPerSecond: session.receivedPerSecond)). Following its window is not working yet.")
+            return String(localized: "Now \(String(size.width)) × \(String(size.height)), \(ScreenStatus.rateText(framesPerSecond: session.receivedPerSecond)).")
         }
         let parts = MachineFormat.modeParts(machine.modes.first ?? "")
         let mode = parts.map { "\($0.size), \($0.rate)" } ?? String(localized: "Shown when it runs")
-        return mode + ". " + String(localized: "Following its window is not working yet.")
+        return follows ? String(localized: "Starts at \(mode), then takes its window's size.") : mode + "."
     }
 
     // MARK: Size
