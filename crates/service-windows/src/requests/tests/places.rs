@@ -173,7 +173,7 @@ fn a_machine_whose_drive_is_gone_is_listed_with_why_and_is_back_with_the_drive()
     wait_for(&service, "win", State::Running);
     assert_eq!(service.work.booted.lock().unwrap()[0].disk, drive.join("win").join("win.vhdx"));
     ask(&service, Request::Stop { name: "win".into() });
-    wait_for(&service, "win", State::Stopped);
+    wait_for(&service, "win", State::Off);
 }
 
 /// A machine that's set up and has two snapshots, so its disks are a chain, and a file of each kind.
@@ -231,7 +231,7 @@ fn a_stopped_machine_is_moved_with_its_snapshots_and_back_again() {
     assert_eq!(ask(&again, Request::Start { name: "win".into() }), [Answer::Ok]);
     wait_for(&again, "win", State::Running);
     ask(&again, Request::Stop { name: "win".into() });
-    wait_for(&again, "win", State::Stopped);
+    wait_for(&again, "win", State::Off);
     drop(again);
 
     // And back to where machines are kept, with the empty folder.
@@ -299,7 +299,7 @@ fn a_running_machine_isnt_moved() {
     assert!(refused_with(&answers).contains("running"), "{answers:?}");
     assert!(names(&drive).is_empty());
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 #[test]
@@ -341,7 +341,7 @@ fn a_move_that_fails_leaves_the_machine_as_it_was_and_no_copy() {
     assert_eq!(ask(service, Request::Start { name: "win".into() }), [Answer::Ok]);
     wait_for(service, "win", State::Running);
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
     service.work.disks.fail_set_parent.store(false, Ordering::SeqCst);
     assert_eq!(ask(service, Request::Move { name: "win".into(), folder: drive.clone() }), [Answer::Ok]);
     wait_for_event(service, "win", "Moved its disks to");

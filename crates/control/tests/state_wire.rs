@@ -1,16 +1,18 @@
-//! A machine's state as it goes over the pipe, held as it is: an old app reads these names and no
-//! other, so every state and every event is held as the JSON it is, both ways, and a name the pipe
-//! never sent is refused as it was.
+//! A machine's state as it goes over the pipe: the states every host shares, by their names, held
+//! as the JSON they are, both ways, and every other name refused. A name changes only with the
+//! pipe's version (`protocol::PROTOCOL`), as an app of another version can't read it.
 
 use guesthouse_control::{Event, State};
 use serde_json::{Value, json};
 
-const STATES: [(State, &str); 5] = [
-    (State::Preparing, "preparing"),
+const STATES: [(State, &str); 7] = [
+    (State::Off, "off"),
     (State::Starting, "starting"),
+    (State::Installing, "installing"),
     (State::Running, "running"),
     (State::Stopping, "stopping"),
-    (State::Stopped, "stopped"),
+    (State::StoppingStalled, "stopping_stalled"),
+    (State::Failed, "failed"),
 ];
 
 #[test]
@@ -19,7 +21,7 @@ fn every_state_is_its_wire_name() {
         assert_eq!(serde_json::to_value(state).unwrap(), json!(name));
         assert_eq!(serde_json::from_value::<State>(json!(name)).unwrap(), state);
     }
-    assert_eq!(State::default(), State::Stopped);
+    assert_eq!(State::default(), State::Off);
 }
 
 #[test]
@@ -45,15 +47,31 @@ fn every_event_is_its_wire_line() {
         assert_eq!(serde_json::to_value(&event).unwrap(), line);
         assert_eq!(serde_json::from_value::<Event>(line).unwrap(), event);
     }
+}
+
+/// Each line byte for byte, as the service writes it.
+#[test]
+fn the_state_lines_byte_for_byte() {
+    let lines: Vec<String> =
+        STATES.iter().map(|(state, _)| serde_json::to_string(&Event::State(*state)).unwrap()).collect();
     assert_eq!(
-        serde_json::to_string(&Event::State(State::Running)).unwrap(),
-        r#"{"kind":"state","text":"running"}"#
+        lines,
+        [
+            r#"{"kind":"state","text":"off"}"#,
+            r#"{"kind":"state","text":"starting"}"#,
+            r#"{"kind":"state","text":"installing"}"#,
+            r#"{"kind":"state","text":"running"}"#,
+            r#"{"kind":"state","text":"stopping"}"#,
+            r#"{"kind":"state","text":"stopping_stalled"}"#,
+            r#"{"kind":"state","text":"failed"}"#,
+        ]
     );
 }
 
 #[test]
-fn a_name_the_pipe_never_sent_is_refused() {
-    for name in ["Running", "off", "failed", "installing", "shutting_down", ""] {
+fn a_name_the_pipe_never_sends_is_refused() {
+    // The Windows host's names before the states were shared, a capital, and others near them.
+    for name in ["stopped", "preparing", "Off", "Running", "shutting_down", "stoppingstalled", ""] {
         assert!(serde_json::from_value::<State>(json!(name)).is_err(), "{name}");
         assert!(serde_json::from_value::<Event>(json!({"kind": "state", "text": name})).is_err(), "{name}");
     }

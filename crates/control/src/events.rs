@@ -18,9 +18,9 @@ pub enum Event {
     State(State),
 }
 
-/// Where a machine stands, as the service tells the app. Every host's states are in
+/// Where a machine stands, as the service tells the app: the states every host has, in
 /// `guesthouse_state_core`.
-pub use guesthouse_state_core::windows_host::State;
+pub use guesthouse_state_core::common::State;
 
 #[cfg(test)]
 mod tests {

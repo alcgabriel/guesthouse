@@ -92,7 +92,7 @@ pub fn stage(main: &mut Main) {
             });
         }
         "settings" | "settings-refused" => {
-            show(main, "win11", State::Stopped);
+            show(main, "win11", State::Off);
             if let Some(draft) = &mut main.draft {
                 draft.memory_mb = Some(24576.0);
                 draft.nvapi_wrapper = false;
@@ -104,7 +104,7 @@ pub fn stage(main: &mut Main) {
             }
         }
         "update" => {
-            show(main, "win11", State::Stopped);
+            show(main, "win11", State::Off);
             main.update = Some(guesthouse_control::updates::Latest {
                 version: "0.10.0".to_owned(),
                 installer: "https://files.ruxn.com/p/guesthouse/guesthouse-setup-0.10.0.exe".to_owned(),
@@ -113,13 +113,13 @@ pub fn stage(main: &mut Main) {
             });
         }
         "report-new" => {
-            show(main, "win11", State::Stopped);
+            show(main, "win11", State::Off);
             main.page = Page::Report;
             main.report.machine = Some("win11".to_owned());
             main.report.what = "It stays black after the logo, and the log says nothing.".to_owned();
         }
         "report" | "report-sent" => {
-            show(main, "win11", State::Stopped);
+            show(main, "win11", State::Off);
             main.page = Page::Report;
             main.report.machine = Some("win11".to_owned());
             main.report.stage = ReportStage::Ready(Ready {
@@ -135,7 +135,7 @@ pub fn stage(main: &mut Main) {
             main.page = Page::Report;
         }
         "delete" => {
-            show(main, "ubuntu", State::Stopped);
+            show(main, "ubuntu", State::Off);
             main.deleting = Some("ubuntu".to_owned());
         }
         remote if remote.starts_with("rv-") => remote_view(main, remote),
@@ -165,7 +165,7 @@ pub fn stage(main: &mut Main) {
 fn remote_view(main: &mut Main, state: &str) {
     let name = "win11";
     let stopped = matches!(state, "rv-off" | "rv-stopped" | "rv-refused");
-    show(main, name, if stopped { State::Stopped } else { State::Running });
+    show(main, name, if stopped { State::Off } else { State::Running });
     let on = !matches!(state, "rv-off" | "rv-refused");
     if let Ok(status) = &mut main.seen
         && let Some(machine) = status.machines.iter_mut().find(|machine| machine.name == name)
@@ -336,7 +336,7 @@ fn status() -> Status {
             machine(
                 "win11",
                 System::Windows,
-                State::Stopped,
+                State::Off,
                 true,
                 Some("NVIDIA GeForce RTX 5090"),
                 Some("172.24.80.12"),
@@ -344,13 +344,13 @@ fn status() -> Status {
             machine(
                 "ubuntu",
                 System::Linux,
-                State::Stopped,
+                State::Off,
                 true,
                 Some("AMD Radeon RX 7900 XTX"),
                 Some("172.24.80.31"),
             ),
-            machine("build-box", System::Linux, State::Stopped, false, Some("NVIDIA GeForce RTX 5090"), None),
-            machine("office", System::Windows, State::Preparing, false, None, None),
+            machine("build-box", System::Linux, State::Off, false, Some("NVIDIA GeForce RTX 5090"), None),
+            machine("office", System::Windows, State::Installing, false, None, None),
         ],
         cards: vec![
             card("NVIDIA GeForce RTX 5090", Some(32607), true),

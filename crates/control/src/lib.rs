@@ -4,13 +4,16 @@
 //!
 //! Each connection carries one request, a line of JSON, and its answer. Most answers are one line.
 //! `Create` and `Watch` answer with a line for each event, as it happens, until the work ends or the
-//! app closes the pipe. The service keeps every rule; the app only asks and shows.
+//! app closes the pipe. The service keeps every rule; the app only asks and shows. Each request,
+//! and the service's status, carry the pipe's version, and an app and a service of different
+//! versions refuse each other in words that say so (see [`protocol`]).
 //!
 //! Nothing here calls into Windows but the pipe, which std opens as a file, so it builds and is
 //! tested anywhere.
 
 pub mod client;
 pub mod events;
+pub mod protocol;
 pub mod report;
 pub mod screen;
 pub mod updates;
@@ -326,6 +329,9 @@ pub enum Card {
 pub enum Answer {
     Status {
         version: String,
+        /// The pipe's version, `protocol::PROTOCOL`. A service from before it says none.
+        #[serde(default = "protocol_before")]
+        protocol: u32,
         machines: Vec<Machine>,
         cards: Vec<CardInfo>,
         /// A service from before bridging doesn't say, which reads as not available.
@@ -474,6 +480,10 @@ pub struct CardInfo {
 
 fn on() -> bool {
     true
+}
+
+fn protocol_before() -> u32 {
+    protocol::BEFORE
 }
 
 /// Reads one line of JSON, at most `REQUEST_LIMIT` long, as a `T`. Every host's JSON lines are in
@@ -672,7 +682,7 @@ mod tests {
         );
         assert_eq!(serde_json::from_value::<Request>(serde_json::to_value(&moved).unwrap()).unwrap(), moved);
         let older: Machine = serde_json::from_value(json!({
-            "name": "u", "system": "windows", "state": "stopped", "set_up": true, "memory_mb": 8192,
+            "name": "u", "system": "windows", "state": "off", "set_up": true, "memory_mb": 8192,
             "processors": 4, "card": null, "address": null
         }))
         .unwrap();
@@ -682,7 +692,7 @@ mod tests {
     #[test]
     fn a_machine_from_a_service_without_its_chosen_card_reads_as_default() {
         let machine: Machine = serde_json::from_value(json!({
-            "name": "win", "system": "windows", "state": "stopped", "set_up": true,
+            "name": "win", "system": "windows", "state": "off", "set_up": true,
             "memory_mb": 8192, "processors": 4, "card": "NVIDIA GeForce RTX 5090", "address": null
         }))
         .unwrap();
@@ -707,7 +717,7 @@ mod tests {
         assert_eq!(value["ask"], json!("change"));
         assert_eq!(value["settings"]["nvapi_wrapper"], json!(false));
         assert_eq!(value["settings"]["nested_virtualization"], json!(true));
-        let older = json!({"name": "win", "system": "windows", "state": "stopped", "set_up": true,
+        let older = json!({"name": "win", "system": "windows", "state": "off", "set_up": true,
             "memory_mb": 8192, "processors": 4, "card": null, "address": null});
         let machine: Machine = serde_json::from_value(older).unwrap();
         assert_eq!((machine.chosen_card, machine.nvapi_wrapper), (Card::Default, true));

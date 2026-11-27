@@ -179,7 +179,8 @@ impl Line {
             Event::Problem(text) => (Kind::Problem, text),
             Event::Guest(text) => (Kind::Guest, text),
             Event::Report(text) => (Kind::Report, text),
-            Event::State(state) => (Kind::Note, format!("It's {}.", state_words(state).to_lowercase())),
+            Event::State(State::Failed) => (Kind::Problem, "It failed.".to_owned()),
+            Event::State(state) => (Kind::Note, format!("It's {}.", state.name().to_lowercase())),
         };
         Line { kind, text }
     }
@@ -196,9 +197,6 @@ pub fn now_ms() -> u64 {
 pub fn new_log() -> Log<Line> {
     Log::new(LOG_LIMIT)
 }
-
-/// A machine's state in the app's words.
-pub use guesthouse_state_core::windows_host::app_words as state_words;
 
 #[cfg(test)]
 mod state_words_tests;
@@ -782,7 +780,7 @@ impl Main {
         };
         let keep = self.draft.as_ref().is_some_and(|draft| {
             draft.machine == machine.name
-                && machine.state == State::Stopped
+                && machine.state == State::Off
                 && (draft.saving
                     || draft.refused.is_some()
                     || draft.changed(machine)
@@ -805,7 +803,7 @@ impl Main {
 
     fn save_settings(&mut self) {
         let Some(machine) = self.machine() else { return };
-        if machine.state != State::Stopped {
+        if machine.state != State::Off {
             return;
         }
         let Some(draft) = self.draft.as_ref().filter(|draft| !draft.saving) else { return };
@@ -1288,10 +1286,9 @@ impl Main {
     fn end_stopped_console(&mut self) {
         let Some(open) = &self.console else { return };
         let Ok(status) = &self.seen else { return };
-        let on = status
-            .machines
-            .iter()
-            .any(|machine| machine.name == open.machine && machine.state != State::Stopped);
+        let on = status.machines.iter().any(|machine| {
+            machine.name == open.machine && !matches!(machine.state, State::Off | State::Failed)
+        });
         if !on {
             open.window.disconnect();
             open.window.close();
@@ -1740,7 +1737,7 @@ mod tests {
         Machine {
             name: "win".to_owned(),
             system: System::Windows,
-            state: State::Stopped,
+            state: State::Off,
             set_up: true,
             memory_mb: 8192,
             processors: 4,

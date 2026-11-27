@@ -227,7 +227,7 @@ fn navigation(main: &Main, context: &ViewContext<Main>) -> View {
                 "{}, {}, {}",
                 machine.name,
                 system_words(machine.system),
-                app::state_words(machine.state)
+                machine.state.name()
             ));
         keyed(machine.name.as_str(), item)
     });
@@ -279,7 +279,7 @@ fn nav_item(machine: &Machine) -> View {
             StackPanel::new()
                 .orientation(Orientation::Horizontal)
                 .spacing(6.0)
-                .children((dot(machine.state), caption(app::state_words(machine.state)))),
+                .children((dot(machine.state), caption(machine.state.name()))),
         ))
         .into()
 }
@@ -375,14 +375,15 @@ fn header(machine: &Machine, context: &ViewContext<Main>) -> View {
         );
 
     let start = button("Start", glyph::START, context.message(Message::Start), true)
-        .is_enabled(state == State::Stopped && machine.working.is_none());
+        .is_enabled(matches!(state, State::Off | State::Failed) && machine.working.is_none());
     // Asked again while it shuts down, the service stops it at once.
-    let stop_words = if state == State::Stopping { "Stop now" } else { "Stop" };
+    let stopping = matches!(state, State::Stopping | State::StoppingStalled);
+    let stop_words = if stopping { "Stop now" } else { "Stop" };
     let stop = button(stop_words, glyph::STOP, context.message(Message::Stop), false)
-        .is_enabled(matches!(state, State::Starting | State::Running | State::Stopping));
+        .is_enabled(stopping || matches!(state, State::Starting | State::Running));
     let delete = MenuItem::item(DELETE_KEY, "Delete…")
         .glyph(glyph::DELETE)
-        .enabled(state == State::Stopped)
+        .enabled(state == State::Off)
         .tooltip("Only a stopped machine can be deleted. Its disks go with it.");
     let more = square(glyph::MORE, &format!("More for {}", machine.name)).tooltip("More").menu(Menu::new(
         [delete],
@@ -407,16 +408,22 @@ fn status_rows(machine: &Machine, context: &ViewContext<Main>) -> Vec<View> {
         State::Stopping => {
             "Its guest is shutting down. Stop now turns it off at once, as pulling the plug would."
         }
-        State::Stopped => "Start boots it. Delete, under More, takes its disks with it.",
-        State::Preparing => "Its disks are being made.",
+        State::Off => "Start boots it. Delete, under More, takes its disks with it.",
+        State::Installing => "Its disks are being made.",
         State::Starting => "Its guest is booting. Stop asks it to shut down.",
         State::Running => "Stop asks its guest to shut down.",
+        // The service doesn't say these two yet.
+        State::StoppingStalled => {
+            "Its guest hasn't shut down in the time it should. Stop now turns it off at once."
+        }
+        State::Failed => "It stopped when it wasn't asked to. Its log says why.",
     };
     // A ring while it's on its way somewhere, so it's plain that it's working.
-    let working = matches!(state, State::Preparing | State::Starting | State::Stopping);
+    let working =
+        matches!(state, State::Installing | State::Starting | State::Stopping | State::StoppingStalled);
     let ring: Option<View> =
         working.then(|| ProgressRing::new().is_active(true).width(20.0).height(20.0).into());
-    let mut rows = vec![row(glyph::POWER, app::state_words(state), &[line], ring)];
+    let mut rows = vec![row(glyph::POWER, state.name(), &[line], ring)];
     if let Some(doing) = &machine.working {
         let ring = ProgressRing::new().is_active(true).width(20.0).height(20.0);
         rows.push(row(
@@ -433,7 +440,7 @@ fn status_rows(machine: &Machine, context: &ViewContext<Main>) -> Vec<View> {
 
 /// Where the machine's disks are, and moving them, which a stopped machine's can be.
 fn location_row(machine: &Machine, context: &ViewContext<Main>) -> View {
-    let free = machine.state == State::Stopped && machine.working.is_none() && machine.problem.is_none();
+    let free = machine.state == State::Off && machine.working.is_none() && machine.problem.is_none();
     let shown = if machine.folder.as_os_str().is_empty() {
         "Where the service keeps its machines.".to_owned()
     } else {
@@ -472,10 +479,10 @@ fn location_row(machine: &Machine, context: &ViewContext<Main>) -> View {
 
 /// The machine's snapshots, and taking another. Each is of a stopped machine that has been set up.
 fn snapshot_rows(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> Vec<View> {
-    let free = machine.state == State::Stopped && machine.working.is_none();
+    let free = machine.state == State::Off && machine.working.is_none();
     let take_words = if !machine.set_up {
         "A machine has snapshots once its first boot has set it up."
-    } else if machine.state != State::Stopped {
+    } else if machine.state != State::Off {
         "Stop it to take a snapshot. A snapshot keeps its disk, its firmware and its TPM as they are."
     } else {
         "Keeps its disk, its firmware and its TPM as they are now, to go back to. Its disk can't grow while it has snapshots."
@@ -612,7 +619,10 @@ fn console_row(main: &Main, machine: &Machine, context: &ViewContext<Main>) -> V
                  The keyboard and mouse go to the guest while its window has them.";
     let open = main.console.as_ref().filter(|open| open.machine == machine.name);
     let Some(open) = open else {
-        let on = matches!(machine.state, State::Starting | State::Running | State::Stopping);
+        let on = matches!(
+            machine.state,
+            State::Starting | State::Running | State::Stopping | State::StoppingStalled
+        );
         let button =
             button("Open console", glyph::CONSOLE, context.message(Message::Console), false).is_enabled(on);
         return row(glyph::CONSOLE, "Console", &[about], Some(button.into()));
@@ -892,7 +902,7 @@ impl Component for Ticking {
 /// What the machine is given at each boot, which can be changed while it's off: the same controls
 /// as the new machine's form, then Save and Undo.
 fn settings_section(main: &Main, machine: &Machine, draft: &Draft, context: &ViewContext<Main>) -> View {
-    let stopped = machine.state == State::Stopped;
+    let stopped = machine.state == State::Off;
     let open = stopped && !draft.saving;
     let mut rows = vec![
         row(
@@ -1927,12 +1937,16 @@ use guesthouse_basics::words::memory_as_given as memory_words;
 /// A card's memory, to the nearest GB, as a card's driver gives a little under its size.
 use guesthouse_basics::words::card_memory_to_nearest_gb as card_memory_words;
 
-/// The colour of a machine's dot: green when running, amber on its way somewhere, grey when stopped.
+/// The colour of a machine's dot: green when running, amber on its way somewhere, grey when off, and
+/// red when it failed.
 fn state_brush(state: State) -> ThemeBrush {
     match state {
         State::Running => ThemeBrush::SystemSuccess,
-        State::Starting | State::Stopping | State::Preparing => ThemeBrush::SystemCaution,
-        State::Stopped => ThemeBrush::TertiaryText,
+        State::Starting | State::Stopping | State::StoppingStalled | State::Installing => {
+            ThemeBrush::SystemCaution
+        }
+        State::Off => ThemeBrush::TertiaryText,
+        State::Failed => ThemeBrush::SystemCritical,
     }
 }
 
@@ -1957,7 +1971,7 @@ fn badge(state: State) -> Border {
             StackPanel::new()
                 .orientation(Orientation::Horizontal)
                 .spacing(8.0)
-                .children((dot(state), TextBlock::new().text(app::state_words(state)).font_size(12.0))),
+                .children((dot(state), TextBlock::new().text(state.name()).font_size(12.0))),
         )
 }
 

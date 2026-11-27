@@ -156,7 +156,7 @@ pub(super) fn start_and_run(service: &Arc<Service<Pretend>>, name: &str) {
 
 pub(super) fn stop(service: &Arc<Service<Pretend>>, name: &str) {
     ask(service, Request::Stop { name: name.into() });
-    wait_for(service, name, State::Stopped);
+    wait_for(service, name, State::Off);
 }
 
 #[test]

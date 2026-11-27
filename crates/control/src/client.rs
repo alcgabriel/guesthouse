@@ -1,8 +1,13 @@
 //! The app's end of the service's pipe. The service makes a new pipe instance for each request, so
 //! between two requests the pipe is away for a moment, and another window's request may hold it: an
 //! open that fails is tried again a few times before the service counts as not running.
+//!
+//! Each request carries the pipe's version, and a service of another version is told from one
+//! whose answer can't be read (see `protocol`).
 
+use crate::protocol::{from_other_version, request_line};
 use crate::{Answer, PIPE, Request, read_line, write_line};
+use serde_json::Value;
 use std::fs::{File, OpenOptions};
 use std::io::BufReader;
 use std::thread;
@@ -30,6 +35,8 @@ pub enum Unreached {
     Refused,
     /// The service answered with something that isn't an answer, or nothing at all.
     Garbled,
+    /// The service is of another version than the app, older or newer.
+    OtherVersion,
 }
 
 impl Unreached {
@@ -41,6 +48,7 @@ impl Unreached {
                 "The Guesthouse service refused this user. Only the signed-in user may use it."
             }
             Unreached::Garbled => "The Guesthouse service's answer couldn't be read.",
+            Unreached::OtherVersion => crate::protocol::OTHER_VERSION,
         }
     }
 }
@@ -59,12 +67,12 @@ pub fn ask(request: &Request) -> Result<Answer, Unreached> {
 /// ends it or `each` returns false.
 pub fn stream(request: &Request, mut each: impl FnMut(Answer) -> bool) -> Result<(), Unreached> {
     let mut pipe = open()?;
-    write_line(&mut pipe, request).map_err(|_| Unreached::NoService)?;
+    write_line(&mut pipe, &request_line(request)).map_err(|_| Unreached::NoService)?;
     let mut reader = BufReader::new(pipe);
     loop {
-        match read_line::<Answer>(&mut reader) {
-            Ok(Some(answer)) => {
-                if !each(answer) {
+        match read_line::<Value>(&mut reader) {
+            Ok(Some(line)) => {
+                if !each(answer_from(line)?) {
                     return Ok(());
                 }
             }
@@ -74,6 +82,15 @@ pub fn stream(request: &Request, mut each: impl FnMut(Answer) -> bool) -> Result
             Err(_) => return Err(Unreached::Garbled),
         }
     }
+}
+
+/// The answer in a line the service wrote. A service of another version is told apart before the
+/// rest is read, as its states may not be this app's.
+pub fn answer_from(line: Value) -> Result<Answer, Unreached> {
+    if from_other_version(&line) {
+        return Err(Unreached::OtherVersion);
+    }
+    serde_json::from_value(line).map_err(|_| Unreached::Garbled)
 }
 
 fn open() -> Result<File, Unreached> {

@@ -168,7 +168,7 @@ impl Work for Pretend {
         while !stop.load(Ordering::SeqCst) {
             thread::sleep(Duration::from_millis(5));
         }
-        sink.state(State::Stopped);
+        sink.state(State::Off);
         Ok(())
     }
 
@@ -385,7 +385,7 @@ fn wait_for(service: &Arc<Service<Pretend>>, name: &str, state: State) {
             .machines()
             .lock()
             .get(name)
-            .is_some_and(|entry| entry.state == state && (state != State::Stopped || entry.idle()))
+            .is_some_and(|entry| entry.state == state && (state != State::Off || entry.idle()))
         {
             return;
         }
@@ -398,14 +398,14 @@ fn wait_for(service: &Arc<Service<Pretend>>, name: &str, state: State) {
 fn a_new_machine_is_made_with_its_events_then_done() {
     let setup = setup("create", Pretend::default());
     let answers = ask(&setup.service, Request::Create { machine: new_machine(&setup, "win") });
-    assert_eq!(answers.first(), Some(&Answer::Event { event: Event::State(State::Preparing) }));
+    assert_eq!(answers.first(), Some(&Answer::Event { event: Event::State(State::Installing) }));
     assert!(answers.contains(&Answer::Event { event: Event::Note("making the disk".into()) }));
     assert_eq!(answers.last(), Some(&Answer::Done { reason: None }));
     let machines = status(&setup.service);
     assert_eq!(machines.len(), 1);
     assert_eq!(
         (machines[0].state, machines[0].card.as_deref()),
-        (State::Stopped, Some("NVIDIA GeForce RTX 5090"))
+        (State::Off, Some("NVIDIA GeForce RTX 5090"))
     );
     assert_eq!(setup.service.machines().store.load().len(), 1, "its settings are kept");
 }
@@ -471,7 +471,7 @@ fn a_machine_starts_stops_and_only_then_is_deleted() {
     assert_eq!(service.work.booted.lock().unwrap()[0].console_access, ["S-1-5-21-1-2-3-1001"]);
 
     assert_eq!(ask(service, Request::Stop { name: "win".into() }), [Answer::Ok]);
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
     assert_eq!(status(service)[0].address.as_deref(), Some("172.29.1.2"));
     assert!(matches!(
         ask(service, Request::Stop { name: "win".into() }).as_slice(),
@@ -499,7 +499,7 @@ fn a_watcher_gets_what_happened_and_what_happens_until_it_goes() {
             &mut Window { answers, readable: true, gone: false },
         );
     });
-    assert_eq!(received.recv().unwrap(), Answer::Event { event: Event::State(State::Preparing) });
+    assert_eq!(received.recv().unwrap(), Answer::Event { event: Event::State(State::Installing) });
     ask(&service, Request::Start { name: "win".into() });
     let running = Answer::Event { event: Event::State(State::Running) };
     while received.recv_timeout(Duration::from_secs(2)).unwrap() != running {}
@@ -528,7 +528,7 @@ fn a_linux_guest_is_given_a_copy_of_its_installer() {
     ask(&setup.service, Request::Start { name: "ubuntu".into() });
     assert!(!store.installer("ubuntu").exists());
     ask(&setup.service, Request::Stop { name: "ubuntu".into() });
-    wait_for(&setup.service, "ubuntu", State::Stopped);
+    wait_for(&setup.service, "ubuntu", State::Off);
     let _ = fs::remove_dir_all(root);
 }
 
@@ -560,7 +560,7 @@ fn a_machine_is_ended_only_while_it_runs_and_has_a_screen_only_once_its_guest_sa
     assert_eq!(ask(service, Request::End { name: "win".into() }), [Answer::Ok]);
     assert_eq!(*service.work.ended.lock().unwrap(), ["guesthouse-win"]);
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 fn change(service: &Arc<Service<Pretend>>, settings: MachineSettings) -> Vec<Answer> {
@@ -601,7 +601,7 @@ fn settings_change_while_off_are_kept_and_reach_the_next_boot() {
     let refused = change(service, MachineSettings { nvapi_wrapper: true, ..wanted.clone() });
     assert!(matches!(refused.as_slice(), [Answer::Refused { reason }] if reason.contains("while it's off")));
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 fn hardware(memory_mb: u64, card: Card) -> MachineSettings {
@@ -644,7 +644,7 @@ fn a_stopped_machine_is_changed_and_boots_with_it_next() {
     // Not while it runs, and its address, which the guest said, outlasts a change.
     assert!(matches!(change(hardware(8192, Card::None)).as_slice(), [Answer::Refused { .. }]));
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
     assert_eq!(change(hardware(8192, Card::None)), [Answer::Ok]);
     let machine = &status(service)[0];
     assert_eq!((machine.card.as_deref(), machine.address.as_deref()), (None, Some("172.29.1.2")));
@@ -764,7 +764,7 @@ fn a_new_machine_is_made_with_its_user_and_edition_and_boots_with_its_switches()
     assert_eq!((booted.tpm, booted.network), (false, false));
     assert_eq!(booted.shares, [host_settings::Share { folder, read_only: true, slot: 0 }]);
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 #[test]
@@ -865,7 +865,7 @@ fn a_machine_shares_several_folders_and_one_gone_leaves_its_slot_empty() {
         booted.shares.iter().map(|share| (share.folder.clone(), share.slot)).collect();
     assert_eq!(slots, [(folders[0].clone(), 0), (folders[2].clone(), 2)]);
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 #[test]
@@ -901,7 +901,7 @@ fn a_stopped_machines_disk_only_grows() {
     wait_for(service, "win", State::Running);
     assert!(matches!(grow(512).as_slice(), [Answer::Refused { .. }]), "not while it runs");
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 #[test]
@@ -935,7 +935,7 @@ fn a_share_is_checked_again_as_whoever_starts_the_machine() {
         history.iter().any(|event| matches!(event, Event::Problem(words) if words.contains("doesn't share")))
     );
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 #[test]
@@ -946,7 +946,7 @@ fn turning_the_network_off_forgets_the_guests_address() {
     ask(service, Request::Start { name: "win".into() });
     wait_for(service, "win", State::Running);
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
     assert!(status(service)[0].address.is_some());
     let off = MachineSettings { network: false, ..hardware(8192, Card::Default) };
     assert_eq!(ask(service, Request::Change { name: "win".into(), settings: off }), [Answer::Ok]);
@@ -1038,7 +1038,7 @@ fn snapshots_are_kept_to_the_services_rules() {
     wait_for(service, "win", State::Running);
     assert!(refused(Request::Snapshot { name: "win".into(), label: "x".into() }), "not while it runs");
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 #[test]
@@ -1090,7 +1090,7 @@ fn a_report_without_a_machine_is_the_hosts_files_then_the_machines_then_done() {
     assert_eq!(names, ["service.log", "windows.txt", "machines.txt"], "the work's parts, then the machines'");
     assert_eq!(missing, [("crashes.txt".to_owned(), "wevtutil isn't here.".to_owned())]);
     assert_eq!(files[0].1, "started\nstopped\n", "the lines about refused requests are left out");
-    assert_eq!(files[2].1, "win: windows, stopped, not set up\n");
+    assert_eq!(files[2].1, "win: windows, off, not set up\n");
     assert_eq!(answers.last(), Some(&Answer::Done { reason: None }));
     assert!(answers.iter().all(|answer| !matches!(answer, Answer::Refused { .. })));
 }
@@ -1210,7 +1210,7 @@ fn nested_virtualization_is_off_until_asked_for_and_reaches_the_next_boot() {
     wait_for(service, "win", State::Running);
     assert!(service.work.booted.lock().unwrap()[0].nested_virtualization);
     ask(service, Request::Stop { name: "win".into() });
-    wait_for(service, "win", State::Stopped);
+    wait_for(service, "win", State::Off);
 }
 
 /// A setup whose machines are all Ubuntu guests, with ports in `busy` taken by other programs.
@@ -1257,7 +1257,7 @@ fn a_port_is_kept_between_starts_and_booted_with() {
         assert_eq!(ask(service, Request::Start { name: "one".into() }), [Answer::Ok]);
         wait_for(service, "one", State::Running);
         ask(service, Request::Stop { name: "one".into() });
-        wait_for(service, "one", State::Stopped);
+        wait_for(service, "one", State::Off);
     }
     let booted = service.work.booted.lock().unwrap();
     assert_eq!(booted.iter().map(|boot| boot.ssh_port).collect::<Vec<_>>(), [Some(2201), Some(2201)]);
@@ -1283,7 +1283,7 @@ fn a_port_found_busy_at_a_start_is_chosen_again_and_said() {
         .collect();
     assert_eq!(said.len(), 1, "{said:?}");
     ask(service, Request::Stop { name: "one".into() });
-    wait_for(service, "one", State::Stopped);
+    wait_for(service, "one", State::Off);
 }
 
 #[test]

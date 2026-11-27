@@ -1,4 +1,4 @@
-//! How the service says a machine's state in a refusal, held word for word as it is.
+//! How the service says a machine's state in a refusal: the common word, in lower case.
 
 use super::words;
 use guesthouse_control::State;
@@ -6,11 +6,13 @@ use guesthouse_control::State;
 #[test]
 fn each_state_in_the_services_words() {
     for (state, said) in [
-        (State::Preparing, "being made"),
+        (State::Off, "off"),
         (State::Starting, "starting"),
+        (State::Installing, "installing"),
         (State::Running, "running"),
-        (State::Stopping, "shutting down"),
-        (State::Stopped, "stopped"),
+        (State::Stopping, "stopping"),
+        (State::StoppingStalled, "still stopping"),
+        (State::Failed, "failed"),
     ] {
         assert_eq!(words(state), said);
     }

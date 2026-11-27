@@ -74,7 +74,7 @@ impl Entry {
 
     /// Whether nothing is being done with the machine, so it may be started or deleted.
     pub fn idle(&self) -> bool {
-        self.state == State::Stopped && self.stop.is_none() && self.busy.is_none()
+        self.state == State::Off && self.stop.is_none() && self.busy.is_none()
     }
 }
 
@@ -97,7 +97,7 @@ impl Machines {
             .load()
             .into_iter()
             .map(|(name, settings)| {
-                let mut entry = Entry::new(settings, State::Stopped);
+                let mut entry = Entry::new(settings, State::Off);
                 entry.remote_view = read_switch(&store, &name);
                 (name, entry)
             })
@@ -147,7 +147,7 @@ impl Machines {
                 Err(TrySendError::Full(_) | TrySendError::Disconnected(_)) => false,
             });
             // Only a machine that has been made has settings to save.
-            ((address_changed && entry.state != State::Preparing).then(|| entry.settings.clone()), kept)
+            ((address_changed && entry.state != State::Installing).then(|| entry.settings.clone()), kept)
         };
         // The file is written with the machines free, as a slow disk must not hold up the others.
         keep_event(&self.store.events(name), &self.store.events_before(name), clock::now(), &kept);
