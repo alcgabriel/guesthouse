@@ -1,13 +1,15 @@
 //! Made-up machines in place of the service's, for looking at each of the window's states without a
 //! service or a GPU. Only a build with the `preview` feature has it. GUESTHOUSE_APP_PREVIEW names
-//! the state, and GUESTHOUSE_APP_THEME may say `light` or `dark`:
+//! the state, GUESTHOUSE_APP_THEME may say `light` or `dark`, and GUESTHOUSE_APP_SECTION may name the
+//! section a machine's page opens on (`Hardware`, `Network`, `Storage` or `Remote View`):
 //!
 //! ```powershell
 //! cargo build -p guesthouse-app-windows --features preview
 //! $env:GUESTHOUSE_APP_PREVIEW = "running"; .\target\debug\guesthouse-app.exe
 //! ```
 //!
-//! The states are `running`, `linux`, `starting`, `empty`, `away`, `refused`, `new`, `making`,
+//! The states are `home` (the machines' cards, some running), `running`, `linux`, `starting`,
+//! `empty` (no machines yet), `away`, `refused`, `new`, `making`,
 //! `failed`, `delete`, `settings` (a stopped machine's settings being changed) and `settings-refused`
 //! (the service said no to them), `report-new` (the report page, being written), `report` (a
 //! prepared report, and `report-sent` once it has an ID) and `report-away` (the report page when the
@@ -19,7 +21,7 @@ use guesthouse_control::{
 };
 use windows_reactor::WindowTheme;
 
-use super::{Account, Form, Kind, Line, Main, Making, Page, Ready, ReportStage};
+use super::{Account, Form, Kind, Line, Main, Making, Page, Ready, ReportStage, Section};
 use crate::bridge::Status;
 use crate::log::Log;
 use crate::remote_view::{Ask, Viewing};
@@ -31,6 +33,7 @@ use std::net::{IpAddr, Ipv4Addr};
 
 const STATE: &str = "GUESTHOUSE_APP_PREVIEW";
 const THEME: &str = "GUESTHOUSE_APP_THEME";
+const SECTION: &str = "GUESTHOUSE_APP_SECTION";
 
 pub fn wanted() -> bool {
     std::env::var_os(STATE).is_some()
@@ -47,6 +50,12 @@ pub fn stage(main: &mut Main) {
     };
     main.seen = Ok(status());
     match state.as_str() {
+        "home" => {
+            for (name, state) in [("win11", State::Running), ("build-box", State::Starting)] {
+                show(main, name, state);
+            }
+            main.page = Page::Home;
+        }
         "linux" => {
             show(main, "ubuntu", State::Running);
             main.account = Some(account("ubuntu"));
@@ -138,7 +147,10 @@ pub fn stage(main: &mut Main) {
             show(main, "ubuntu", State::Off);
             main.deleting = Some("ubuntu".to_owned());
         }
-        remote if remote.starts_with("rv-") => remote_view(main, remote),
+        remote if remote.starts_with("rv-") => {
+            remote_view(main, remote);
+            main.section = Section::RemoteView;
+        }
         _ => {
             show(main, "win11", State::Running);
             main.account = Some(account("win11"));
@@ -156,6 +168,9 @@ pub fn stage(main: &mut Main) {
                 note("It's running."),
             ]);
         }
+    }
+    if let Some(section) = std::env::var(SECTION).ok().as_deref().and_then(Section::of_label) {
+        main.section = section;
     }
 }
 
@@ -176,6 +191,8 @@ fn remote_view(main: &mut Main, state: &str) {
             machine.network_mode = NetworkMode::Bridged { adapter: "Ethernet".to_owned() };
         }
     }
+    // The draft was made from the machine before its network changed here.
+    main.follow_draft();
     let now = super::now_ms();
     let fingerprint = |head: &str| format!("{head}{}", "0".repeat(64 - head.len()));
     let device = |name: &str, head: &str, connected: bool, clipboard: bool| DeviceInfo {
@@ -280,6 +297,7 @@ fn show(main: &mut Main, name: &str, state: State) {
         machine.state = state;
     }
     main.page = Page::Machine;
+    main.back_to = Page::Machine;
     main.selected = Some(name.to_owned());
     main.follow_draft();
 }

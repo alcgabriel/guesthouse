@@ -8,7 +8,8 @@
 //! it, `window.rs` what's shown, `bridge.rs` the calls to the service, `screen.rs` remoteman's
 //! viewer, `console.rs` a machine's own screen in Windows' Remote Desktop control, `report.rs` a bug
 //! report's making and sending, `log.rs` a log's lines, `pace.rs` how often the window is told
-//! things, `remote_view.rs` what the Remote View group shows and asks, and `system.rs` the rest of what's asked of Windows.
+//! things, `remote_view.rs` what the Remote View group shows and asks, `shell.rs` how
+//! the window gets about, and `system.rs` the rest of what's asked of Windows.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
@@ -28,6 +29,8 @@ mod remote_view;
 mod report;
 #[cfg(windows)]
 mod screen;
+#[cfg(any(windows, test))]
+mod shell;
 #[cfg(windows)]
 mod system;
 #[cfg(windows)]

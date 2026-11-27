@@ -32,6 +32,8 @@ use guesthouse_remote_view_core::share::ShareState;
 #[cfg(feature = "preview")]
 mod preview;
 
+/// How long after a page opens its focus is moved, by when it has been laid out.
+const FOCUS_AFTER: std::time::Duration = std::time::Duration::from_millis(100);
 /// The most lines a log keeps. The oldest go first.
 const LOG_LIMIT: usize = 500;
 /// What a new machine is given unless the person changes it.
@@ -95,14 +97,19 @@ fn live() -> bool {
     true
 }
 
-/// What the right side shows.
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// What the window shows under its title bar.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Page {
+    /// The machines, a card each, to go into.
+    Home,
+    /// The selected machine's page, gone into from Home and out of with Back.
     Machine,
     New,
     /// Report a problem, which can be reached when the service can't be.
     Report,
 }
+
+pub use crate::shell::{Layout, Section};
 
 /// The report page: what's been written so far, and how far the report has got.
 #[derive(Clone)]
@@ -518,6 +525,19 @@ pub struct Making {
 pub struct Main {
     pub seen: Seen,
     pub page: Page,
+    /// Where Back goes from New machine and Report a problem: Home, or the machine's page they
+    /// were opened from.
+    pub back_to: Page,
+    /// The part of the machine's page that shows.
+    pub section: Section,
+    /// How the window's width lays the pages out.
+    pub layout: Layout,
+    /// What takes the keyboard's focus when a page opens, so keys and a screen reader start there.
+    pub focus: ElementRef,
+    /// The page that last had the focus moved to it, and the timer that moves it once a new page
+    /// has been laid out, as a control that isn't laid out yet can't take the focus.
+    focused: Option<(Page, Option<String>, bool)>,
+    focus_timer: Option<ComponentTimer>,
     /// The machine whose page is shown, by name, as the list's order can change under it.
     pub selected: Option<String>,
     /// The selected machine's log, from its watch.
@@ -568,10 +588,10 @@ pub struct Main {
 /// The key of Delete in a machine's More menu.
 pub const DELETE_KEY: &str = "delete";
 
-/// The tag of the navigation's New machine item. It has a space, which no machine's name can.
+/// The key of New machine in the machine switcher. It has a space, which no machine's name can.
 pub const NEW_TAG: &str = " new";
 
-/// The tag of the navigation's Report a problem item.
+/// The key of Report a problem in a machine's More menu.
 pub const REPORT_TAG: &str = " report";
 
 #[derive(Clone)]
@@ -584,13 +604,23 @@ pub enum Message {
     WatchEnded(u64, Ended),
     Creating(Event),
     Created(Option<String>),
-    /// An item of the navigation was chosen, by its tag: a machine's name, or `NEW_TAG`.
+    /// A machine was chosen in the switcher, by its name, or `NEW_TAG`. Its page keeps the
+    /// section that showed.
     Navigate(Option<String>),
+    /// A machine's card on Home was chosen: its page opens on its Overview.
+    Open(String),
+    /// Back: out of a machine's page to Home, or out of New machine or Report a problem to where
+    /// they were opened from.
+    Back,
+    /// A section of the machine's page was chosen, by its name in the bar.
+    Section(Option<String>),
+    /// The window's width crossed into another layout.
+    Layout(Layout),
+    /// Move the keyboard's focus to the page that has opened.
+    Focus,
     NewMachine,
     /// Open the report page, from the service-away page too.
     OpenReport,
-    /// Leave the report page for the machines, or the away page.
-    CloseReport,
     /// A machine was chosen for the report: 0 is none, then each in the list's order.
     ReportMachine(Option<usize>),
     /// A kind was chosen, by its place in `ProblemKind::ALL`.
@@ -864,7 +894,7 @@ impl Main {
         }
     }
 
-    /// Opens the report page. A report not begun is about the machine that's shown.
+    /// Opens the report page. A report not begun is about the machine whose page it's opened from.
     fn open_report(&mut self) {
         if self.page != Page::Report
             && matches!(self.report.stage, ReportStage::Writing { .. })
@@ -872,10 +902,40 @@ impl Main {
             && self.report.what.is_empty()
         {
             self.report.machine = self.selected.clone().filter(|name| {
-                self.status().is_some_and(|status| status.machines.iter().any(|m| &m.name == name))
+                self.page == Page::Machine
+                    && self.status().is_some_and(|status| status.machines.iter().any(|m| &m.name == name))
             });
         }
-        self.page = Page::Report;
+        self.go(Page::Report);
+    }
+
+    /// Shows `page`. New machine and Report a problem note where they were opened from, for Back.
+    fn go(&mut self, page: Page) {
+        if matches!(page, Page::New | Page::Report) && matches!(self.page, Page::Home | Page::Machine) {
+            self.back_to = self.page;
+        }
+        self.page = page;
+    }
+
+    /// Back, as the title bar's button, Alt+Left and the keyboard's Back key go.
+    fn back(&mut self) {
+        self.page = match self.page {
+            Page::Home | Page::Machine => Page::Home,
+            Page::New | Page::Report => self.back_to,
+        };
+    }
+
+    /// Goes into the machine `name`'s page, if it's one of the list's, on `section` if it has it.
+    fn enter(&mut self, name: String, section: Section) {
+        let Some(machine) = self.status().and_then(|status| status.machines.iter().find(|m| m.name == name))
+        else {
+            return;
+        };
+        self.section = if section.offered(machine.system) { section } else { Section::Overview };
+        self.page = Page::Machine;
+        if self.selected.as_ref() != Some(&name) {
+            self.select(Some(name));
+        }
     }
 
     /// What the report needs from the last status and the form.
@@ -1143,10 +1203,17 @@ impl Main {
         let names: Vec<String> = status.machines.iter().map(|machine| machine.name.clone()).collect();
         self.end_stopped_console();
         match &self.selected {
-            Some(name) if !names.contains(name) => self.select(names.first().cloned()),
+            // Gone, as when it was deleted: its page goes too, back to Home.
+            Some(name) if !names.contains(name) => {
+                self.select(None);
+                if self.page == Page::Machine {
+                    self.page = Page::Home;
+                }
+                // Back from New machine or Report a problem has no machine's page to go to now.
+                self.back_to = Page::Home;
+            }
             Some(_) if self.rewatch && was_away => self.select(self.selected.clone()),
-            Some(_) => {}
-            None => self.select(names.first().cloned()),
+            Some(_) | None => {}
         }
         self.follow_draft();
     }
@@ -1375,7 +1442,13 @@ impl Component for Main {
         let jobs = if live { bridge::start(window.clone()) } else { std::sync::mpsc::channel().0 };
         let mut main = Main {
             seen: Err(Unreached::NoService.words().to_owned()),
-            page: Page::Machine,
+            page: Page::Home,
+            back_to: Page::Home,
+            section: Section::Overview,
+            layout: Layout::of(crate::window::WIDTH),
+            focus: ElementRef::new(),
+            focused: None,
+            focus_timer: None,
             selected: None,
             log: new_log(),
             watch: None,
@@ -1410,6 +1483,14 @@ impl Component for Main {
             return main;
         }
         main.take_status(start.first.clone());
+        // With only one machine, its page is where the app opens, and Home is one Back away.
+        let only = main
+            .status()
+            .filter(|status| status.machines.len() == 1)
+            .map(|status| status.machines[0].name.clone());
+        if let Some(name) = only {
+            main.enter(name, Section::Overview);
+        }
         // Only an installed app asks, and anyone can turn it off.
         let asked_not_to = std::env::var("GUESTHOUSE_UPDATE_CHECK").is_ok_and(|value| value == "0");
         if crate::system::installed() && !asked_not_to {
@@ -1418,7 +1499,7 @@ impl Component for Main {
         main
     }
 
-    fn update(&mut self, message: Message, _: &ComponentContext<Self>) {
+    fn update(&mut self, message: Message, context: &ComponentContext<Self>) {
         match message {
             Message::Hwnd(hwnd) => self.hwnd = hwnd,
             Message::Status(seen) => self.take_status(seen),
@@ -1440,24 +1521,27 @@ impl Component for Main {
                     making.ended = Some(ended);
                 }
             }
-            Message::Navigate(Some(tag)) if tag == NEW_TAG => self.page = Page::New,
+            Message::Navigate(Some(tag)) if tag == NEW_TAG => self.go(Page::New),
             Message::Navigate(Some(tag)) if tag == REPORT_TAG => self.open_report(),
-            Message::Navigate(Some(name)) => {
-                let known =
-                    self.status().is_some_and(|status| status.machines.iter().any(|m| m.name == name));
-                if known {
-                    self.page = Page::Machine;
-                    // The navigation says what's selected whenever it's drawn, so only a new choice
-                    // counts.
-                    if self.selected.as_ref() != Some(&name) {
-                        self.select(Some(name));
-                    }
+            Message::Navigate(Some(name)) => self.enter(name, self.section),
+            Message::Navigate(None) => {}
+            Message::Open(name) => self.enter(name, Section::Overview),
+            Message::Back => self.back(),
+            Message::Section(label) => {
+                let system = self.machine().map(|machine| machine.system);
+                if let (Some(section), Some(system)) = (label.as_deref().and_then(Section::of_label), system)
+                    && section.offered(system)
+                {
+                    self.section = section;
                 }
             }
-            Message::Navigate(None) => {}
-            Message::NewMachine => self.page = Page::New,
+            Message::Layout(layout) => self.layout = layout,
+            Message::Focus => {
+                self.focus_timer = None;
+                let _ = self.focus.request_focus();
+            }
+            Message::NewMachine => self.go(Page::New),
             Message::OpenReport => self.open_report(),
-            Message::CloseReport => self.page = Page::Machine,
             Message::ReportMachine(index) => {
                 let names: Vec<String> = self
                     .status()
@@ -1515,11 +1599,11 @@ impl Component for Main {
             Message::ReportStartOver => self.start_over(),
             Message::Start => self.ask(Job::Start),
             Message::Stop => self.ask(Job::Stop),
-            Message::More(key) => {
-                if key.as_deref() == Some(DELETE_KEY) {
-                    self.deleting = self.selected.clone();
-                }
-            }
+            Message::More(key) => match key.as_deref() {
+                Some(DELETE_KEY) => self.deleting = self.selected.clone(),
+                Some(REPORT_TAG) => self.open_report(),
+                _ => {}
+            },
             Message::DeleteAnswered(result) => {
                 if let Some(name) = self.deleting.take()
                     && result == ContentDialogResult::Primary
@@ -1722,6 +1806,12 @@ impl Component for Main {
             }
         }
         self.follow_remote_view();
+        let opened =
+            (self.page, self.selected.clone().filter(|_| self.page == Page::Machine), self.seen.is_ok());
+        if self.focused.as_ref() != Some(&opened) {
+            self.focused = Some(opened);
+            self.focus_timer = Some(context.set_timeout(FOCUS_AFTER, Message::Focus));
+        }
     }
 
     fn view(&self, _: &Start, context: &mut ViewContext<Self>) -> View {
