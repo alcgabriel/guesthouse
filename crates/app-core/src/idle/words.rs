@@ -2,22 +2,14 @@
 
 use super::{Busy, GuestKind, IdleReading, Input, Limits, Verdict, judge};
 
+#[cfg(test)]
 const MINUTE: u64 = 60;
+#[cfg(test)]
 const HOUR: u64 = 60 * MINUTE;
 const PERCENT: f64 = 100.0;
 
 /// "45 seconds", "12 minutes", "3 hours 5 minutes".
-fn span(seconds: u64) -> String {
-    let plural = |count: u64, unit: &str| format!("{count} {unit}{}", if count == 1 { "" } else { "s" });
-    match seconds {
-        0..MINUTE => plural(seconds, "second"),
-        MINUTE..HOUR => plural(seconds / MINUTE, "minute"),
-        _ => match seconds % HOUR / MINUTE {
-            0 => plural(seconds / HOUR, "hour"),
-            minutes => format!("{} {}", plural(seconds / HOUR, "hour"), plural(minutes, "minute")),
-        },
-    }
-}
+use guesthouse_basics::words::span;
 
 fn percent(cores: f64) -> String {
     format!("{:.0}%", cores * PERCENT)

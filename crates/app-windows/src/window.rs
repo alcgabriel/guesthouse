@@ -1635,21 +1635,11 @@ fn system_glyph(system: System) -> &'static str {
     }
 }
 
-const MB_PER_GB: u64 = 1024;
-
 /// A machine's memory, as it was given: in GB when it's a whole number of them, and in MB otherwise.
-fn memory_words(mb: u64) -> String {
-    if mb >= MB_PER_GB && mb.is_multiple_of(MB_PER_GB) {
-        format!("{} GB", mb / MB_PER_GB)
-    } else {
-        format!("{mb} MB")
-    }
-}
+use guesthouse_basics::words::memory_as_given as memory_words;
 
 /// A card's memory, to the nearest GB, as a card's driver gives a little under its size.
-fn card_memory_words(mb: u64) -> String {
-    if mb >= MB_PER_GB { format!("{} GB", (mb + MB_PER_GB / 2) / MB_PER_GB) } else { format!("{mb} MB") }
-}
+use guesthouse_basics::words::card_memory_to_nearest_gb as card_memory_words;
 
 /// The colour of a machine's dot: green when running, amber on its way somewhere, grey when stopped.
 fn state_brush(state: State) -> ThemeBrush {

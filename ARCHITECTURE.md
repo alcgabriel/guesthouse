@@ -22,6 +22,7 @@ They're in `crates/`, listed here from the bottom up. Each depends only on crate
 
 | Crate | Its job |
 |---|---|
+| `basics` | Small pieces every host shares that belong to no one subject, each a value in and a value out or a plain file, moved from a host as they were and still reachable at their old paths there. Its package is `guesthouse-basics`. |
 | `transport` | The byte stream from QEMU: frames, packet kinds, guest page ranges. |
 | `messages` | What the guest's messages look like, and how to write the answers. No state, no decisions. |
 | `sensors` | The host card's newest readings, each process's part of an NVIDIA card, and each guest's video memory by its daemon's books, in small files any process of the user can read. |
@@ -264,6 +265,8 @@ There are three hosts. The Linux host is `app`, which calls `app-core` in the sa
 So most of what sits above the OS exists once per host. Machine files, settings checks, the states a machine goes through, the report code and the wording of errors are each written separately, and some field names differ, such as `cores` and `ram_gib` on Linux, `processors` and `memory_mb` on Windows, and `cores` and `memory_mb` on the Mac.
 
 Two crates are shared. `guesthouse-jail` is built on by the Linux daemon, `app-core` and `host-windows`. `guesthouse-remote-view-core` (`crates/remote-view`) is the first piece with no OS or hypervisor calls that the Linux and Windows hosts both build on: a guest's screen through remoteman, with the state types, remoteman's control words and status parsing, pairing as a state machine, the switch and the wording. Its names and shapes were taken from the macOS host's design so all three agree, and the macOS host is to build on the crate too rather than keep its own copy.
+
+Small pieces that belong to no one subject go in `guesthouse-basics` (`crates/basics`), so a host takes them without the rest of a subject's crate.
 
 The direction is one core for every host:
 
