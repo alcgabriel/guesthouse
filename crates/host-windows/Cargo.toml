@@ -14,6 +14,8 @@ name = "guesthouse-serial-relay"
 path = "src/relay.rs"
 
 [dependencies]
+# Which names a guest's administrator takes, as each host has them.
+guesthouse-account-core.workspace = true
 # The events it says what it does in, as the service sends them on to the app.
 guesthouse-control.workspace = true
 guesthouse-hcs.workspace = true
