@@ -83,6 +83,14 @@ pub trait Work: Send + Sync + 'static {
     /// can be, which stays open until what comes back is dropped, and has taken its announcement
     /// back and let go of its port once it has been.
     fn open_view(&self, view: &ViewSettings) -> Result<Opened, String>;
+    /// This PC's own addresses now, which a Windows guest lets reach its screen's port.
+    fn this_pcs_addresses(&self) -> Vec<std::net::Ipv4Addr> {
+        guesthouse_host_windows::screen::this_pcs_addresses()
+    }
+    /// The address of this PC's that a packet to `guest` leaves from.
+    fn source_towards(&self, guest: std::net::Ipv4Addr) -> Option<std::net::Ipv4Addr> {
+        guesthouse_host_windows::screen::source_towards(guest)
+    }
     /// Makes `folder`, which must not be there yet, for one machine's disks, so that only the system
     /// and administrators may open it or anything made in it. Its parent is the user's, so nothing
     /// is made but this one folder.
@@ -620,6 +628,7 @@ impl<W: Work> Service<W> {
             }
             entry.stop = Some(Arc::clone(&stop));
             entry.ctl = Some(ctl.clone());
+            entry.boot_addresses = Vec::new();
             entry.state = State::Starting;
             // What the guest said last run isn't where its forwards lead until it says it again.
             entry.run_address = None;
@@ -650,6 +659,10 @@ impl<W: Work> Service<W> {
                 ),
             }
         }
+        let host_addresses = self.work.this_pcs_addresses();
+        if let Some(entry) = self.machines.lock().get_mut(&name) {
+            entry.boot_addresses = host_addresses.clone();
+        }
         // An Ubuntu guest's SSH port, chosen again if another program has taken it since.
         let (ssh_port, said) = keep_port(&self.machines, &*self.work, &name);
         if let Some(said) = said {
@@ -671,6 +684,8 @@ impl<W: Work> Service<W> {
                 NetworkMode::Shared => None,
                 NetworkMode::Bridged { adapter } => Some(adapter.clone()),
             },
+            // Only this PC may reach the guest's screen, whichever network it's on.
+            host_addresses: Some(host_addresses.clone()),
             ..BootSettings::new(&vm_id(&name), disk)
         };
         if settings.bridge.is_some() && !entry_settings.forwards.is_empty() {

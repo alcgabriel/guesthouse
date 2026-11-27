@@ -43,6 +43,8 @@ pub struct Entry {
     pub remote_view: Switch,
     /// The way to ask remoteman's host in its guest, while it runs.
     pub ctl: Option<GuestCtl>,
+    /// This PC's addresses as this run began, which its guest lets reach its screen's port.
+    pub boot_addresses: Vec<std::net::Ipv4Addr>,
     /// Where its remote view stands on this PC's network, as its keeper last left it.
     pub view: ViewStanding,
     /// Whether the guest's remoteman answered when it was last asked this run, and how many devices
@@ -62,6 +64,7 @@ impl Entry {
             run_address: None,
             remote_view: Switch::default(),
             ctl: None,
+            boot_addresses: Vec::new(),
             view: ViewStanding::default(),
             view_answered: None,
             history: VecDeque::new(),

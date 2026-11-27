@@ -19,8 +19,8 @@
 use super::{Service, Work, no_machine};
 use crate::machines::{ViewStanding, write_switch};
 use crate::store::Held;
-use guesthouse_control::Answer;
 use guesthouse_control::Event as MachineEvent;
+use guesthouse_control::{Answer, NetworkMode};
 use guesthouse_host_windows::guest_ctl::GuestCtl;
 use guesthouse_host_windows::machine::Guest;
 use guesthouse_host_windows::network::{
@@ -154,6 +154,14 @@ fn refusal(name: &str, record: &Record, network: bool) -> Option<String> {
 /// The pairing policy for the machine whose disk is `disk`: Guesthouse's own viewer, by its
 /// fingerprint beside the disk, is kept out of sight. A machine that never had a viewer made has
 /// none to hide.
+/// Why a bridged guest can't be reached now.
+fn moved(from: Ipv4Addr) -> String {
+    format!(
+        "This PC's address on the guest's network is {from} now, which the guest didn't have as this PC's when \
+         it started, so it lets nothing in from it. Restart the machine to share its screen again."
+    )
+}
+
 pub(super) fn policy(disk: &Path) -> Policy {
     let certificate = state_beside(disk).join("client").join("cert.der");
     fs::read(certificate).map_or_else(|_| Policy::linux(), |der| Policy::windows(&screen::fingerprint(&der)))
@@ -418,10 +426,16 @@ impl<W: Work> Service<W> {
 
     /// The port and guest address `name`'s view should be open on now, or what it shows instead.
     fn wanted_view(&self, name: &str, record: &Record) -> Result<Wanted, ViewStanding> {
-        let (switch, network, said) = {
+        let (switch, network, said, bridged, given) = {
             let entries = self.machines.lock();
             let entry = entries.get(name).ok_or_else(|| standing(ShareState::Off, None))?;
-            (entry.remote_view, entry.settings.network, entry.run_address.clone())
+            (
+                entry.remote_view,
+                entry.settings.network,
+                entry.run_address.clone(),
+                matches!(entry.settings.network_mode, NetworkMode::Bridged { .. }),
+                entry.boot_addresses.clone(),
+            )
         };
         let port = match switch.values() {
             (true, Some(port)) => port,
@@ -441,6 +455,14 @@ impl<W: Work> Service<W> {
                 Some(format!("The guest's address {said:?} isn't one other devices can be passed on to.")),
             )
         })?;
+        // A bridged guest lets in only the addresses this PC had as it started. One this PC has
+        // taken since, as a new lease or another network gives, is let in from its next start.
+        if bridged
+            && let Some(from) = self.work.source_towards(guest)
+            && !given.contains(&from)
+        {
+            return Err(standing(ShareState::Failed, Some(moved(from))));
+        }
         Ok(Wanted { port, guest })
     }
 

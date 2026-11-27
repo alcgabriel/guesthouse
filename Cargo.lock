@@ -1101,6 +1101,7 @@ dependencies = [
  "guesthouse-hcs",
  "guesthouse-jail",
  "guesthouse-remote-view-core",
+ "if-addrs",
  "serde",
  "serde_json",
 ]

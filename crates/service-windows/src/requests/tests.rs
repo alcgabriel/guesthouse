@@ -25,7 +25,12 @@ struct Pretend {
     remoteman: Arc<Remoteman>,
     /// The service's log.
     logged: Mutex<Vec<String>>,
+    /// The address of this PC's that packets to a guest leave from, when a test says.
+    source: Mutex<Option<std::net::Ipv4Addr>>,
 }
+
+/// This PC's address on its network, in these tests.
+const THIS_PC: std::net::Ipv4Addr = std::net::Ipv4Addr::new(192, 168, 1, 20);
 
 /// remoteman's host in a pretend Windows guest: it keeps the words of each `ctl` request that
 /// reaches it, answers `status` with `status`, and everything else with `ok`.
@@ -214,6 +219,14 @@ impl Work for Pretend {
 
     fn log(&self, text: &str) {
         self.logged.lock().unwrap().push(text.to_owned());
+    }
+
+    fn this_pcs_addresses(&self) -> Vec<std::net::Ipv4Addr> {
+        vec![THIS_PC]
+    }
+
+    fn source_towards(&self, _: std::net::Ipv4Addr) -> Option<std::net::Ipv4Addr> {
+        *self.source.lock().unwrap()
     }
 
     fn udp_port_free(&self, port: u16) -> bool {

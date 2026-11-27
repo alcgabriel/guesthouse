@@ -3,6 +3,7 @@
 
 use super::network::{FakeNet, net, problems, start_and_run, stop, wait_net};
 use super::*;
+use guesthouse_control::AdapterInfo;
 use guesthouse_host_windows::network::{Proxy, rule_name};
 use guesthouse_remote_view_core::share::{ShareInfo, ShareState};
 use std::net::Ipv4Addr;
@@ -196,15 +197,29 @@ fn switching_it_on_and_off_while_the_machine_runs_opens_and_closes_it_and_never_
 
 #[test]
 fn a_bridged_machines_relay_leads_to_the_address_its_guest_has_on_this_pcs_network() {
-    let setup = setup("view-bridged", Pretend::default());
+    let fake = FakeNet::with(|net| {
+        net.bridging = Bridging {
+            available: true,
+            reason: None,
+            adapters: vec![AdapterInfo {
+                name: "Ethernet".into(),
+                description: "Ethernet".into(),
+                wifi: false,
+            }],
+        }
+    });
+    let setup = setup("view-bridged", Pretend { net: fake, ..Pretend::default() });
     let service = &setup.service;
     windows_machine(&setup, "win");
-    change(
-        service,
-        MachineSettings {
-            network_mode: NetworkMode::Bridged { adapter: "Ethernet".into() },
-            ..hardware(8192, Card::Default)
-        },
+    assert_eq!(
+        change(
+            service,
+            MachineSettings {
+                network_mode: NetworkMode::Bridged { adapter: "Ethernet".into() },
+                ..hardware(8192, Card::Default)
+            },
+        ),
+        [Answer::Ok]
     );
     share(service, "win", Some(true));
     service.work.silent.store(true, Ordering::SeqCst);
@@ -212,6 +227,21 @@ fn a_bridged_machines_relay_leads_to_the_address_its_guest_has_on_this_pcs_netwo
     service.machines().tell("win", Event::Guest("guesthouse: address: 192.168.1.40".into()));
     wait_view(service, "win", ShareState::Listening);
     assert_eq!(net(service).calls[1], "open_view 7792 192.168.1.40:7791");
+    assert_eq!(
+        service.work.booted.lock().unwrap()[0].host_addresses,
+        Some(vec![THIS_PC]),
+        "the guest lets in this PC"
+    );
+
+    // This PC takes another address on that network while the machine runs: the guest won't let it
+    // in until its next start, which the view says, and back on the old one it opens again.
+    *service.work.source.lock().unwrap() = Some(Ipv4Addr::new(192, 168, 1, 77));
+    wait_view(service, "win", ShareState::Failed);
+    assert!(net(service).views.is_empty());
+    let shown = shown(service, "win");
+    assert!(shown.reason.unwrap().contains("192.168.1.77"));
+    *service.work.source.lock().unwrap() = Some(THIS_PC);
+    wait_view(service, "win", ShareState::Listening);
     stop(service, "win");
 }
 
