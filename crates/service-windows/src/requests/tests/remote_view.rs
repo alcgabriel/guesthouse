@@ -431,3 +431,24 @@ fn a_guest_that_doesnt_answer_is_said_and_the_app_is_answered_anyway() {
     assert_eq!(info(share(service, "win", None)).state, ShareState::Starting);
     assert_eq!(service.work.remoteman.asked().len(), before);
 }
+
+#[test]
+fn a_machine_whose_name_cant_be_announced_still_listens_and_says_why() {
+    let setup = setup(
+        "view-unlisted",
+        Pretend { net: FakeNet::with(|net| net.name_taken = true), ..Pretend::default() },
+    );
+    let service = &setup.service;
+    windows_machine(&setup, "win");
+    share(service, "win", Some(true));
+    start_and_run(service, "win");
+    wait_view(service, "win", ShareState::Listening);
+    let shown = shown(service, "win");
+    assert_eq!(shown.state, ShareState::Listening);
+    let reason = shown.reason.unwrap();
+    assert!(reason.contains("the name is taken") && reason.contains("still reach it"), "{reason}");
+    assert!(service.work.logged.lock().unwrap().iter().any(|line| line.contains("the name is taken")));
+    assert!(problems(service, "win").is_empty(), "a note, not a problem");
+    stop(service, "win");
+    assert!(net(service).views.is_empty());
+}

@@ -64,8 +64,9 @@ pub struct ViewSettings {
     pub fingerprint: Option<String>,
 }
 
-/// An announcer that says nothing: the machine is reached by the address and port the app shows.
-/// Windows' own DNS-SD responder takes its place behind the same trait.
+/// An announcer that says nothing, for tests and wherever nothing may go on the network: the
+/// machine is reached by the address and port the app shows. The service on Windows announces
+/// through Windows' own responder behind the same trait.
 pub struct Unannounced;
 
 impl Announcer for Unannounced {
@@ -85,9 +86,18 @@ impl Drop for Open {
     }
 }
 
+/// A machine's remote view opened on this PC's network.
+pub struct Opened {
+    /// The relay, which closes, taking its announcement back first, when dropped.
+    pub relay: Held,
+    /// Why the machine isn't listed on the network by its name, when it isn't. Its address and
+    /// port still work.
+    pub unlisted: Option<String>,
+}
+
 /// Opens `view` as the shared relay does it: listening on its port on every network of this PC,
 /// passing each device on to the guest, and announced by `announcer` while it listens.
-pub fn open_relay(view: &ViewSettings, announcer: Box<dyn Announcer + Send>) -> Result<Held, String> {
+pub fn open_relay(view: &ViewSettings, announcer: Box<dyn Announcer + Send>) -> Result<Opened, String> {
     let settings = LanSettings {
         listen: Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), view.port)),
         name: Some(view.machine.clone()),
@@ -97,7 +107,8 @@ pub fn open_relay(view: &ViewSettings, announcer: Box<dyn Announcer + Send>) -> 
     let lan = Lan::with_announcer(&settings, announcer);
     let status = lan.status();
     match status.state {
-        RelayState::Listening => Ok(Box::new(Open(lan))),
+        // Listening with a reason is listening unannounced.
+        RelayState::Listening => Ok(Opened { relay: Box::new(Open(lan)), unlisted: status.reason }),
         _ => Err(status.reason.unwrap_or_else(|| format!("port {} couldn't be listened on.", view.port))),
     }
 }
@@ -382,7 +393,12 @@ impl<W: Work> Service<W> {
                     self.close_view(name, made);
                 }
                 if let Ok(wanted) = wanted {
-                    made = Some(self.open_view(name, wanted, record.screen.clone()));
+                    // The fingerprint the guest said last, which a first start after setting up
+                    // may have said only now.
+                    let disk = self.machines.store.disk(name);
+                    let fingerprint =
+                        Record::load(&disk).ok().and_then(|now| now.screen).or(record.screen.clone());
+                    made = Some(self.open_view(name, wanted, fingerprint));
                 }
             }
             let now = match (&wanted, &made) {
@@ -455,7 +471,7 @@ impl<W: Work> Service<W> {
             fingerprint,
         };
         match self.work.open_view(&view) {
-            Ok(relay) => {
+            Ok(Opened { relay, unlisted }) => {
                 self.machines.tell(
                     name,
                     MachineEvent::Note(format!(
@@ -463,11 +479,18 @@ impl<W: Work> Service<W> {
                         wanted.guest
                     )),
                 );
+                if let Some(why) = &unlisted {
+                    let said = format!("{why} Devices still reach it by this PC's address and port {port}.");
+                    self.machines.tell(name, MachineEvent::Note(said.clone()));
+                    self.work.log(&format!("{name}: {said}"));
+                }
+                let reason = unlisted
+                    .map(|why| format!("{why} Devices still reach it by this PC's address and port."));
                 Made {
                     wanted,
                     rule: Some(rule),
                     relay: Some(relay),
-                    standing: standing(ShareState::Listening, None),
+                    standing: standing(ShareState::Listening, reason),
                 }
             }
             Err(error) => {

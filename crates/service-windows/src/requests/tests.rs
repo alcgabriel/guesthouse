@@ -221,14 +221,17 @@ impl Work for Pretend {
     }
 
     /// A relay that's only an entry in the double's calls, made as it opens and as it closes.
-    fn open_view(&self, view: &ViewSettings) -> Result<Held, String> {
+    fn open_view(&self, view: &ViewSettings) -> Result<Opened, String> {
         let mut state = self.net.state.lock().unwrap();
         state.calls.push(format!("open_view {} {}", view.port, view.upstream));
         if state.refuse_view {
             return Err("the port is taken".into());
         }
         state.views.push(view.port);
-        Ok(Box::new(Relay { net: Arc::clone(&self.net.state), port: view.port }))
+        let unlisted = state
+            .name_taken
+            .then(|| "The machine isn't announced on the network: the name is taken.".to_owned());
+        Ok(Opened { relay: Box::new(Relay { net: Arc::clone(&self.net.state), port: view.port }), unlisted })
     }
 
     fn free_space(&self, _: &Path) -> Result<u64, String> {

@@ -490,7 +490,7 @@ mod tests {
         fn udp_port_free(&self, _: u16) -> bool {
             false
         }
-        fn open_view(&self, _: &crate::requests::ViewSettings) -> Result<crate::requests::Held, String> {
+        fn open_view(&self, _: &crate::requests::ViewSettings) -> Result<crate::requests::Opened, String> {
             Err("not here".into())
         }
         fn free_space(&self, _: &Path) -> Result<u64, String> {

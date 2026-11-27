@@ -25,6 +25,8 @@ pub(super) struct NetState {
     pub views: Vec<u16>,
     /// A remote view's relay can't listen.
     pub refuse_view: bool,
+    /// The machine's name is announced on the network already, by something else on this PC.
+    pub name_taken: bool,
 }
 
 #[derive(Default)]

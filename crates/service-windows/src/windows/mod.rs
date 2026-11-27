@@ -9,7 +9,7 @@ mod scm;
 mod security;
 
 use crate::report_parts::{tail_file, without_refusals};
-use crate::requests::{Held, Service, Unannounced, ViewSettings, Work, open_relay};
+use crate::requests::{Opened, Service, ViewSettings, Work, open_relay};
 use crate::store::Store;
 use guesthouse_control::{CardInfo, PIPE};
 use guesthouse_hcs::gpu;
@@ -124,9 +124,9 @@ impl Work for HostWork {
         guesthouse_relay::udp_port_free(port)
     }
 
-    /// Nothing announces the machine on the network yet: a device is given the address and port.
-    fn open_view(&self, view: &ViewSettings) -> Result<Held, String> {
-        open_relay(view, Box::new(Unannounced))
+    /// Announced through Windows' own mDNS responder, by the machine's name.
+    fn open_view(&self, view: &ViewSettings) -> Result<Opened, String> {
+        open_relay(view, Box::new(guesthouse_host_windows::announce::DnsSd::new()))
     }
 
     fn private_folder(&self, folder: &Path) -> Result<(), String> {

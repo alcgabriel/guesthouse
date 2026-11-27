@@ -79,9 +79,10 @@ pub trait Work: Send + Sync + 'static {
     fn port_free(&self, port: u16) -> bool;
     /// Whether a remote view's relay could listen on UDP `port` on every network of this PC now.
     fn udp_port_free(&self, port: u16) -> bool;
-    /// Opens a machine's remote view on this PC's network, which stays open until what comes back
-    /// is dropped, and has let go of its port once it has been.
-    fn open_view(&self, view: &ViewSettings) -> Result<Held, String>;
+    /// Opens a machine's remote view on this PC's network, announced by the machine's name where it
+    /// can be, which stays open until what comes back is dropped, and has taken its announcement
+    /// back and let go of its port once it has been.
+    fn open_view(&self, view: &ViewSettings) -> Result<Opened, String>;
     /// Makes `folder`, which must not be there yet, for one machine's disks, so that only the system
     /// and administrators may open it or anything made in it. Its parent is the user's, so nothing
     /// is made but this one folder.
@@ -117,7 +118,7 @@ pub trait Connection {
 /// The folder a check holds open, for as long as it's kept.
 pub use crate::store::Held;
 
-pub use remote_view::{Unannounced, ViewSettings, open_relay};
+pub use remote_view::{Opened, Unannounced, ViewSettings, open_relay};
 
 /// HCS's ID for a machine, which also names its pipes. `boot` stops any machine with its ID that's
 /// still there, so it's never another program's.
