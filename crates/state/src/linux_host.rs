@@ -1,28 +1,8 @@
-//! The Linux host's machine states and the word each is shown with. They have no serialized form:
-//! the app shows them by these words.
+//! The Linux host's machine states: the common ones in [`crate::common`], whose first five and
+//! their words are the Linux host's own. It never has the other two. The app shows them by their
+//! words and never sends them anywhere.
 
-/// Where a machine stands, as the Linux app shows it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum State {
-    #[default]
-    Off,
-    Starting,
-    Installing,
-    Running,
-    Stopping,
-}
-
-impl State {
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Off => "Off",
-            Self::Starting => "Starting",
-            Self::Installing => "Installing",
-            Self::Running => "Running",
-            Self::Stopping => "Stopping",
-        }
-    }
-}
+pub use crate::common::State;
 
 #[cfg(test)]
 mod tests;

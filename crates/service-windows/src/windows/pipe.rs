@@ -11,7 +11,9 @@
 use super::log;
 use super::security::{Descriptor, SYSTEM, is_administrator, last_error, own_user, token_user, wide};
 use crate::requests::{Connection, Held, Service, Work};
-use guesthouse_control::{Answer, REQUEST_LIMIT, Request, read_line, write_line};
+use guesthouse_control::protocol::{NOT_A_REQUEST, request_from};
+use guesthouse_control::{Answer, REQUEST_LIMIT, read_line, write_line};
+use serde_json::Value;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufReader};
 use std::os::windows::ffi::OsStringExt;
@@ -119,21 +121,23 @@ fn serve<W: Work>(name: &str, service: Arc<Service<W>>, security: Descriptor, fi
 
 /// Reads one request and answers it, if whoever asked may ask.
 fn answer<W: Work>(service: &Arc<Service<W>>, pipe: File) {
-    let request = read_line::<Request>(&mut BufReader::new(&pipe));
+    let line = read_line::<Value>(&mut BufReader::new(&pipe));
     let mut connection = Pipe { file: &pipe };
-    match request {
-        Ok(Some(request)) => match allowed(&pipe) {
+    match line.map(|line| line.map(request_from)) {
+        Ok(Some(Ok(request))) => match allowed(&pipe) {
             Ok(()) => service.answer(request, &mut connection),
             Err(reason) => {
                 log(&format!("refused: {reason}"));
                 let _ = connection.send(&Answer::Refused { reason });
             }
         },
+        // An app of another version, or a line that isn't a request: told why, in words any app shows.
+        Ok(Some(Err(reason))) => {
+            let _ = connection.send(&Answer::Refused { reason });
+        }
         Ok(None) => {}
         Err(_) => {
-            let reason =
-                "That isn't a request the service knows. The app and the service may be different versions.";
-            let _ = connection.send(&Answer::Refused { reason: reason.into() });
+            let _ = connection.send(&Answer::Refused { reason: NOT_A_REQUEST.into() });
         }
     }
     // The answer is waited on until the app has read it, and then the instance is closed, which
@@ -402,7 +406,8 @@ mod folder_tests {
 mod tests {
     use super::*;
     use crate::store::Store;
-    use guesthouse_control::{CardInfo, read_line};
+    use guesthouse_control::protocol::{OTHER_VERSION, PROTOCOL, request_line};
+    use guesthouse_control::{CardInfo, Request, read_line};
     use guesthouse_host_windows::events::Sink;
     use guesthouse_host_windows::settings::{BootSettings, PrepareSettings};
     use std::fs::OpenOptions;
@@ -515,12 +520,22 @@ mod tests {
 
         for _ in 0..3 {
             let pipe = OpenOptions::new().access_mode(0x0012_008b).open(name).unwrap();
-            write_line(&mut &pipe, &Request::Status).unwrap();
+            write_line(&mut &pipe, &request_line(&Request::Status)).unwrap();
             match read_line::<Answer>(&mut BufReader::new(&pipe)).unwrap() {
-                Some(Answer::Status { machines, .. }) => assert!(machines.is_empty()),
+                Some(Answer::Status { machines, protocol, .. }) => {
+                    assert!(machines.is_empty());
+                    assert_eq!(protocol, PROTOCOL);
+                }
                 other => panic!("{other:?}"),
             }
         }
+        // An app from before the pipe had a version is told to update, in words it shows.
+        let pipe = OpenOptions::new().access_mode(0x0012_008b).open(name).unwrap();
+        write_line(&mut &pipe, &Request::Status).unwrap();
+        assert_eq!(
+            read_line::<Answer>(&mut BufReader::new(&pipe)).unwrap(),
+            Some(Answer::Refused { reason: OTHER_VERSION.into() })
+        );
         let _ = std::fs::remove_dir_all(root);
     }
 }

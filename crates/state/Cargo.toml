@@ -1,6 +1,6 @@
 [package]
 name = "guesthouse-state-core"
-description = "A machine's states and their words, as each host has them, with the names that go over the wire kept as they are. Nothing here calls the system, so every host can build on it."
+description = "A machine's states and their words, one list for every host, with the names that go over the wire. Nothing here calls the system, so every host can build on it."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
-# The Windows host's states go over its pipe as JSON.
+# The states go over the Windows host's pipe as JSON.
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]

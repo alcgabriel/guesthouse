@@ -73,7 +73,7 @@ pub fn boot_with(
     sink.state(State::Starting);
     let ran = run(settings, &sink, stop, &ctl);
     ctl.end();
-    sink.state(State::Stopped);
+    sink.state(State::Off);
     ran
 }
 

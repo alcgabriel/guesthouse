@@ -370,7 +370,13 @@ impl<W: Work> Service<W> {
                 }
             })
             .collect();
-        Answer::Status { version: guesthouse_control::WINDOWS_VERSION.into(), machines, cards, bridging }
+        Answer::Status {
+            version: guesthouse_control::WINDOWS_VERSION.into(),
+            protocol: guesthouse_control::protocol::PROTOCOL,
+            machines,
+            cards,
+            bridging,
+        }
     }
 
     /// Why a machine can't be given `memory_mb` and `processors`, if it can't.
@@ -481,9 +487,9 @@ impl<W: Work> Service<W> {
             ssh_port: None,
             size_gb: Some(machine.size_gb),
         };
-        self.machines.lock().insert(name.clone(), Entry::new(settings, State::Preparing));
+        self.machines.lock().insert(name.clone(), Entry::new(settings, State::Installing));
         let (_, events) = self.machines.watch(&name).expect("the machine was just added");
-        self.machines.tell(&name, Event::State(State::Preparing));
+        self.machines.tell(&name, Event::State(State::Installing));
 
         let service = Arc::clone(self);
         let work = thread::spawn(move || service.make(machine));
@@ -578,7 +584,7 @@ impl<W: Work> Service<W> {
             settings.map_or(Ok(()), |settings| store.save(&name, &settings))
         });
         match &made {
-            Ok(()) => self.machines.tell(&name, Event::State(State::Stopped)),
+            Ok(()) => self.machines.tell(&name, Event::State(State::Off)),
             Err(error) => {
                 self.machines.tell(&name, Event::Problem(error.clone()));
                 self.machines.lock().remove(&name);
@@ -727,7 +733,7 @@ impl<W: Work> Service<W> {
             let mut entries = service.machines.lock();
             if let Some(entry) = entries.get_mut(&name) {
                 entry.stop = None;
-                entry.state = State::Stopped;
+                entry.state = State::Off;
             }
         });
         Answer::Ok
@@ -1505,7 +1511,7 @@ fn no_snapshot(name: &str, id: u64) -> Answer {
 fn busy_words(entry: &Entry) -> String {
     match &entry.busy {
         Some(doing) => doing.to_lowercase(),
-        None => words(entry.state).to_owned(),
+        None => words(entry.state),
     }
 }
 
@@ -1523,8 +1529,10 @@ fn no_machine(name: &str) -> Answer {
     Answer::Refused { reason: format!("There is no machine called {name}.") }
 }
 
-/// A machine's state in the service's words.
-use guesthouse_state_core::windows_host::service_words as words;
+/// A machine's state in the service's words: its common word, in lower case, as it's said mid-way.
+fn words(state: State) -> String {
+    state.name().to_lowercase()
+}
 
 #[cfg(test)]
 #[path = "requests/state_words_tests.rs"]

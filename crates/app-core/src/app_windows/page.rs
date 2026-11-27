@@ -67,8 +67,11 @@ pub fn body(situation: &Situation) -> Body {
         return Body::SwitchedOff;
     }
     match situation.state {
-        State::Off => Body::MachineOff,
-        State::Starting | State::Installing | State::Stopping => Body::Waiting(situation.state),
+        // This host never has a failed machine or a stalled shutdown, which the common states have.
+        State::Off | State::Failed => Body::MachineOff,
+        State::Starting | State::Installing | State::Stopping | State::StoppingStalled => {
+            Body::Waiting(situation.state)
+        }
         State::Running if situation.has_forward == Some(false) => Body::NeedsRestart,
         State::Running => Body::Ask,
     }

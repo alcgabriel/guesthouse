@@ -101,7 +101,7 @@ impl Window {
 /// Asks how things stand.
 pub fn status() -> Seen {
     match client::ask(&Request::Status) {
-        Ok(Answer::Status { version, machines, cards, bridging }) => {
+        Ok(Answer::Status { version, machines, cards, bridging, .. }) => {
             Ok(Status { version, machines, cards, bridging })
         }
         Ok(Answer::Refused { reason }) => Err(reason),
