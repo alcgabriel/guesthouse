@@ -1,0 +1,12 @@
+{
+  "big": 18446744073709551615,
+  "card_memories": {
+    "0000:01:00.0": 24576,
+    "0000:02:00.0": 8192
+  },
+  "card_memory_mib": 24576,
+  "driver_folder": "/somewhere/driver",
+  "negative": -3,
+  "nothing": null,
+  "version": 1
+}
