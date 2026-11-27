@@ -18,6 +18,10 @@ guesthouse-basics.workspace = true
 guesthouse-control.workspace = true
 # The work itself: making a machine's disks and running it.
 guesthouse-host-windows.workspace = true
+# A machine's remote view: its switch, pairing's driver and what it shows, as every host has them.
+guesthouse-remote-view-core.workspace = true
+# The relay that lets other devices on this PC's network reach a guest's remoteman.
+guesthouse-relay.workspace = true
 # Each machine's settings, in its folder.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

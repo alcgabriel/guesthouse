@@ -1,17 +1,27 @@
 [package]
 name = "guesthouse-relay"
-description = "A UDP relay from a port on the network to a loopback port, with a socket of its own upstream for each client."
+description = "A UDP relay from a port on the network to a guest's port, with a socket of its own upstream for each client, and the network side of a machine's remote view that runs it."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
 
-[target.'cfg(target_os = "linux")'.dependencies]
-# Larger socket buffers, which the standard library does not set. Safe calls, so this crate's one `unsafe` stays in `signal.rs`.
-rustix = { version = "1", features = ["net"] }
+[dependencies]
+# The announcement and the state the network side reports, which every host shares.
+guesthouse-remote-view-core.workspace = true
+# Larger socket buffers, which the standard library does not set, through safe calls on Linux and Windows alike.
+socket2 = "0.6"
+# What a host asks the network side and what it answers are JSON.
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(unix)'.dependencies]
 # sigaction, for ending on SIGTERM.
 libc = "0.2"
+
+[dev-dependencies]
+# The requests' wording on the wire, which a test holds.
+serde_json = "1"
 
 [lints]
 workspace = true

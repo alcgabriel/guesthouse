@@ -1,0 +1,12 @@
+10:00:01 app: could not read ~/.config/guesthouse/app.json
+10:00:02 <user>-desk task: start <machine> on <host> (<host>.local), not Marrowboxes
+10:00:03 disk ~/.local/share/guesthouse/machines/<machine>/disk.qcow2 and /home/quillonx/y
+10:00:04 {"machine": "<machine-3>"} and "<machine-2>" at /store/machines/<machine-2>/vars.fd, a tv show on windows, /machines/<machine-4>/x and w11-old
+10:00:05 uuid <uuid> {<uuid>} fixed <uuid>
+10:00:06 mac <mac> and 00-15-5D-12-34-56, not <mac>:dd, time 12:30:45, pci 0000:01:00.0
+10:00:07 mail <user>@example.org and Quill.Smith+gh@mail.example.co.uk., unit getty@tty1.service
+10:00:08 sid S-1-5-21-1004336348-1177238915-682003330-1001 and S-1-5-32-544 and S-1-5-18
+10:00:09 C:\Users\<user>\Downloads\x.iso and C:\\Users\\<user>\\y and c:/users/<user>/Desktop
+10:00:10 guesthouse-<user>-games-com1 and \\.\pipe\guesthouse-w11 and guesthouse-W11
+10:00:11 Quillon's PC, QUILLON, quillons and marrowboxes, al calls, HOME=~
+10:00:12 guest GuestAccount on DESKTOP-GUEST said: Pat signed in to "<machine-5>"

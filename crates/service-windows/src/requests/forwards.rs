@@ -6,7 +6,7 @@
 
 use super::{Service, Work};
 use guesthouse_control::{Event, Forward, NetworkMode};
-use guesthouse_host_windows::network::{parse_rule_name, rule_name, usable_guest_address};
+use guesthouse_host_windows::network::{Protocol, parse_rule_name, rule_name, usable_guest_address};
 use std::net::Ipv4Addr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -144,7 +144,7 @@ impl<W: Work> Service<W> {
                 continue;
             }
             let rule = rule_name(name, port);
-            if let Err(error) = network.add_rule(&rule, port) {
+            if let Err(error) = network.add_rule(&rule, port, Protocol::Tcp) {
                 why_not(format!("the firewall rule couldn't be made: {error}"));
                 continue;
             }

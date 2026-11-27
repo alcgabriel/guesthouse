@@ -1,3 +1,6 @@
 # What goes into a Linux guest keeps Linux's line endings on any checkout, Windows' included, as a
 # script with a carriage return after its first line won't run.
 crates/host-windows/guest/linux/** text eol=lf
+# Golden copies of what a report holds, compared byte for byte, so a checkout keeps them as they are.
+crates/app-core/tests/report-golden/** -text
+crates/control/tests/report-golden/** -text
