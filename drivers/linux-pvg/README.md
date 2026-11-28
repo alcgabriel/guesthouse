@@ -52,19 +52,33 @@ The app fetches the package by its manifest from `files.ruxn.com/p/guesthouse/`,
 
 `install.sh` runs as root, with the network. On the serial port it says exactly `guesthouse: driver installed`, or `guesthouse: driver failed CODE`, where CODE is `root`, `system`, `files`, `network`, `headers`, `packages`, `module` or `account` (its header says what each means). Its log is `/var/log/guesthouse/driver-install.log`.
 
-`package/make-package.sh` makes the folder. Today it runs on a Mac and builds in an Ubuntu 26.04 arm64 VM, started by the QEMU that `qemu/mac/build.sh` builds:
+Each `.deb` has its copyright file in `/usr/share/doc/PACKAGE/copyright`. `pvg-mesa`'s carries Mesa's licence page and every licence text of Mesa's `licenses/` folder, from the commit it was built from.
+
+The version is in `package/version.txt`. On files.ruxn.com each file is published as `guesthouse-linux-driver-V-FILE`, once, and the manifest last; a new version is a new `version.txt`.
+
+### Building it
+
+`package/build-here.sh` makes the folder on Ubuntu 26.04 for arm64 itself, a machine, a runner or a container, with no VM. As root:
+
+```sh
+PVG_HEADERS=linux-headers-generic sh drivers/linux-pvg/package/vm-packages.sh
+sh drivers/linux-pvg/package/build-here.sh $PWD target/linux-pvg/package
+```
+
+That's what `.github/workflows/linux-package.yml` runs, and on a push to main it publishes the result. In a container the headers are `linux-headers-generic`, since the container runs another kernel; on a real Ubuntu leave `PVG_HEADERS` out.
+
+`package/make-package.sh` makes the same folder on a Mac, in an Ubuntu 26.04 arm64 VM started by the QEMU that `qemu/mac/build.sh` builds:
 
 ```sh
 PVG_IMAGE=ubuntu-26.04-server-cloudimg-arm64.img sh drivers/linux-pvg/package/vm.sh $PWD make
 sh drivers/linux-pvg/package/vm.sh $PWD start 900
 sh drivers/linux-pvg/package/vm.sh $PWD ssh sudo sh -s < drivers/linux-pvg/package/vm-packages.sh
 sh drivers/linux-pvg/package/vm.sh $PWD stop
-PVG_MESA_TREE=../mesa PVG_WAYLAND_PROTOCOLS=wayland-protocols-1.50.tar.xz \
-  sh drivers/linux-pvg/package/make-package.sh $PWD target/linux-pvg/package
+sh drivers/linux-pvg/package/make-package.sh $PWD target/linux-pvg/package
 ```
 
-Nothing in it is signed and it holds no key.
+Both fetch our Mesa at the commit `package/lib.sh` pins and wayland-protocols 1.50 at the sum Mesa's own wrap file names, and check both. `PVG_MESA_TREE` (and `PVG_MESA_COMMIT`) builds from a Mesa tree of your own instead. Nothing in the package is signed and it holds no key.
 
 ### Our Mesa
 
-The Vulkan driver is KosmicKrisp with a bridge to this driver, and GL is Zink over it. That's a branch of Mesa, and it isn't in this repo or public yet, so the package can't be made from public parts alone for now. `build-mesa.sh` and `vm-mesa.sh` are how it's built for the package: no LLVM linked, through glvnd under the vendor name `pvg`, every library with the run path `/opt/pvg-mesa/lib`.
+The Vulkan driver is KosmicKrisp with a bridge to this driver, and GL is Zink over it. That's s3k000's branch of Mesa, `pvg-air` in [ruxnlabs/mesa](https://github.com/ruxnlabs/mesa). `vm-mesa.sh` builds it for the package: no LLVM linked, through glvnd under the vendor name `pvg`, every library with the run path `/opt/pvg-mesa/lib`.
