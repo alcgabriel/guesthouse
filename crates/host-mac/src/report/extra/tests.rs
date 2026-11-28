@@ -64,3 +64,31 @@ fn any_users_home_folder_is_a_tilde() {
     assert_eq!(scrub("/Users/Shared/x"), "/Users/Shared/x");
     assert_eq!(scrub("a\nb\n"), "a\nb\n");
 }
+
+#[test]
+fn the_macs_pass_cannot_put_back_what_the_shared_list_takes_out() {
+    use guesthouse_report_core::scrub::Scrubber;
+    let shared = Scrubber::new("pat", "/Users/pat", "pat-mac", &["Quill".to_owned()]);
+    let with_pass =
+        Scrubber::new("pat", "/Users/pat", "pat-mac", &["Quill".to_owned()]).with_extra(scrub);
+    let text = "password=hunter2 for pat on pat-mac at /Users/pat/Library/x, /Users/lee/y\n\
+        fingerprint 9f2c41ab9f2c41ab9f2c41ab9f2c41ab9f2c41ab9f2c41ab9f2c41ab9f2c41ab Quill\n\
+        code: 123 456, serial number: C02ABC, mail pat@example.org, 1920x1080\n";
+    let done = with_pass.scrub(text);
+    for secret in [
+        "hunter2",
+        "pat",
+        "Quill",
+        "lee",
+        "9f2c41ab",
+        "123 456",
+        "C02ABC",
+        "pat@example.org",
+    ] {
+        assert!(!done.contains(secret), "{secret} is left in:\n{done}");
+    }
+    // Scrubbing what came out again with the shared list alone finds nothing more to take out.
+    assert_eq!(shared.scrub(&done), done);
+    // And the host's pass alone is unchanged by what the shared list did around it.
+    assert_eq!(scrub(&done), done);
+}

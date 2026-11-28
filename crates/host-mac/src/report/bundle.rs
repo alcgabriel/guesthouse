@@ -8,8 +8,9 @@ use super::collect::{Collection, FIRST_PER_FILE, Places};
 use super::{Request, extra};
 use guesthouse_report_core::clock;
 use guesthouse_report_core::contract::MOST_REPORT_BYTES;
+use guesthouse_report_core::host::Host;
 use guesthouse_report_core::manifest::{
-    DESCRIPTION_FILE, MANIFEST_FILE, Missing, SUMMARY_FILE, manifest_from,
+    DESCRIPTION_FILE, MANIFEST_FILE, Missing, SUMMARY_FILE, manifest_for,
 };
 use guesthouse_report_core::scrub::Scrubber;
 use guesthouse_report_core::summary::{self, Summary};
@@ -22,8 +23,8 @@ pub const REPORTS_FOLDER: &str = "Reports";
 const NAME_START: &str = "guesthouse-report-";
 /// Reports kept, newest first, so a person can save one after sending it.
 const KEPT_REPORTS: usize = 3;
-/// What `host` says in a report from a Mac.
-pub const HOST_MAC: &str = "macos";
+/// What `host` says in a report from a Mac, and how the manifest says it is from one.
+pub const HOST: Host = Host::new("macos", "a Mac");
 const MACHINE_ID_MARK: &str = "machine";
 
 /// A report as the app shows it before it is sent.
@@ -93,7 +94,10 @@ fn names(request: &Request, places: &Places) -> Names {
             &places.home.to_string_lossy(),
             &computer,
             &machine_names,
-        ),
+        )
+        // The Mac's own pass runs inside the shared one, which runs again after it, so nothing
+        // it writes can put back what the shared list takes out.
+        .with_extra(extra::scrub),
         ids,
     }
 }
@@ -106,10 +110,12 @@ fn host_name() -> String {
 }
 
 impl Names {
-    /// Everything that is taken out of every file: the shared scrubber, then the Mac's own, then the
-    /// machines' folder names where they stand as a part of a path.
+    /// Everything that is taken out of every file: the shared scrubber with the Mac's own pass
+    /// inside it, then the machines' folder names where they stand as a part of a path. The folder
+    /// names are this Mac's own data, which a pass (a plain function) cannot hold, so they go last,
+    /// on text that is already scrubbed.
     fn scrub(&self, text: &str) -> String {
-        let mut text = extra::scrub(&self.scrubber.scrub(text));
+        let mut text = self.scrubber.scrub(text);
         for (id, mark) in &self.ids {
             text = replace_path_part(&text, id, mark);
         }
@@ -227,7 +233,7 @@ fn put(
 fn summary_of(request: &Request, collection: &Collection, description: &str) -> Summary {
     let mut summary = Summary::default();
     summary.set(summary::VERSION, &request.app_version);
-    summary.set(summary::HOST, HOST_MAC);
+    summary.set_host(HOST);
     let fact = |key: &str| {
         collection
             .items
@@ -269,7 +275,7 @@ fn manifest(files: &[(String, usize)], missing: &[(String, String)], notes: &[St
         .collect();
     let mut notes = notes.to_vec();
     notes.insert(0, EXTRA_REDACTIONS.to_owned());
-    manifest_from(Some("a Mac"), files, &missing, &notes)
+    manifest_for(HOST, files, &missing, &notes)
 }
 
 fn pack(reports: &Path, name: &str, archive: &Path) -> Result<(), String> {
