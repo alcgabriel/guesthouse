@@ -18,13 +18,14 @@ use crate::install::steps::{MachineControl, RealSteps, Setup, firmware_dirs_of};
 use crate::protocol::{Secret, install_event_line};
 use crate::store;
 use crate::tools::{self, Places, Tool};
+use guesthouse_basics::clock::{Clock, RealClock};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// The programs one install is run with, as the request named them.
 #[derive(Debug, Clone, Default)]
@@ -84,7 +85,8 @@ struct AgentControl {
     agent: Agent,
     tools: Tools,
     run_dir: PathBuf,
-    began: Instant,
+    /// The install's own clock, the shared one, from where the install began.
+    clock: Arc<RealClock>,
 }
 
 impl MachineControl for AgentControl {
@@ -195,11 +197,11 @@ impl MachineControl for AgentControl {
     }
 
     fn now_ms(&mut self) -> u64 {
-        self.began.elapsed().as_millis() as u64
+        self.clock.now().as_millis() as u64
     }
 
     fn sleep_ms(&mut self, ms: u64) {
-        thread::sleep(Duration::from_millis(ms));
+        self.clock.sleep(Duration::from_millis(ms));
     }
 }
 
@@ -416,8 +418,11 @@ impl Agent {
             firmware_dirs,
             desktop: desktop_for(&info, &tools),
         };
-        let began = Instant::now();
-        let clock = move || began.elapsed().as_millis() as u64;
+        let real_clock = Arc::new(RealClock::default());
+        let clock = {
+            let real_clock = Arc::clone(&real_clock);
+            move || real_clock.now().as_millis() as u64
+        };
         let mut changed = |info: &InstallInfo| self.publish_install(id, info.clone());
         let mut runner = Runner {
             folder: machines.join(id),
@@ -448,7 +453,7 @@ impl Agent {
                 agent: self.clone(),
                 tools,
                 run_dir: store::run_folder(&machines, id),
-                began,
+                clock: real_clock,
             };
             let mut steps = RealSteps {
                 setup,
