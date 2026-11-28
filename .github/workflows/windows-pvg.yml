@@ -1,0 +1,176 @@
+# UNTESTED: written before it ever ran on GitHub's runners. Check every step on a fork first.
+#
+# The Windows graphics driver for the Mac host, drivers/windows-pvg/. It's cross-built on a Mac, as
+# BUILDING.md says: clang and lld-link with Microsoft's driver kit for the kernel driver, llvm-mingw
+# for the user-mode parts. Microsoft's kit can't be in git, so the job fetches its NuGet packages
+# from nuget.org at build time, checks them against the SHA-256 below, uses them and throws them
+# away. Nothing of the kit is cached, uploaded or put in an artifact.
+#
+# A pull request gets an unsigned build. A push to main, or a run by hand, also signs with the test
+# certificate held as a secret, makes the catalog on Windows and lays out the package.
+name: Windows graphics driver (Mac host)
+
+on:
+  pull_request:
+    paths:
+      - "drivers/windows-pvg/**"
+      - ".github/workflows/windows-pvg.yml"
+  push:
+    branches: [main]
+    paths:
+      - "drivers/windows-pvg/**"
+      - ".github/workflows/windows-pvg.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-pvg-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  KIT_VERSION: "10.0.28000.2526"
+  WDK_SHA256: dcd83a77c83ee3163fa07b26421c0b132af0ea446d391bda2e63ac6664a261a5
+  SDK_SHA256: be1b419491607eae6f7c57844ebab39face9643c51e2af1d9176a3ba0d0b23fc
+  SDK_ARM64_SHA256: f890c85f46cc76c094f30fa555a438a212ee3d36165bcd7afdca96bb52c9bc7a
+  LLVM_MINGW: llvm-mingw-20261117-ucrt-macos-universal
+  LLVM_MINGW_SHA256: 98d340bbb8d46b09ad6886ffba88bd9d5415e131c316de48e6bd7647377446aa
+  DXMT_COMMIT: faa73e4a0686e432ce5d3bb99a02b5363d76885c
+
+jobs:
+  build:
+    name: build on a Mac
+    runs-on: macos-15
+    timeout-minutes: 150
+    # Signing needs the test certificate's two secrets. Where they aren't set (a fork, or this
+    # repository before they exist) the build is unsigned and there is no package.
+    env:
+      HAVE_CERT: ${{ secrets.WINDOWS_PVG_TEST_PFX != '' }}
+    outputs:
+      signed: ${{ steps.cert.outputs.signed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tools from Homebrew and pip
+        run: |
+          ROOT="$RUNNER_TEMP/root"
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+          brew install ninja lld osslsigncode
+          python3 -m venv "$ROOT/.venv"
+          "$ROOT/.venv/bin/pip" install meson cmake
+      - name: llvm-mingw
+        run: |
+          mkdir -p "$ROOT/.tools"
+          cd "$ROOT/.tools"
+          curl -fsSL --retry 3 -o llvm-mingw.tar.xz \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20261117/$LLVM_MINGW.tar.xz"
+          echo "$LLVM_MINGW_SHA256  llvm-mingw.tar.xz" | shasum -a 256 -c -
+          tar -xf llvm-mingw.tar.xz && mv "$LLVM_MINGW" llvm-mingw && rm llvm-mingw.tar.xz
+      # Microsoft's packages, under Microsoft's licence: fetched for this build only.
+      - name: Microsoft's driver kit and SDK, from nuget.org
+        run: |
+          fetch() { # fetch ID SHA256
+            mkdir -p "$ROOT/.tools/wdk/$1"
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/$1.nupkg" \
+              "https://api.nuget.org/v3-flatcontainer/$1/$KIT_VERSION/$1.$KIT_VERSION.nupkg"
+            echo "$2  $RUNNER_TEMP/$1.nupkg" | shasum -a 256 -c -
+            unzip -q "$RUNNER_TEMP/$1.nupkg" -d "$ROOT/.tools/wdk/$1"
+            rm "$RUNNER_TEMP/$1.nupkg"
+          }
+          fetch microsoft.windows.wdk.arm64 "$WDK_SHA256"
+          fetch microsoft.windows.sdk.cpp "$SDK_SHA256"
+          fetch microsoft.windows.sdk.cpp.arm64 "$SDK_ARM64_SHA256"
+      - name: DXMT
+        run: |
+          git clone --filter=blob:none https://github.com/3Shain/dxmt "$ROOT/.tools/src/dxmt"
+          git -C "$ROOT/.tools/src/dxmt" checkout --detach "$DXMT_COMMIT"
+      # LLVM 15 is built twice (for the Mac and for Windows on arm64). It takes most of the job.
+      - name: airconv and LLVM 15
+        run: sh drivers/windows-pvg/dxmt-win/airconv-build.sh "$ROOT"
+      - name: The test certificate
+        id: cert
+        if: ${{ github.event_name != 'pull_request' && env.HAVE_CERT == 'true' }}
+        env:
+          PFX: ${{ secrets.WINDOWS_PVG_TEST_PFX }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_PVG_TEST_PFX_PASSWORD }}
+        run: |
+          umask 077
+          printf '%s' "$PFX" | base64 --decode > "$RUNNER_TEMP/test.pfx"
+          openssl pkcs12 -in "$RUNNER_TEMP/test.pfx" -passin env:PFX_PASSWORD -nokeys -out "$RUNNER_TEMP/test.pem"
+          openssl pkcs12 -in "$RUNNER_TEMP/test.pfx" -passin env:PFX_PASSWORD -nocerts -nodes -out "$RUNNER_TEMP/test.key"
+          rm "$RUNNER_TEMP/test.pfx"
+          echo "SIGN_CERT=$RUNNER_TEMP/test.pem" >> "$GITHUB_ENV"
+          echo "SIGN_KEY=$RUNNER_TEMP/test.key" >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+      - name: Kernel driver, user-mode driver and tools
+        run: sh drivers/windows-pvg/ruxnwddm/build.sh "$ROOT"
+      - name: winemetal, DXMT and the test programs
+        # Without the first triangle's stand-in and the checks that draw on this Mac's GPU: the
+        # stand-in needs a shader tool that isn't public, and a release doesn't carry it.
+        env:
+          RUXN_STANDIN: "0"
+          CHECKS: "0"
+        run: sh drivers/windows-pvg/dxmt-win/build.sh "$ROOT"
+      - name: Forget the key
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/test.key" "$RUNNER_TEMP/test.pem"
+      - name: Gather what the package needs
+        run: |
+          out="$RUNNER_TEMP/driver"
+          mkdir -p "$out"
+          cp "$ROOT/build/ruxnwddm/ruxnwddm.sys" "$ROOT/build/ruxnwddm/ruxnumd.dll" \
+            drivers/windows-pvg/ruxnwddm/ruxnwddm-full.inf \
+            "$ROOT/build/dxmt-win/obj/winemetal.dll" \
+            "$ROOT/build/dxmt-win/meson/src/d3d11/ruxnd3d11.dll" \
+            "$ROOT/build/dxmt-win/meson/src/dxgi/ruxndxgi.dll" "$out/"
+          # Only our own binaries leave the job; none of Microsoft's files are among them.
+          ls -l "$out"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-pvg-driver
+          path: ${{ runner.temp }}/driver
+          retention-days: 7
+
+  package:
+    name: catalog and package on Windows
+    needs: build
+    if: ${{ github.event_name != 'pull_request' && needs.build.outputs.signed == 'true' }}
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-pvg-driver
+          path: ${{ runner.temp }}/driver
+      - name: Catalog, signed with the test certificate
+        shell: pwsh
+        env:
+          PFX: ${{ secrets.WINDOWS_PVG_TEST_PFX }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_PVG_TEST_PFX_PASSWORD }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'driver'
+          $pfx = Join-Path $env:RUNNER_TEMP 'test.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX))
+          $password = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
+          $cert = Get-PfxData -FilePath $pfx -Password $password | Select-Object -ExpandProperty EndEntityCertificates
+          $flags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+          $signer = [Security.Cryptography.X509Certificates.X509Certificate2]::new($pfx, $env:PFX_PASSWORD, $flags)
+          Remove-Item $pfx
+          New-FileCatalog -Path $dir -CatalogFilePath (Join-Path $dir 'ruxnwddm-full.cat') -CatalogVersion 2.0 | Out-Null
+          $result = Set-AuthenticodeSignature -FilePath (Join-Path $dir 'ruxnwddm-full.cat') -Certificate $signer -HashAlgorithm SHA256
+          if ($result.Status -ne 'Valid' -and $result.Status -ne 'UnknownError') { throw "catalog not signed: $($result.StatusMessage)" }
+          # The public half only, as the installer trusts it in the guest.
+          [IO.File]::WriteAllBytes((Join-Path $dir 'ruxn-driver.cer'), $cert[0].Export('Cert'))
+      - name: Package
+        shell: bash
+        run: sh drivers/windows-pvg/release/package.sh "$RUNNER_TEMP/driver" "$RUNNER_TEMP/package"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-pvg-package
+          path: ${{ runner.temp }}/package
+          retention-days: 7

@@ -1,0 +1,314 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+diff --git a/build-aarch64-llvm-mingw.txt b/build-aarch64-llvm-mingw.txt
+new file mode 100644
+index 0000000..028c96e
+--- /dev/null
++++ b/build-aarch64-llvm-mingw.txt
+@@ -0,0 +1,15 @@
++[binaries]
++c = 'aarch64-w64-mingw32-clang'
++cpp = 'aarch64-w64-mingw32-clang++'
++ar = 'llvm-ar'
++strip = 'llvm-strip'
++windres = 'aarch64-w64-mingw32-windres'
++
++[properties]
++needs_exe_wrapper = true
++
++[host_machine]
++system = 'windows'
++cpu_family = 'aarch64'
++cpu = 'aarch64'
++endian = 'little'
+diff --git a/meson.build b/meson.build
+index e10c901..ed068b1 100644
+--- a/meson.build
++++ b/meson.build
+@@ -96,7 +96,9 @@ endif
+ dxmt_include_path = include_directories(dxmt_include_dirs)
+ dxmt_native_include_path = include_directories(dxmt_native_include_dirs)
+ 
+-if not fs.is_file('include/native/directx/d3d11.h')
++pvg_winemetal = get_option('pvg_winemetal')
++
++if pvg_winemetal == '' and not fs.is_file('include/native/directx/d3d11.h')
+   error('Don\'t forget to clone submodules. `git submodule update --init --recursive`')
+ endif
+ 
+diff --git a/meson.options b/meson.options
+index 715b176..3862a3f 100644
+--- a/meson.options
++++ b/meson.options
+@@ -8,4 +8,5 @@ option('wine_builtin_dll', type : 'boolean', value : true)
+ option('enable_tests', type : 'boolean', value : false)
+ option('enable_nvapi', type : 'boolean', value : false)
+ option('enable_nvngx', type : 'boolean', value : false)
++option('pvg_winemetal', type : 'string', value : '', description : 'import library of a winemetal over ruxnpvg; builds without Wine and without the Mac side')
+ option('enable_d3d12', type : 'boolean', value : false)
+\ No newline at end of file
+diff --git a/src/airconv/meson.build b/src/airconv/meson.build
+index 6133d85..fa00fc5 100644
+--- a/src/airconv/meson.build
++++ b/src/airconv/meson.build
+@@ -111,6 +111,6 @@ executable('airconv', airconv_src + airconv_cli_src,
+ 
+ endif
+ 
+-if cpu_family == 'x86_64' or cpu_family == 'aarch64' or not dxmt_crossbuild
++if pvg_winemetal == '' and (cpu_family == 'x86_64' or cpu_family == 'aarch64' or not dxmt_crossbuild)
+   subdir('darwin')
+ endif
+\ No newline at end of file
+diff --git a/src/d3d11/d3d11.def b/src/d3d11/d3d11.def
+index b79deb7..d4422ad 100644
+--- a/src/d3d11/d3d11.def
++++ b/src/d3d11/d3d11.def
+@@ -1,4 +1,4 @@
+-LIBRARY D3D11.DLL
++LIBRARY ruxnd3d11.dll
+ EXPORTS  
+     D3D11CoreCreateDevice @18
+     D3D11CreateDevice @22
+diff --git a/src/d3d11/d3d11_context_impl.cpp b/src/d3d11/d3d11_context_impl.cpp
+index d2ef5d4..5c0a453 100644
+--- a/src/d3d11/d3d11_context_impl.cpp
++++ b/src/d3d11/d3d11_context_impl.cpp
+@@ -3826,6 +3826,9 @@ public:
+     }
+     if (SrcBox.right <= SrcBox.left)
+       return;
++    // A buffer's box is empty too when its rows or slices are.
++    if (pSrcBox && (SrcBox.bottom <= SrcBox.top || SrcBox.back <= SrcBox.front))
++      return;
+     if (auto staging_dst = GetStagingResource(pDstResource, DstSubresource)) {
+       if (auto staging_src = GetStagingResource(pSrcResource, SrcSubresource)) {
+         SwitchToBlitEncoder(CommandBufferState::BlitEncoderActive);
+diff --git a/src/d3d11/d3d11_texture_device.cpp b/src/d3d11/d3d11_texture_device.cpp
+index 0647de1..3d2925c 100644
+--- a/src/d3d11/d3d11_texture_device.cpp
++++ b/src/d3d11/d3d11_texture_device.cpp
+@@ -27,6 +27,10 @@
+ #include "d3d11_resource.hpp"
+ #include "util_win32_compat.h"
+ 
++#ifdef DXMT_PVG
++extern "C" __declspec(dllimport) int __stdcall RuxnSurfaceTakeImported(void);
++#endif
++
+ namespace dxmt {
+ 
+ #pragma region DeviceTexture
+@@ -375,6 +379,12 @@ HRESULT CreateDeviceTextureInternal(MTLD3D11Device *pDevice,
+ 
+   auto initialize = [&](Rc<TextureAllocation> &&allocation) {
+     texture->rename(std::move(allocation));
++#ifdef DXMT_PVG
++    // A texture over a surface imported from another process holds that
++    // process's pixels: it is not cleared (wm_surface.c).
++    if (!pInitialData && RuxnSurfaceTakeImported())
++      return;
++#endif
+     if (!pInitialData) {
+       for (auto sub : EnumerateSubresources(finalDesc)) {
+         initializer.initWithZero(texture.ptr(), texture->current(), sub.ArraySlice, sub.MipLevel);
+diff --git a/src/d3d11/meson.build b/src/d3d11/meson.build
+index 4723852..e44ed72 100644
+--- a/src/d3d11/meson.build
++++ b/src/d3d11/meson.build
+@@ -42,7 +42,8 @@ d3d10_src = [
+ d3d11_ld_args      = ['-L' + windows_native_install_dir] # a nice trick to force relink
+ d3d11_link_depends = []
+ 
+-d3d11_dll = shared_library('d3d11', d3d11_src, d3d10_src, d3d11_res,
++# Under our own name inside the user-mode driver, beside Windows' d3d11.dll.
++d3d11_dll = shared_library(pvg_winemetal != '' ? 'ruxnd3d11' : 'd3d11', d3d11_src, d3d10_src, d3d11_res,
+   name_prefix         : '',
+   dependencies        : [ 
+     dxgi_dep, 
+diff --git a/src/dxgi/dxgi.def b/src/dxgi/dxgi.def
+index 6e92e79..d17ee9f 100644
+--- a/src/dxgi/dxgi.def
++++ b/src/dxgi/dxgi.def
+@@ -1,4 +1,4 @@
+-LIBRARY DXGI.DLL
++LIBRARY ruxndxgi.dll
+ EXPORTS  
+     CreateDXGIFactory @9
+     CreateDXGIFactory1 @10
+diff --git a/src/dxgi/meson.build b/src/dxgi/meson.build
+index acf8347..c256be7 100644
+--- a/src/dxgi/meson.build
++++ b/src/dxgi/meson.build
+@@ -11,7 +11,8 @@ dxgi_src = [
+ dxgi_ld_args      = ['-L' + windows_native_install_dir] # a nice trick to force relink
+ dxgi_link_depends = []
+ 
+-dxgi_dll = shared_library('dxgi', dxgi_src, dxgi_res,
++# Under our own name inside the user-mode driver, beside Windows' dxgi.dll.
++dxgi_dll = shared_library(pvg_winemetal != '' ? 'ruxndxgi' : 'dxgi', dxgi_src, dxgi_res,
+   name_prefix         : '',
+   dependencies        : [ dxmt_dep, util_dep, winemetal_dep ],
+   include_directories : [ dxmt_include_path ],
+diff --git a/src/dxmt/dxmt_context.cpp b/src/dxmt/dxmt_context.cpp
+index 7b29f1e..99c0b3e 100644
+--- a/src/dxmt/dxmt_context.cpp
++++ b/src/dxmt/dxmt_context.cpp
+@@ -58,6 +58,9 @@ ArgumentEncodingContext::ArgumentEncodingContext(CommandQueue &queue, WMT::Devic
+   dummy_cbuffer_host_ = wsi::aligned_malloc(65536, DXMT_PAGE_SIZE);
+   dummy_cbuffer_info_.length = 65536;
+   dummy_cbuffer_info_.memory.set(dummy_cbuffer_host_);
++#ifdef DXMT_PVG
++  dummy_cbuffer_info_.memory.set(nullptr); // the device's memory, see dxmt_ring_bump_allocator.hpp
++#endif
+   dummy_cbuffer_info_.options = WMTResourceOptionCPUCacheModeWriteCombined | WMTResourceStorageModeShared |
+                                 WMTResourceHazardTrackingModeUntracked;
+   dummy_cbuffer_ = device.newBuffer(dummy_cbuffer_info_);
+diff --git a/src/dxmt/dxmt_resource_initializer.hpp b/src/dxmt/dxmt_resource_initializer.hpp
+index 187df0b..446e0a9 100644
+--- a/src/dxmt/dxmt_resource_initializer.hpp
++++ b/src/dxmt/dxmt_resource_initializer.hpp
+@@ -26,7 +26,11 @@
+ namespace dxmt {
+ 
+ constexpr size_t kResourceInitializerCpuCommandHeapSize = 0x100000; // 1MB
++#ifdef DXMT_PVG
++constexpr size_t kResourceInitializerGpuUploadHeapSize = 0x800000; // 8MB, see kStagingBlockSize
++#else
+ constexpr size_t kResourceInitializerGpuUploadHeapSize = 0x2000000; // 32MB
++#endif
+ constexpr size_t kResourceInitializerGpuUploadHeapAlignment = 256;
+ constexpr size_t kResourceInitializerChunks = 2;
+ 
+diff --git a/src/dxmt/dxmt_ring_bump_allocator.hpp b/src/dxmt/dxmt_ring_bump_allocator.hpp
+index 5c92d92..ecf9b76 100644
+--- a/src/dxmt/dxmt_ring_bump_allocator.hpp
++++ b/src/dxmt/dxmt_ring_bump_allocator.hpp
+@@ -9,7 +9,12 @@
+ 
+ namespace dxmt {
+ 
++#ifdef DXMT_PVG
++// A buffer object of ruxnpvg is at most 16 MiB of contiguous guest memory.
++constexpr size_t kStagingBlockSize = 0x800000; // 8MB
++#else
+ constexpr size_t kStagingBlockSize = 0x2000000; // 32MB
++#endif
+ constexpr size_t kStagingBlockSizeForDeferredContext = 0x200000; // 2MB
+ constexpr size_t kStagingBlockLifetime = 300;
+ 
+@@ -71,6 +76,9 @@ public:
+   allocate(size_t block_size) {
+     Block block{};
+     buffer_info_.length = block_size;
++    // newBuffer writes the mapping it made into the info; a second block
++    // must not pass the first one's mapping in as memory of its own.
++    buffer_info_.memory.set(nullptr);
+     block.buffer = device_.newBuffer(buffer_info_);
+     block.gpu_address = buffer_info_.gpu_address;
+     return block;
+@@ -94,9 +102,10 @@ public:
+     WMT::Reference<WMT::Buffer> buffer;
+     uint64_t gpu_address;
+     void *mapped_address;
++    bool owned = true;
+ 
+     ~Block() {
+-      if (mapped_address) {
++      if (mapped_address && owned) {
+         free(mapped_address);
+         mapped_address = nullptr;
+       }
+@@ -109,6 +118,7 @@ public:
+       buffer = std::move(move.buffer);
+       gpu_address = move.gpu_address;
+       mapped_address = move.mapped_address;
++      owned = move.owned;
+       move.mapped_address = nullptr;
+     };
+   };
+@@ -116,6 +126,18 @@ public:
+   Block
+   allocate(size_t block_size) {
+     Block block{};
++#ifdef DXMT_PVG
++    // The GPU reads only memory the device's library maps: never the
++    // program's own pages. Its mapping is the block's.
++    WMTBufferInfo info;
++    info.options = buffer_info_;
++    info.memory.set(nullptr);
++    info.length = block_size;
++    block.buffer = device_.newBuffer(info);
++    block.gpu_address = info.gpu_address;
++    block.mapped_address = info.memory.get();
++    block.owned = false;
++#else
+     block.mapped_address = placed_buffer_ ? malloc(block_size) : nullptr;
+     WMTBufferInfo info;
+     info.options = buffer_info_;
+@@ -123,6 +145,7 @@ public:
+     info.length = block_size;
+     block.buffer = device_.newBuffer(info);
+     block.gpu_address = info.gpu_address;
++#endif
+     return block;
+   };
+ 
+diff --git a/src/dxmt/meson.build b/src/dxmt/meson.build
+index 9d5bfe2..3da71f2 100644
+--- a/src/dxmt/meson.build
++++ b/src/dxmt/meson.build
+@@ -29,15 +29,23 @@ dxmt_shaders = [
+   'dxmt_command.metal'
+ ]
+ 
++if pvg_winemetal != ''
++# No helper library: pvg/dxmt_command.h is an empty one, answered by the
++# winemetal over ruxnpvg with placeholders.
++dxmt_shaders_header = []
++dxmt_command_include = [ include_directories('pvg') ]
++else
+ dxmt_shaders_ir = metalir_generator.process(dxmt_shaders)
+ 
+ dxmt_shaders_lib = metallib_generator.process(dxmt_shaders_ir)
+ 
+ dxmt_shaders_header = hexdump_generator.process(dxmt_shaders_lib)
++dxmt_command_include = []
++endif
+ 
+ dxmt_lib = static_library('dxmt', dxmt_src, dxmt_shaders_header, dxmt_version,
+   dependencies        : [ util_dep, airconv_forward_dep, winemetal_dep ],
+-  include_directories : [ dxmt_include_path ],
++  include_directories : [ dxmt_include_path, dxmt_command_include ],
+ )
+ 
+ dxmt_dep = declare_dependency(
+diff --git a/src/dxmt/pvg/dxmt_command.h b/src/dxmt/pvg/dxmt_command.h
+new file mode 100644
+index 0000000..d444bd0
+--- /dev/null
++++ b/src/dxmt/pvg/dxmt_command.h
+@@ -0,0 +1,5 @@
++/* Stands in for the helper library made by xxd from dxmt_command.metal.
++   Empty: the winemetal over ruxnpvg answers a library of length 0 with
++   placeholders that fail if they are ever used. */
++static unsigned char dxmt_command[1] = { 0 };
++static unsigned int dxmt_command_len = 0;
+diff --git a/src/meson.build b/src/meson.build
+index d50bdb4..0aeed0d 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -1,7 +1,13 @@
+ subdir('util')
+ subdir('airconv')
+ 
+-if not dxmt_crossbuild
++if pvg_winemetal != ''
++winemetal_dep = declare_dependency(
++  link_args           : [ pvg_winemetal ],
++  include_directories : [ include_directories('winemetal') ],
++  compile_args        : [ '-DDXMT_PVG' ],
++)
++elif not dxmt_crossbuild
+ subdir('nativemetal')
+ else
+ subdir('winemetal')

@@ -1,0 +1,66 @@
+; SPDX-License-Identifier: GPL-2.0-only OR MIT
+;
+; ruxnwddm.inf: installs ruxnwddm.sys, a display miniport, on the
+; paravirtualized graphics PCI device. Unlike ruxnpvg's INF the class is
+; Display: the device becomes the display adapter and Windows hands the
+; desktop to this driver. It replaces ruxnpvg on the device; the two never
+; run together (one driver to a device).
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = Display
+ClassGuid   = {4d36e968-e325-11ce-bfc1-08002be10318}
+Provider    = %ruxn%
+CatalogFile = ruxnwddm.cat
+DriverVer   = 11/26/2026,0.1.2.0
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%
+
+[SourceDisksFiles]
+ruxnwddm.sys = 1
+
+[Manufacturer]
+%ruxn% = ruxn, NTarm64
+
+[ruxn.NTarm64]
+%DeviceDesc% = ruxnwddm_Install, PCI\VEN_106B&DEV_EEEE
+
+; Display drivers must name a feature score, by which Windows ranks them (a
+; lower one wins). F9 is the value viogpu-wddm's display INFs use.
+[ruxnwddm_Install.NT]
+FeatureScore = F9
+CopyFiles    = ruxnwddm_Files
+
+[ruxnwddm_Files]
+ruxnwddm.sys
+
+; The device has no interrupt pin, only MSI, so it opts in, with two
+; messages as ruxnpvg asks.
+[ruxnwddm_Install.NT.HW]
+AddReg = ruxnwddm_Msi
+
+[ruxnwddm_Msi]
+HKR, "Interrupt Management", , 0x00000010
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", , 0x00000010
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", MSISupported, 0x00010001, 1
+HKR, "Interrupt Management\MessageSignaledInterruptProperties", MessageNumberLimit, 0x00010001, 2
+
+[ruxnwddm_Install.NT.Services]
+AddService = ruxnwddm, 0x00000002, ruxnwddm_Service
+
+[ruxnwddm_Service]
+DisplayName   = %DeviceDesc%
+ServiceType   = 1               ; kernel driver
+StartType     = 3               ; started by PnP
+ErrorControl  = 1               ; log and carry on
+ServiceBinary = %13%\ruxnwddm.sys
+
+[Strings]
+ruxn       = "ruxn"
+DeviceDesc = "ruxn PV Graphics Display"
+DiskName   = "ruxn PV Graphics Display Driver Disk"

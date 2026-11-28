@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# airconv-faa73e4.diff: DXMT faa73e4, src/airconv/airconv_public.h.
+# AIRCONV_STATIC makes AIRCONV_API empty so airconv can be linked as a static
+# library into another module: on _WIN32 the header otherwise marks the SM50*
+# functions dllimport (or dllexport with WIN_EXPORT), and on other systems
+# sysv_abi. Define AIRCONV_STATIC both when building libairconv.a and in
+# the code that includes airconv_public.h.
+# Apply with: patch -d airconv-src -p1 < airconv-faa73e4.diff
+
+diff --git a/src/airconv/airconv_public.h b/src/airconv/airconv_public.h
+index e8bf54a..80927fb 100644
+--- a/src/airconv/airconv_public.h
++++ b/src/airconv/airconv_public.h
+@@ -156,7 +156,10 @@ typedef sm50_ptr64_t sm50_shader_t;
+ typedef sm50_ptr64_t sm50_bitcode_t;
+ typedef sm50_ptr64_t sm50_error_t;
+ 
+-#ifdef _WIN32
++#if defined(AIRCONV_STATIC)
++/* static library linked into another module: no dllimport/dllexport */
++#define AIRCONV_API
++#elif defined(_WIN32)
+ #ifdef WIN_EXPORT
+ #define AIRCONV_API __declspec(dllexport)
+ #else
