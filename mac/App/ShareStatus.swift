@@ -39,7 +39,7 @@ nonisolated struct ShareStatus: Equatable {
 
         /// "Viewing now" or "Not connected".
         var statusText: String {
-            connected ? String(localized: "Viewing now") : String(localized: "Not connected")
+            Wording.text(connected ? "remote_view.device_status.viewing_now" : "remote_view.device_status.not_connected")
         }
     }
 
@@ -97,17 +97,17 @@ nonisolated struct ShareStatus: Equatable {
     /// One line on where viewing from other devices stands. `allowed` is the machine's setting
     /// and `machineRunning` whether the machine is up, since the screen is only shared then.
     static func headline(allowed: Bool, machineRunning: Bool, share: ShareStatus) -> String {
-        guard allowed else { return String(localized: "Off. Nothing is listening for other devices.") }
-        guard machineRunning else { return String(localized: "On. The screen is shared once the machine is running.") }
+        guard allowed else { return Wording.text("remote_view.headline.off") }
+        guard machineRunning else { return Wording.text("remote_view.headline.not_running") }
         switch share.state {
         case .off, .starting:
-            return String(localized: "Starting to share the screen…")
+            return Wording.text("remote_view.headline.starting")
         case .listening:
-            if let viewer = share.viewer { return String(localized: "\(viewer) is viewing this machine.") }
-            return String(localized: "Ready. A paired device can connect.")
+            if let viewer = share.viewer { return Wording.text("remote_view.headline.viewing", ["viewer": viewer]) }
+            return Wording.text("remote_view.headline.ready")
         case .failed:
-            let why = share.reason ?? String(localized: "Something went wrong.")
-            return String(localized: "The screen could not be shared: \(why)")
+            let why = share.reason ?? Wording.text("remote_view.headline.no_reason")
+            return Wording.text("remote_view.headline.failed", ["why": why])
         }
     }
 
@@ -116,34 +116,34 @@ nonisolated struct ShareStatus: Equatable {
     /// the code and accepts.
     static var pairingSteps: [String] {
         [
-            String(localized: "In remoteman on the other device, add a computer and enter the address above."),
-            String(localized: "If remoteman shows a fingerprint, check that it matches the one above."),
-            String(localized: "The device waits, and its name and a code appear here. Check that the code matches the one on the device, then press Accept. Pairing closes when the device has been answered, or when the time is up."),
+            Wording.text("remote_view.pairing_steps.1"),
+            Wording.text("remote_view.pairing_steps.2"),
+            Wording.text("remote_view.pairing_steps.3"),
         ]
     }
 
     /// How a device already paired connects.
     static var pairedHint: String {
-        String(localized: "A device that is already paired connects to the address above. To add another device, press Pair a New Device.")
+        Wording.text("remote_view.paired_hint")
     }
 
     /// The line for the check that has to be made before Accept.
     static var compareCodeLine: String {
-        String(localized: "Check that this code matches the one shown on the device before you press Accept.")
+        Wording.text("remote_view.compare_code_line")
     }
 
     /// What to say about pairing while it is closed, by how it last ended.
     var closedText: String {
         switch closedReason {
         case "paired":
-            guard let paired else { return String(localized: "Closed. A device was paired.") }
-            return String(localized: "Closed. \(paired) was paired.")
+            guard let paired else { return Wording.text("remote_view.closed_text.paired") }
+            return Wording.text("remote_view.closed_text.paired_name", ["name": paired])
         case "declined":
-            return String(localized: "Closed. The device was turned away. Press Pair a New Device to try again.")
+            return Wording.text("remote_view.closed_text.declined")
         case "timeout":
-            return String(localized: "Closed. Nobody paired in time.")
+            return Wording.text("remote_view.closed_text.timeout")
         default:
-            return String(localized: "Closed")
+            return Wording.text("remote_view.closed_text.closed")
         }
     }
 
@@ -179,6 +179,6 @@ nonisolated struct ShareStatus: Equatable {
 
     /// The reminder about the network, said once in the pane.
     static var networkWarning: String {
-        String(localized: "Devices on the same network can reach this machine's screen once they are paired.")
+        Wording.text("remote_view.network_warning")
     }
 }

@@ -75,13 +75,13 @@ struct MenuBarContent: View {
         let device = library.agent.share(of: machine).pending
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(device?.name ?? "A device") wants to pair").fontWeight(.semibold)
+                Text(Wording.text("remote_view.wants_to_pair", ["name": device?.name ?? "A device"])).fontWeight(.semibold)
                 Text("With \(machine.name). Code \(device?.code ?? "")")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Decline") { library.declineDevice(machine) }
-            Button("Accept") { library.acceptDevice(machine) }.buttonStyle(.borderedProminent)
+            Button(Wording.text("remote_view.decline")) { library.declineDevice(machine) }
+            Button(Wording.text("remote_view.accept")) { library.acceptDevice(machine) }.buttonStyle(.borderedProminent)
         }
         .padding(10)
         .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))

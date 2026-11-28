@@ -26,6 +26,9 @@ targets:
     sources:
       - App
       - Shared
+      # The remote-view crate's sentences, copied from the pinned crate by build-core.sh.
+      - path: build/wording.json
+        buildPhase: resources
       # The reading side of the frame channel, compiled in from where it lives (MIT, with its
       # headers), not copied.
       - path: ../scripts/mac/rmhost/rmframes_sub.c
@@ -111,6 +114,7 @@ targets:
       - App/UpdateText.swift
       - App/LocalNetwork.swift
       - App/PresenterPace.swift
+      - App/Wording.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ruxn.guesthouse.tests

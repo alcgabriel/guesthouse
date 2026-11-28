@@ -13,9 +13,9 @@ struct DevicesCard: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Devices that can view this machine")
+                Text(Wording.text("remote_view.devices_title"))
                 Spacer()
-                Text("Control").frame(width: 90)
+                Text(Wording.text("remote_view.permission_label.input")).frame(width: 90)
                 Text("").frame(width: 190)
             }
             .font(.caption.weight(.semibold))
@@ -24,7 +24,7 @@ struct DevicesCard: View {
             .padding(.vertical, 12)
             if share.devices.isEmpty {
                 Divider()
-                Text("No device has been paired yet. Press Pair a New Device to add one.")
+                Text(Wording.text("remote_view.no_devices"))
                     .foregroundStyle(.secondary)
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -36,16 +36,16 @@ struct DevicesCard: View {
         }
         .card(padding: 0)
         .confirmationDialog(
-            "Remove \(removing?.name ?? "this device")?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+            Wording.text("remote_view.remove_question", ["name": removing?.name ?? "this device"]), isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
             titleVisibility: .visible
         ) {
-            Button("Remove", role: .destructive) {
+            Button(Wording.text("remote_view.remove"), role: .destructive) {
                 if let removing { library.removeDevice(machine, device: removing) }
                 removing = nil
             }
-            Button("Cancel", role: .cancel) { removing = nil }
+            Button(Wording.text("remote_view.cancel"), role: .cancel) { removing = nil }
         } message: {
-            Text("It will be disconnected and will have to be paired again to view this machine.")
+            Text(Wording.text("remote_view.remove_message"))
         }
     }
 
@@ -59,7 +59,7 @@ struct DevicesCard: View {
                 }
             }
             Spacer()
-            Toggle("Control for \(device.name)", isOn: Binding(
+            Toggle(Wording.text("remote_view.switch_name", ["label": Wording.text("remote_view.permission_label.input"), "device": device.name]), isOn: Binding(
                 get: { device.control },
                 set: { library.setControl(machine, device: device, allowed: $0) }
             ))
@@ -70,9 +70,9 @@ struct DevicesCard: View {
             HStack {
                 Spacer()
                 if device.connected {
-                    Button("Disconnect") { library.disconnectDevice(machine) }
+                    Button(Wording.text("remote_view.disconnect")) { library.disconnectDevice(machine) }
                 }
-                Button("Remove", role: .destructive) { removing = device }
+                Button(Wording.text("remote_view.remove"), role: .destructive) { removing = device }
                     .foregroundStyle(.red)
             }
             .frame(width: 190)

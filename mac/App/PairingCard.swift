@@ -11,7 +11,7 @@ struct PairingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                CardTitle("Pairing")
+                CardTitle(verbatim: Wording.text("remote_view.pairing_title"))
                 Spacer()
                 header
             }
@@ -31,14 +31,14 @@ struct PairingCard: View {
     private var header: some View {
         if let device = share.pending {
             HStack(spacing: 4) {
-                Text("Waiting for you, time left")
+                Text(Wording.text("remote_view.waiting_time_left"))
                 Text(timerInterval: Date.now...device.until, countsDown: true).monospacedDigit()
             }
             .font(.callout)
             .foregroundStyle(.secondary)
         } else if share.pairing, let until = share.pairingUntil, until > .now {
             HStack(spacing: 4) {
-                Text("Open, time left")
+                Text(Wording.text("remote_view.open_time_left"))
                 Text(timerInterval: Date.now...until, countsDown: true).monospacedDigit()
             }
             .font(.callout)
@@ -55,7 +55,7 @@ struct PairingCard: View {
                     .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("\(device.name) wants to pair")
+                    Text(Wording.text("remote_view.wants_to_pair", ["name": device.name]))
                         .font(.title3.weight(.semibold))
                     Text(ShareStatus.compareCodeLine)
                         .foregroundStyle(.secondary)
@@ -69,12 +69,12 @@ struct PairingCard: View {
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12)))
                     .textSelection(.enabled)
-                    .accessibilityLabel("Pairing code \(device.code)")
+                    .accessibilityLabel(Wording.text("remote_view.code_label", ["code": device.code]))
             }
             HStack {
                 Spacer()
-                Button("Decline") { library.declineDevice(machine) }
-                Button("Accept") { library.acceptDevice(machine) }
+                Button(Wording.text("remote_view.decline")) { library.declineDevice(machine) }
+                Button(Wording.text("remote_view.accept")) { library.acceptDevice(machine) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
@@ -89,7 +89,7 @@ struct PairingCard: View {
             }
             HStack {
                 Spacer()
-                Button("Stop") { library.stopPairing(machine) }
+                Button(Wording.text("remote_view.stop")) { library.stopPairing(machine) }
             }
         }
         .foregroundStyle(.secondary)

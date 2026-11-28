@@ -13,7 +13,7 @@ struct AllowViewingCard: View {
     var body: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Allow viewing from other devices")
+                Text(Wording.text("remote_view.allow_title"))
                     .font(.headline)
                 Text(sentence)
                     .foregroundStyle(share.state == .failed && machine.remoteView ? Color.red : Color.secondary)
@@ -26,7 +26,7 @@ struct AllowViewingCard: View {
                 }
             }
             Spacer()
-            Toggle("Allow viewing from other devices", isOn: allowed)
+            Toggle(Wording.text("remote_view.allow_title"), isOn: allowed)
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .disabled(!canChange)

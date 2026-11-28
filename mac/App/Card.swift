@@ -31,12 +31,15 @@ extension View {
 
 /// The small grey heading at the top of a card.
 struct CardTitle: View {
-    let text: LocalizedStringKey
+    let text: Text
 
-    init(_ text: LocalizedStringKey) { self.text = text }
+    init(_ text: LocalizedStringKey) { self.text = Text(text) }
+
+    /// A sentence that is not a string-catalog key, as the shared wording is.
+    init(verbatim text: String) { self.text = Text(verbatim: text) }
 
     var body: some View {
-        Text(text)
+        text
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
     }

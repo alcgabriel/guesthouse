@@ -14,15 +14,15 @@ struct ConnectCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            CardTitle("Connect from remoteman")
+            CardTitle(verbatim: Wording.text("remote_view.connect_title"))
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 9) {
                 row("Name", Text(machine.name))
-                row("Address", Text(address).font(.system(.callout, design: .monospaced)).textSelection(.enabled))
+                row(Wording.text("remote_view.address_label"), Text(address).font(.system(.callout, design: .monospaced)).textSelection(.enabled))
                 if LocalNetwork.address != nil {
                     row("or", Text("\(LocalNetwork.hostName):\(port)").font(.system(.callout, design: .monospaced)).textSelection(.enabled))
                 }
                 if let short = share.shortFingerprint {
-                    row("Fingerprint", Text(short)
+                    row(Wording.text("remote_view.fingerprint_label"), Text(short)
                         .font(.system(.callout, design: .monospaced))
                         .textSelection(.enabled)
                         .help(share.fingerprint ?? ""))
@@ -30,12 +30,12 @@ struct ConnectCard: View {
             }
             Spacer(minLength: 0)
             HStack(spacing: 8) {
-                Button("Copy Address") {
+                Button(Wording.text("remote_view.copy_address")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(address, forType: .string)
                 }
                 .frame(maxWidth: .infinity)
-                Button("Pair a New Device") { library.pairNewDevice(machine) }
+                Button(Wording.text("remote_view.pair_new_device")) { library.pairNewDevice(machine) }
                     .frame(maxWidth: .infinity)
                     .disabled(share.pairing || share.pending != nil)
             }
@@ -43,9 +43,9 @@ struct ConnectCard: View {
         .card(padding: 18, fillsHeight: true)
     }
 
-    private func row(_ title: LocalizedStringKey, _ value: some View) -> some View {
+    private func row(_ title: String, _ value: some View) -> some View {
         GridRow {
-            Text(title).foregroundStyle(.secondary)
+            Text(verbatim: title).foregroundStyle(.secondary)
             value.gridColumnAlignment(.trailing)
         }
     }
