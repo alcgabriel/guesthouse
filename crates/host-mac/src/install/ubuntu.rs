@@ -97,7 +97,7 @@ if ! mount -o ro "$disk" "$mnt"; then
     systemctl --no-block poweroff
     exit 1
 fi
-version=$(sed -n 's/.*"version" *: *"\([^"]*\)".*//p' "$mnt/$manifest")
+version=$(sed -n 's/.*"version" *: *"\([^"]*\)".*/\1/p' "$mnt/$manifest")
 if [ -n "$version" ] && [ "$(cat "$state/driver-version" 2>/dev/null)" = "$version" ]; then
     umount "$mnt"
     exit 0
