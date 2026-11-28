@@ -478,7 +478,7 @@ impl Agent {
             Graphics::Guarded => Some(self.check_guarded(&qemu, pvg_host)?),
         };
         let run_dir = &launch.run_dir;
-        fs::create_dir_all(run_dir)
+        store::make_run_folder_private(run_dir)
             .map_err(|error| format!("cannot make {}: {error}", run_dir.display()))?;
         for stale in [
             &launch.control_socket,

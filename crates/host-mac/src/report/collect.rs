@@ -68,7 +68,14 @@ const UNIFIED_LOG_WINDOW: &str = "2h";
 const MOST_CRASH_REPORTS: usize = 3;
 const CRASH_REPORT_DAYS: u64 = 14;
 const CRASH_REPORT_LINES: usize = 200;
-const CRASH_NAMES: [&str; 3] = ["Guesthouse", "qemu", "pvg-host"];
+/// What a crash report's file name starts with: the process's own name, which for the graphics process is
+/// `guesthouse-pvg-host` (and `guesthouse-daemon` once there is one).
+const CRASH_NAMES: [&str; 4] = [
+    "Guesthouse",
+    "qemu",
+    "guesthouse-pvg-host",
+    "guesthouse-daemon",
+];
 
 pub fn collect(request: &Request, places: &Places) -> Collection {
     let mut found = Collection::default();

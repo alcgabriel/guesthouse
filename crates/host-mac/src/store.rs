@@ -38,6 +38,22 @@ pub fn run_folder(machines: &Path, id: &str) -> PathBuf {
     machines.with_file_name("Run").join(id)
 }
 
+/// The mode of a machine's run folder and of the `Run` folder above it: this user only.
+pub const RUN_FOLDER_MODE: u32 = 0o700;
+
+/// Makes a machine's run folder (and the `Run` folder above it) readable by this user only. The
+/// graphics process and QEMU make their sockets there under the process's umask, which leaves them
+/// open to every user of the Mac, so the folder is what keeps them private. Done at every start, so
+/// a folder an older version made with the default mode is closed too.
+pub fn make_run_folder_private(run_dir: &Path) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::create_dir_all(run_dir)?;
+    for folder in [run_dir.parent(), Some(run_dir)].into_iter().flatten() {
+        fs::set_permissions(folder, fs::Permissions::from_mode(RUN_FOLDER_MODE))?;
+    }
+    Ok(())
+}
+
 /// What a machine's `machine.json` holds.
 #[derive(Deserialize)]
 struct Settings {
@@ -262,6 +278,23 @@ pub fn find(machines: &Path, id: &str) -> Result<Machine, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_run_folder_and_the_one_above_it_are_this_users_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let base = std::env::temp_dir().join(format!("gh-run-mode-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let run = base.join("Run").join("win");
+        // As an older version left them: open to everyone.
+        fs::create_dir_all(&run).unwrap();
+        fs::set_permissions(base.join("Run"), fs::Permissions::from_mode(0o755)).unwrap();
+        fs::set_permissions(&run, fs::Permissions::from_mode(0o755)).unwrap();
+        make_run_folder_private(&run).unwrap();
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&run), RUN_FOLDER_MODE);
+        assert_eq!(mode(&base.join("Run")), RUN_FOLDER_MODE);
+        let _ = fs::remove_dir_all(base);
+    }
+
     use super::*;
     use std::sync::atomic::{AtomicU32, Ordering};
 
