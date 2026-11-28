@@ -9,5 +9,5 @@ Priority: optional
 Description: Guesthouse: Ubuntu's GNOME desktop on the Mac's graphics device
  GNOME Shell (Ubuntu's session) in place of weston, through our Mesa (Zink on
  KosmicKrisp), signed in at boot by GDM as the account the install made, at
- the scale the Mac app gives and with a German keyboard. Removing this package
+ the scale and with the keyboard layout the Mac app gives. Removing this package
  gives the weston desktop back.

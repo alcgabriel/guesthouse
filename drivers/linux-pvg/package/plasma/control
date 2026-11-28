@@ -9,5 +9,5 @@ Priority: optional
 Description: Guesthouse: KDE Plasma on the Mac's graphics device
  Plasma (KWin on Wayland) in place of weston, through our Mesa (Zink on
  KosmicKrisp), signed in at boot by SDDM as the account the install made, at
- the scale the Mac app gives and with a German keyboard. Removing this package
+ the scale and with the keyboard layout the Mac app gives. Removing this package
  gives the weston desktop back.
