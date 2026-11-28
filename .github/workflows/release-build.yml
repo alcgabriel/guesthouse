@@ -310,7 +310,7 @@ jobs:
             gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber "${FILES[@]}"
             gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes.md"
           else
-            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag --title "$VERSION" \
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag --title "Linux $VERSION" \
               --notes-file "$RUNNER_TEMP/notes.md" "${FILES[@]}"
           fi
           echo "The draft of $TAG is ready to read and publish: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases"
