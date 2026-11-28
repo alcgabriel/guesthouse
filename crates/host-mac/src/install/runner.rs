@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Taking an install one step after another: starting each, passing its progress on, saving the
 //! state after every change (so the app can be closed and opened again), and stopping where
 //! something fails or the person says stop. What each step does is `Steps`; the runner knows only

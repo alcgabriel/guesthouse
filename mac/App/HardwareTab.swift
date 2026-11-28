@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// This Mac's size, for saying how much of it a machine has.

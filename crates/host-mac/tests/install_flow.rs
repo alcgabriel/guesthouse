@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Installing a guest through the agent, with the stand-in network and guest (`install::fake`):
 //! no download and no machine. Covers the steps in order, a failure and what is chosen at it,
 //! stopping, and an install found again by a new agent.
 
+mod support;
 use guesthouse_core::agent::{Agent, Config, InstallConfig};
 use guesthouse_core::install::plan::{Guest, Plan, Step};
 use guesthouse_core::install::state::{self, InstallInfo, Source, StepStatus};
@@ -46,7 +48,8 @@ impl Support {
             install: InstallConfig {
                 fake: true,
                 driver_dir: Some(self.0.join("driver")),
-                stick_script: None,
+                stick_script: Some(support::stand_ins(&self.0).1),
+                firmware_dir: Some(support::stand_ins(&self.0).0),
             },
             shutdown_timeout: Duration::from_secs(5),
             start_timeout: Duration::from_secs(10),

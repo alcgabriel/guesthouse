@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! What can stop a machine starting on this Mac, judged from facts handed in: memory against what
 //! other machines hold and what is free now, and disk against what the machine's disk can still
 //! grow by. No OS calls here: the app reads the Mac's memory and free space and passes them in, and

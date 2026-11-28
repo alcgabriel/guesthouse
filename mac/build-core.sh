@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Builds the Rust core for macOS on Apple silicon and wraps it as an XCFramework that Swift
 # imports as `GuesthouseCore`. Run from anywhere; the output is build/GuesthouseCore.xcframework.
 set -e
@@ -21,7 +22,13 @@ module GuesthouseCore {
 }
 EOF
 
-cargo build --release --manifest-path core/Cargo.toml --target "$target"
+# The lab's own build places (core/src/lab.rs) are compiled in only inside the lab's tree, which
+# has the driver's scripts beside the app; a public checkout has none of them.
+features=""
+if [ -f "$here/../scripts/mac/run.sh" ]; then features="--features lab"; fi
+
+# shellcheck disable=SC2086
+cargo build --release --manifest-path core/Cargo.toml --target "$target" $features
 xcodebuild -create-xcframework \
     -library "core/target/$target/release/libguesthouse_core.a" -headers "$headers" \
     -output "$out"

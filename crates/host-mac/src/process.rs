@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Finding a process again. A pid alone is not enough: after a restart of the Mac or a long
 //! time the number may belong to something else. A process is named by its pid and the time it
 //! started, which a recycled pid will not share.

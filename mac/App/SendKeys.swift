@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// A combination of keys to send the guest as one: the ones the Mac would keep for itself

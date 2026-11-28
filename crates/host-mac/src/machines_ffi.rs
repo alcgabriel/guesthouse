@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The C functions for finding QEMU and for adding and renaming machines. Like the rest of the
 //! interface, they take and give JSON text, and every string they return is freed with
 //! `guesthouse_string_free`.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The machine store: one folder per machine under the machines folder, each holding a
 //! `machine.json` with the machine's settings. The store lists what is there and works out what
 //! starting a machine needs from it.

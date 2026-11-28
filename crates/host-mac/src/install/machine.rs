@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The machine an install makes: its folder and `machine.json`, written before anything is
 //! downloaded so the library shows it from the start. The disk and the firmware are the make-disk
 //! step's.

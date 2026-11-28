@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// The rounded panel the overview and sharing tabs are made of: the system's own control

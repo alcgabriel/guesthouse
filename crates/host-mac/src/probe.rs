@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Asking a program what it can do before it is trusted with a machine: a graphics process
 //! with no frame export would start a machine with no screen, and a QEMU without `pvg-fwd`
 //! would fail with a message nobody can act on. Each check runs the program for a moment with

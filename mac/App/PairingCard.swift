@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// Pairing a new device: closed, open with the time left, or a device waiting with its code

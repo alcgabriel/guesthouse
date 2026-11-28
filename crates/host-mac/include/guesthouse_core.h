@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /* The C interface of Guesthouse's Mac core, written by hand to match core/src/lib.rs. */
 
 #ifndef GUESTHOUSE_CORE_H

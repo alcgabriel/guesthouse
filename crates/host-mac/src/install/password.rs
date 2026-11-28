@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The password of a guest's account. The app makes it (random, readable, no letters that look
 //! alike), keeps it in the Mac's Keychain and sends it with the install; this only checks that
 //! what arrives is safe to write into the answer files, where it is put at generation time and

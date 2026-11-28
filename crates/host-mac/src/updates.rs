@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Whether a newer Guesthouse for the Mac is out, on the shared check (`guesthouse-update-check`,
 //! which the Linux and Windows hosts use): a release publishes a small file, the file says the
 //! newest version, and the shared code decides what that means for the running one. This only

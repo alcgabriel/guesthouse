@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 use super::*;
 use crate::install::driver::{REQUIRED, fetch_package};
 use crate::install::fake::FakeNetwork;

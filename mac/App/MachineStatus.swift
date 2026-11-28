@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// Where a machine stands, as the agent last said.

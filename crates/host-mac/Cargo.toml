@@ -12,6 +12,11 @@ publish.workspace = true
 name = "guesthouse_core"
 crate-type = ["staticlib", "rlib"]
 
+[features]
+# The lab's own build places (src/lab.rs). Off in every public build; build-core.sh turns it on
+# only inside the lab's tree.
+lab = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

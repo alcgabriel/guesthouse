@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// The Mac's own address on the local network, for telling another device where to connect.

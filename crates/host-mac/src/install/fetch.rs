@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Getting a file from the network: with room checked first, a download that goes on from where
 //! it stopped, and a checksum before the file is kept. The network is behind `Transport`, so the
 //! rest runs in tests with no network; `CurlTransport` is the real one (the system's `curl`, as

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! A Linux machine on the guarded path with stand-ins: its QEMU line has the network and the
 //! scale the start asked for, and the size the app wants reaches the graphics process as its
 //! mode while the machine runs, through the C function the app calls. QEMU's own device and a

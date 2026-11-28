@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Bug reports: what is gathered about one machine and this Mac, made into one file the person can
 //! send to the developer with a click, or save and attach. The Linux and Windows hosts do the
 //! same, and the Mac does it with their words and their server.

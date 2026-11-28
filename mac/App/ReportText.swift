@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// The words of bug reporting, the Linux and Windows apps' own: the kinds of problem (each with

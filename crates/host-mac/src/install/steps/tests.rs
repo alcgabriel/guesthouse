@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 #![allow(clippy::field_reassign_with_default)]
 use super::*;
 use crate::install::fake::{FakeGuest as Control, FakeNetwork as Network};

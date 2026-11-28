@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The agent's Unix socket: what the app talks to when the agent was not started by launchd.
 //! One request or event per line, as in `protocol`. Each connection hears every state change
 //! from the moment it connects, and its answers share the line with them.

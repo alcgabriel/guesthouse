@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The size a machine's screen should be, as the app works it out from the machine's window.
 //!
 //! This is the app's half of "the screen follows the window". When a resize of the window ends

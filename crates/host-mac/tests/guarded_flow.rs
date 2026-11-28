@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The guarded path with stand-ins: `fake_pvg_host` for the graphics process and `fake_qemu`,
 //! which connects to its socket as QEMU's `pvg-fwd` does. Covers the start order, a graphics
 //! process that ends before its socket or while the machine runs, one that outstays its QEMU,

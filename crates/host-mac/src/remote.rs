@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Showing a machine's screen to another device, with remoteman's viewer. The work is done by
 //! `rmhost serve`, a program of its own that the agent runs for a machine while it is running
 //! and the person has allowed it (`allow_remote_view` in `machine.json`). It stays a separate

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! A stand-in for `guesthouse-pvg-host`, for trying the agent with no graphics. It takes the
 //! arguments the agent gives the real one, writes them one a line to `fake-pvg-host.args`, opens
 //! the `--socket` that QEMU's `pvg-fwd` connects to and the `--control` socket (which answers

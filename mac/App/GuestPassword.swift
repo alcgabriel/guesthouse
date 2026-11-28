@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// The password the app gives a guest's account: random, and easy to read out and type. Four short

@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Ubuntu's install through the agent with a Linux driver package, with the stand-in network and
 //! guest (`install::fake`): a stand-in package whose `install.sh` only says its line, which the
 //! stand-in guest says as the driver's service would run it. Both ends: the driver installed and
 //! the first start, and the driver refused with Try Again and Open Without the Driver.
 
+mod support;
 use guesthouse_core::agent::{Agent, Config, InstallConfig};
 use guesthouse_core::install::driver::{LINUX, LINUX_SCRIPT};
 use guesthouse_core::install::plan::Step;
@@ -55,7 +57,8 @@ impl Support {
             install: InstallConfig {
                 fake: true,
                 driver_dir: Some(self.0.join("linux-driver")),
-                stick_script: None,
+                stick_script: Some(support::stand_ins(&self.0).1),
+                firmware_dir: Some(support::stand_ins(&self.0).0),
             },
             shutdown_timeout: Duration::from_secs(5),
             start_timeout: Duration::from_secs(10),

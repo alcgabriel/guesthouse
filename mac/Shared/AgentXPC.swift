@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// What the app asks of the agent over XPC. A message is one line of the agent's JSON, the same

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// When a presenter that wants a picture no more often than `interval` is given one. A frame it

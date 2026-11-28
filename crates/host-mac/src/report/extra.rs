@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! What the Mac host takes out of a report beyond what the Linux and Windows hosts do (their
 //! `Scrubber` takes the user name, host name, home folder, UUIDs, MAC addresses, e-mail addresses
 //! and machine names): passwords and the like, pairing keys and device fingerprints, pairing codes,

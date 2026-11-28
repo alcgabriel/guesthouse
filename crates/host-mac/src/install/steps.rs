@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The steps themselves: getting the installer, making the machine's disk, running the guest's
 //! installer with the answers we wrote, putting our driver in, and the first start.
 //!

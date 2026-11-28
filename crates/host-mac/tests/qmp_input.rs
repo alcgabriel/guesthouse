@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Input through the same C functions the screen window calls, into a stand-in for QEMU's
 //! QMP socket that greets, answers every line and records what it got.
 

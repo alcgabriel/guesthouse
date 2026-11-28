@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// The overview's picture: the machine's screen filling the card, live while it runs, with its

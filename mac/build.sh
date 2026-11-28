@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Builds the core, the project and the app, into build/dd/Build/Products/Release/Guesthouse.app.
 # Ad hoc signed unless GUESTHOUSE_SIGN_IDENTITY holds the SHA-1 of a team's Apple Development
 # certificate in the login keychain; the team is read from that certificate here, never stored.

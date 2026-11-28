@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// The firmware files that sit beside a disk image, found by their names: a machine's folder

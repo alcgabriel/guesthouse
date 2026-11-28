@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// Where an install stands, as the agent says it, for the install screens (not built yet) and for

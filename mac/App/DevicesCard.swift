@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// The devices that can view this machine, with control switched per device, Disconnect for the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The Rust core of Guesthouse's Mac app. Swift reaches it through the C functions below,
 //! declared in `include/guesthouse_core.h`. Answers cross as JSON text, so the interface stays a
 //! handful of functions while what they carry grows.
@@ -11,6 +12,7 @@ pub mod input;
 pub mod install;
 pub mod keyboard_layout;
 pub mod keys;
+pub mod lab;
 pub mod launch;
 pub mod link;
 pub mod machines_ffi;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The agent and its socket as C functions, declared in `include/guesthouse_core.h`. The Swift
 //! agent calls the first group; the app calls the connection functions. Lines cross as C
 //! strings that the caller frees with `guesthouse_string_free`.

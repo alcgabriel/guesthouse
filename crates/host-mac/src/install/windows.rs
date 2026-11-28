@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Windows 11 for ARM: where the installer comes from, the answers its setup is given, and what
 //! the first logon runs.
 //!

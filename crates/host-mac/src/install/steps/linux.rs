@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Ubuntu's own parts of the steps: its installer started by its kernel, the driver from a disk
 //! labelled `RUXN`, and the first start, with or without the driver.
 

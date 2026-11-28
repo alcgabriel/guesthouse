@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Where an install stands, as data: each step's status and progress, a failure with the choices it
 //! offers, and the moves between them. Everything here is pure (no clock, no files except `save`
 //! and `load`), so the screens and the tests read the same thing. It is written to `install.json`

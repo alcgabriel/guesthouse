@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// The overview: the machine's screen as a picture with its name and buttons on it, and four

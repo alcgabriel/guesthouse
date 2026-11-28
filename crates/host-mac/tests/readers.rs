@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! One machine's frames read by more than one program at once, as the screen window and
 //! `rmhost serve` do: `testsource` publishes, `rmhost serve` (with `-p`, the lab way, so the
 //! viewer pairs unasked) and `rmhost stats` read, and `viewcheck` is the viewer. Both readers

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! `guesthouse-report`, the report tool for when the app will not open: the Linux host's tool by
 //! name, options and output as far as they apply, built from the same functions the app uses. It
 //! shows what the report holds before anything is sent, and sends only after a typed `yes`.

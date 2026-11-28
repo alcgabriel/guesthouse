@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The window's mouse and keyboard as QMP `input-send-event` events. The guest has a USB tablet
 //! and a USB keyboard; this keeps track of what is held so it can all be let go at once, and
 //! turns the window's points into the tablet's range.

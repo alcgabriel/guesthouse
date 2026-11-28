@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! A stand-in for QEMU, for trying the agent with no guest. It takes the arguments the agent
 //! gives QEMU, opens the `-qmp unix:...` sockets and speaks enough QMP: the greeting,
 //! `qmp_capabilities`, `system_powerdown` (it exits half a second later) and `quit` (at once).

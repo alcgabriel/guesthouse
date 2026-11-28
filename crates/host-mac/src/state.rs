@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Where a machine stands, and the moves between states. It is a pure function of the state and
 //! an event, so every rule is tested without a process: the agent turns what happens (a request,
 //! QEMU answering, QEMU exiting) into events and applies them one at a time.

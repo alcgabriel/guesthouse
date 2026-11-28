@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// The two systems Guesthouse can install, with the sizes it chooses for this Mac and the words

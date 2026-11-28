@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// Viewing the machine's screen from other devices with remoteman: the switch, pairing, how to

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Whether the graphics driver in a Windows machine is the one this Guesthouse comes with: the
 //! version the released package says (kept from the last fetch) against the version the machine
 //! last reported. The guest does not report its driver's version yet, so this stores one when it

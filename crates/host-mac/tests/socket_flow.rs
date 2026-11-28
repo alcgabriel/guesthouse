@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The agent's socket is private to this user: its folder is 0700, the socket 0600, and a program
 //! of this user can still talk to it.
 
@@ -35,6 +36,7 @@ fn the_socket_is_owner_only_in_an_owner_only_folder_and_its_owner_can_use_it() {
             fake: true,
             driver_dir: None,
             stick_script: None,
+            firmware_dir: None,
         },
         shutdown_timeout: Duration::from_secs(5),
         start_timeout: Duration::from_secs(10),

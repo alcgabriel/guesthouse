@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Sends a written report to the server with the system's `curl`, as the other hosts do, and reads
 //! the answer. The arguments and the reading are the shared crate's (and tested there against the
 //! Linux host's own); running curl is this file's.

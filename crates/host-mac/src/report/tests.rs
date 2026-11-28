@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 use super::*;
 use crate::report::bundle::prepare;
 use crate::report::collect::{Collection, Places};

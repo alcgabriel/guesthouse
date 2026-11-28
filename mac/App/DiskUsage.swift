@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// How big a machine's disk image is, and how much space it takes on this Mac.

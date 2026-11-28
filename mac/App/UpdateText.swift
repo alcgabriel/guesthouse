@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// What a check for a newer Guesthouse found, and the words for it. Plain data, so a test can hold

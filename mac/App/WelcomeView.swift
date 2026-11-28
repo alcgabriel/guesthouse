@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// What the library shows before there is a machine: the one choice, Windows or Ubuntu, and a

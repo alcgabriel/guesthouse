@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Stand-ins for the network and the guest, so an install can be run with neither: by the tests,
 //! and by the agent when it is started with `GUESTHOUSE_INSTALL_FAKE` set, to try the install
 //! screens or the command line (`--install`) with no download and no machine.

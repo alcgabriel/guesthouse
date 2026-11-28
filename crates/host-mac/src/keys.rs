@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! macOS key codes (the `kVK_` constants of Carbon's `Events.h`, which `NSEvent.keyCode`
 //! gives) to QEMU's key names (`QKeyCode` in QEMU's `qapi/ui.json`). Both name a key by its
 //! place on the keyboard, not by the letter printed on it, so the guest's own layout decides

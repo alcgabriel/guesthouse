@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Adding, renaming and finding QEMU through the C functions, in a support folder of their own.
 
 use guesthouse_core::machines_ffi::{

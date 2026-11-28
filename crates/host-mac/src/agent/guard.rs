@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The guarded path: the graphics device runs in `guesthouse-pvg-host`, a process of its own,
 //! and QEMU forwards to it. The agent starts it first, waits for its socket, then starts QEMU;
 //! the two live and die together.

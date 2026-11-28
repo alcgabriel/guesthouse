@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The QMP socket that input goes to. A thread of its own connects, does the handshake and
 //! writes the commands, so the window never waits on QEMU: a hung guest cannot freeze it.
 //!

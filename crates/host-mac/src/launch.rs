@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! What starting a machine runs: the QEMU command line for a Windows guest with QEMU's own
 //! graphics device and frame export, the same one `win/run.sh` builds for `WIN_PVG=qemu
 //! WIN_RAMFB=no WIN_RMHOST=NAME`. Where the lab script is given a run folder and changes into

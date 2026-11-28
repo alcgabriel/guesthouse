@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The rules a machine's page and menus follow, judged from facts handed in: what a state allows,
 //! whether the Start and Open Screen buttons work, whether an install is shown, and the order the
 //! start checks run in. The app only draws what comes back.

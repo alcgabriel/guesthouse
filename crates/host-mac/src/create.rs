@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Making a machine from files the person already has, and renaming one.
 //!
 //! A new machine is a folder in the machines folder holding clones (or, off APFS, copies) of

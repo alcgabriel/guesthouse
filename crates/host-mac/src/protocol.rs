@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The words the app and the agent speak: one JSON object per line, in both directions, the
 //! same over the Unix socket and over XPC (which carries each line as a string). Version 1.
 

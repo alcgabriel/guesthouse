@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// A machine in the sidebar: a plain mark for its system, its name and where it stands.

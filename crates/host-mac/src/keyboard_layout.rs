@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The Mac's keyboard layout as a Linux guest names it (XKB's layout and variant), so the guest's
 //! console, its sign-in screen and its desktop put the same characters on the same keys. QEMU
 //! sends the keys' places, not characters, so the guest's layout is what makes them.

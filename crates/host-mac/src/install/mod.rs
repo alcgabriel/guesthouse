@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Installing a guest from nothing, with one press: the plan (what is done, in what order, for a
 //! Windows or an Ubuntu machine), the state it is in (for the screens and for starting again after
 //! the app was closed), the fetching of the installer, the answers the guest's installer is given,

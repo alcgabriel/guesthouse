@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// Words and numbers for the machine pane, kept apart from the views so they can be tried

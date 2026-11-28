@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! What an install is made of: the same five steps for a Windows machine and an Ubuntu machine,
 //! with each step's words as the install screens say them.
 

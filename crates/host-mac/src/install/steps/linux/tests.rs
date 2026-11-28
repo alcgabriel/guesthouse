@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 use super::super::{RealSteps, Setup};
 use super::*;
 use crate::install::fake::{FakeGuest, FakeNetwork};

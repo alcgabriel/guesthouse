@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Makes the files of a report from what was gathered (each scrubbed, the end of a long one kept,
 //! with the person's words, the summary and the manifest), writes them in a folder of the app's own
 //! and packs them as the others do: a `tar.gz` made by the system's `tar`. The folder is kept

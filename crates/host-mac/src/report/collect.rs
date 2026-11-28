@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Gathers each part of a report from its own source, and never stops for one that cannot be read:
 //! what is missing is said, with why. Nothing is scrubbed here (`bundle` does that for every part).
 //!

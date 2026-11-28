@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The agent's own use of a machine's QMP socket: one short conversation at a time. QEMU takes
 //! one client per socket, so the agent never holds the connection; it comes, asks and leaves.
 

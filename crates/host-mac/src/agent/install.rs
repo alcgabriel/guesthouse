@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Installing a guest, as the agent does it: a thread for each install that runs the steps, keeps
 //! the state in the machine's folder, and tells everyone connected as it changes. An install that
 //! was running when the agent went away is taken up again where it was.
@@ -56,11 +57,6 @@ pub(super) struct InstallSlot {
     tools: Tools,
 }
 
-/// Where the lab keeps QEMU's firmware, as a development convenience beside QEMU's own folder.
-const LAB_FIRMWARE: &str =
-    "Developer/lab/m5/.tools/src/qemu-build/pc-bios";
-/// Where the lab's `stick.sh` is, as a development convenience.
-const LAB_STICK_SCRIPT: &str = "Developer/lab/win/stick.sh";
 const FAKE_DISK_GB: u64 = 1;
 /// The driver's disk, at least, and the room it keeps beside its files.
 const STICK_MEGABYTES: u64 = 64;
@@ -124,7 +120,7 @@ impl MachineControl for AgentControl {
             .stick_script
             .clone()
             .or_else(|| {
-                std::env::var_os("HOME").map(|home| Path::new(&home).join(LAB_STICK_SCRIPT))
+                std::env::var_os("HOME").and_then(|home| crate::lab::stick_script(Path::new(&home)))
             })
             .filter(|path| path.is_file())
             .ok_or("stick.sh, which makes the driver's disk, was not found.")?;
@@ -399,8 +395,10 @@ impl Agent {
         );
         let mut firmware_dirs: Vec<PathBuf> =
             qemus.iter().flat_map(|q| firmware_dirs_of(q)).collect();
-        firmware_dirs
-            .extend(std::env::var_os("HOME").map(|home| Path::new(&home).join(LAB_FIRMWARE)));
+        firmware_dirs.extend(config.install.firmware_dir.clone());
+        firmware_dirs.extend(
+            std::env::var_os("HOME").and_then(|home| crate::lab::firmware_dir(Path::new(&home))),
+        );
         let setup = Setup {
             machines: machines.clone(),
             id: id.to_string(),

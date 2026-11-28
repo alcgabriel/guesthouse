@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Ubuntu for ARM: the official installer and its published checksums, and the answers its
 //! installer reads (cloud-init's autoinstall), in the shape the other hosts use
 //! (`crates/host-windows/guest/linux/user-data` of the public repo).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import Foundation
 
 /// The messages for things going wrong, in the words of the design: what happened, what it means

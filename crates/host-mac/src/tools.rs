@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Finding the programs the app runs, so a person never has to type a path: QEMU, which runs
 //! the machines, and rmhost, which shares a machine's screen with other devices.
 //!
@@ -55,39 +56,6 @@ impl Tool {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// LAB ONLY. The builds on the lab's Mac, each list in the order tried, newest first. Paths are
-// under the home folder. A person's own Mac never has them and a release does not rely on them;
-// the fix for the public repo is to delete this whole section and the `lab` place with it.
-// ---------------------------------------------------------------------------------------------
-const LAB_QEMU: &[&str] = &[
-    "Developer/lab/m5/build/rmhost/qemu-windows/qemu-system-aarch64",
-];
-const LAB_RMHOST: &[&str] =
-    &["Developer/lab/m5/build/rmhost/rmhost"];
-/// The contributor's build (a library with a thin main, both sockets 0600, the frame export built
-/// in), which the lab's run.sh uses by default; then the earlier separate frame-export build.
-/// The stock build in build/guesthouse has no --frames and is refused.
-const LAB_PVG_HOST: &[&str] = &[
-    "Developer/lab/m5/build/guesthouse-adcafeb/release/guesthouse-pvg-host",
-    "Developer/lab/m5/.tools/m4-frame-export/target/release/guesthouse-pvg-host",
-];
-const LAB_PVG_QEMU: &[&str] = &[
-    "Developer/lab/m5/build/qemu-pvg/qemu/qemu-system-aarch64",
-];
-
-/// The lab's builds of `tool` that exist under `home`, newest first.
-fn lab_builds(tool: Tool, home: &Path) -> Vec<PathBuf> {
-    let list = match tool {
-        Tool::Qemu => LAB_QEMU,
-        Tool::Rmhost => LAB_RMHOST,
-        Tool::PvgHost => LAB_PVG_HOST,
-        Tool::PvgQemu => LAB_PVG_QEMU,
-    };
-    list.iter().map(|path| home.join(path)).collect()
-}
-// ---------------------------------------------------------------------------------------------
-
 /// Which of the places a QEMU was found in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source {
@@ -142,7 +110,7 @@ impl Places {
                 .map(PathBuf::from),
             bundled,
             lab: std::env::var_os("HOME")
-                .map(|home| lab_builds(tool, Path::new(&home)))
+                .map(|home| crate::lab::builds(tool, Path::new(&home)))
                 .unwrap_or_default(),
         }
     }
@@ -335,10 +303,6 @@ mod tests {
         assert_eq!(locate(Tool::PvgHost, &places).unwrap().path, newer);
         places.lab.remove(1);
         assert_eq!(locate(Tool::PvgHost, &places).unwrap().path, older);
-        assert!(
-            lab_builds(Tool::PvgHost, Path::new("/h"))[0]
-                .ends_with("guesthouse-adcafeb/release/guesthouse-pvg-host")
-        );
     }
 
     #[test]

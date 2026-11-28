@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! The graphics driver's package for a Windows guest, as a release publishes it, and how it is got.
 //!
 //! **What a release must produce** (written down for whoever builds releases; `notes/mac-app-install.md`

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 import SwiftUI
 
 /// The four small cards under the overview's picture: what draws the machine, its screen, its

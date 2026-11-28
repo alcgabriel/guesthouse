@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 //! Sharing a machine's screen with another device, with no virtual machine: `fake_qemu` stands in
 //! for QEMU, `testsource` publishes a moving picture under the name the device would, the agent
 //! starts the real `rmhost serve` against it, and `viewcheck` (a viewer with no screen) connects

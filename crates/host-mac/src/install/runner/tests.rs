@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 use super::*;
 use crate::install::plan::{Guest, Plan};
 use crate::install::state::{Choice, Source, StepStatus};
