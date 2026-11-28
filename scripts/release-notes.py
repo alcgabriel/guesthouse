@@ -22,7 +22,7 @@ Each host's notes are only that host's news. A title that names a host ("Mac hos
 app: ...", "for the Mac host") is that host's, unless it also says every host or both. A title
 that names none is every host's, unless every file it touched is one host's: mac/ and the Mac
 crates are the Mac host's, windows/ and the Windows host's crates are the Windows host's, and the
-Linux app, daemon, GPU backends and packaging are the Linux host's.
+Linux app, daemon, GPU backends, their cores and packaging are the Linux host's.
 
 Left out, and listed with why in a comment at the end so nothing goes missing unseen: another
 host's pull requests, the release and version pull requests, the ones pointing the installer or
@@ -56,7 +56,7 @@ HOSTS = {
     "linux": re.compile(r"\bLinux (hosts?|app)\b|^Remote view on Linux:"),
 }
 EVERY_HOST = re.compile(r"\b(every|each|both|all) hosts?\b", re.I)
-# The files only one host builds. Cargo.lock and Cargo.toml at the top say nothing either way, and any
+# The files only one host builds. Cargo.lock, Cargo.toml and CLA-SIGNERS.md say nothing either way, and any
 # other file is every host's.
 HOST_FILES = {
     "mac": re.compile(r"^(mac/|crates/(host-mac|pvg-host|pvg-sys)/)"),
@@ -64,11 +64,11 @@ HOST_FILES = {
         r"^(windows/|crates/((app|host|service|installer)-windows|hcs|control)/|tools/hcs-boot/|scripts/windows-)"
     ),
     "linux": re.compile(
-        r"^(crates/(app|daemon|backend|backend-[a-z]+|sensors|replay|frame-socket|transport)/"
+        r"^(crates/(app|app-core|core|daemon|backend|backend-[a-z]+|sensors|replay|frame-socket|transport)/"
         r"|packaging/|install\.sh$|uninstall\.sh$|tests/(install|proxmox)/|tools/card-check/)"
     ),
 }
-NEUTRAL_FILES = {"Cargo.lock", "Cargo.toml"}
+NEUTRAL_FILES = {"Cargo.lock", "Cargo.toml", "CLA-SIGNERS.md"}
 NAMES = {"mac": "the Mac host", "windows": "the Windows host", "linux": "the Linux host"}
 
 # The areas that go last, in this order, after the others by size.
