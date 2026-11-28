@@ -12,7 +12,6 @@ use crate::control;
 use crate::launch::{self, Graphics, Launch};
 use crate::process::{self, Pid};
 use crate::protocol::{self, MachineState, Op, Response, StateChange};
-use crate::remote;
 use crate::state::{self, Event, Refused, Status};
 use crate::store;
 use guesthouse_remote_view_core::pairing::Event as PairEvent;
@@ -284,13 +283,16 @@ impl Agent {
                 fingerprint,
                 what,
                 on,
-            } => remote::allow_line(&fingerprint, &what, on)
-                .and_then(|line| self.pair_say(&machine, &line)),
+            } => self.device_command(&machine, |policy| {
+                policy.device_allow(&fingerprint, &what, on)
+            }),
             Op::DeviceRevoke {
                 machine,
                 fingerprint,
-            } => remote::revoke_line(&fingerprint).and_then(|line| self.pair_say(&machine, &line)),
-            Op::DeviceDrop { machine } => self.pair_say(&machine, &remote::drop_line()),
+            } => self.device_command(&machine, |policy| policy.device_revoke(&fingerprint)),
+            Op::DeviceDrop { machine } => self.device_command(&machine, |_| {
+                Ok(guesthouse_remote_view_core::ctl::device_drop())
+            }),
         };
         match result {
             Ok(()) => Response::ok(id),

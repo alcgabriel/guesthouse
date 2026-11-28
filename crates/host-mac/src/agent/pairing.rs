@@ -78,6 +78,18 @@ impl Agent {
         }
     }
 
+    /// A command about a device, built by the shared policy and given to rmhost with no answer
+    /// waited for: what happened comes back as what rmhost says. Gives why it did not go.
+    pub(super) fn pairing_device(
+        &self,
+        id: &str,
+        words: impl FnOnce(&Policy) -> Result<Words, String>,
+    ) -> Result<(), String> {
+        let policy = Policy::default();
+        let words = words(&policy)?;
+        self.with_pairing_driver(id, |driver| driver.host_device(&words))
+    }
+
     /// What rmhost said about pairing, in the order it said it.
     pub(super) fn pairing_says(&self, id: &str, said: &PairingEvent) {
         if let Some(why) = self.with_pairing_driver(id, |driver| driver.host_says(said)) {

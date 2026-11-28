@@ -12,7 +12,6 @@ use crate::launch::Launch;
 use crate::protocol::{CloseReason, DeviceInfo, Pending};
 use crate::store::{self, MACHINE_FILE};
 use guesthouse_basics::json_file::write_json;
-use guesthouse_remote_view_core::ctl;
 use guesthouse_remote_view_core::events::PairingEvent;
 use std::fs;
 use std::net::UdpSocket;
@@ -26,37 +25,11 @@ pub use guesthouse_remote_view_core::share::{
 };
 
 // rmhost takes the words remoteman's own host takes for these (`pair accept`, `device FP allow KIND
-// on|off`, `revoke FP`, `drop`), so the shared crate's words are the lines, one to a line. A
-// fingerprint is checked there to be the 64 hex digits of one, so a request cannot put a second
-// command on the line. `pair close` and `pair open SECONDS` are rmhost's own (remoteman's are
-// `pair off` and `pair on`, with no time), so those lines stay here.
-
-/// A command's words as the line rmhost reads.
-fn line(words: ctl::Words) -> String {
-    words.join(" ") + "\n"
-}
-
-pub fn pair_accept_line() -> String {
-    line(ctl::pair_accept())
-}
-
-pub fn pair_decline_line() -> String {
-    line(ctl::pair_decline())
-}
-
-/// The line for `device_allow`, or why there is none. `input` is control, whose opposite is
-/// `view-only`.
-pub fn allow_line(fingerprint: &str, what: &str, on: bool) -> Result<String, String> {
-    ctl::device_allow(fingerprint, what, on).map(line)
-}
-
-pub fn revoke_line(fingerprint: &str) -> Result<String, String> {
-    ctl::device_revoke(fingerprint).map(line)
-}
-
-pub fn drop_line() -> String {
-    line(ctl::device_drop())
-}
+// on|off`, `revoke FP`, `drop`), so the shared crate's words are the lines, one to a line: the
+// pairing's driver builds them (a fingerprint is checked there to be the 64 hex digits of one, so a
+// request cannot put a second command on the line) and `rmhost_line` turns them into lines.
+// `pair close` and `pair open SECONDS` are rmhost's own (remoteman's are `pair off` and `pair on`,
+// with no time), so those lines are made here.
 
 /// The line that closes pairing.
 pub const PAIR_CLOSE_LINE: &str = "pair close\n";

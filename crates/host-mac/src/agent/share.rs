@@ -20,7 +20,9 @@ use crate::protocol::{ShareInfo, ShareState, share_event_line};
 use crate::remote::{self, LogEvent};
 use crate::state::Status;
 use crate::store::{self, Machine};
+use guesthouse_remote_view_core::ctl::Words;
 use guesthouse_remote_view_core::pairing::Event as PairEvent;
+use guesthouse_remote_view_core::policy::Policy;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
@@ -101,16 +103,20 @@ impl Agent {
         self.pairing_event(id, event)
     }
 
-    /// The ops that name a device (`device_allow`, `device_revoke`, `device_drop`): one line to
-    /// rmhost.
-    pub(super) fn pair_say(&self, id: &str, line: &str) -> Result<(), String> {
+    /// The ops that name a device (`device_allow`, `device_revoke`, `device_drop`): the shared
+    /// pairing's word for it, which checks the fingerprint, given to rmhost without an answer.
+    pub(super) fn device_command(
+        &self,
+        id: &str,
+        words: impl FnOnce(&Policy) -> Result<Words, String>,
+    ) -> Result<(), String> {
         if !matches!(
             self.share_state(id),
             Some(ShareState::Starting | ShareState::Listening)
         ) {
             return Err("This machine's screen is not being shared.".into());
         }
-        self.send_to_rmhost(id, line)
+        self.pairing_device(id, words)
     }
 
     /// Writes a line to rmhost's input. The pipe is opened for a moment each time, so it works

@@ -168,30 +168,38 @@ fn ports_in_use_are_skipped_and_running_out_is_said() {
 const FP: &str = "abababababababababababababababababababababababababababababababab";
 
 #[test]
-fn device_lines_are_built_only_from_a_fingerprint_and_a_known_permission() {
+fn device_lines_are_the_crates_words_and_only_from_a_fingerprint_and_a_known_permission() {
+    use guesthouse_remote_view_core::ctl;
+    use guesthouse_remote_view_core::policy::Policy;
+    let policy = Policy::default();
+    let line = |words: Result<Vec<String>, String>| rmhost_line(&words.unwrap()).unwrap();
     assert_eq!(
-        allow_line(FP, "clipboard", true).unwrap(),
+        line(policy.device_allow(FP, "clipboard", true)),
         format!("device {FP} allow clipboard on\n")
     );
     // Control is the opposite of view-only.
     assert_eq!(
-        allow_line(FP, "input", false).unwrap(),
+        line(policy.device_allow(FP, "input", false)),
         format!("device {FP} view-only on\n")
     );
     assert_eq!(
-        allow_line(FP, "input", true).unwrap(),
+        line(policy.device_allow(FP, "input", true)),
         format!("device {FP} view-only off\n")
     );
-    assert!(allow_line(FP, "root", true).is_err());
-    assert!(allow_line(&format!("{FP}\npair open 5"), "files", true).is_err());
-    assert!(allow_line("", "files", true).is_err());
-    assert_eq!(revoke_line(FP).unwrap(), format!("revoke {FP}\n"));
-    assert_eq!(drop_line(), "drop\n");
-    assert_eq!(pair_accept_line(), "pair accept\n");
-    assert_eq!(pair_decline_line(), "pair decline\n");
+    assert!(policy.device_allow(FP, "root", true).is_err());
+    assert!(
+        policy
+            .device_allow(&format!("{FP}\npair open 5"), "files", true)
+            .is_err()
+    );
+    assert!(policy.device_allow("", "files", true).is_err());
+    assert_eq!(line(policy.device_revoke(FP)), format!("revoke {FP}\n"));
+    assert_eq!(rmhost_line(&ctl::device_drop()).unwrap(), "drop\n");
+    assert_eq!(rmhost_line(&ctl::pair_accept()).unwrap(), "pair accept\n");
+    assert_eq!(rmhost_line(&ctl::pair_decline()).unwrap(), "pair decline\n");
     // A short one is not a fingerprint: the real ones are 64 hex digits.
-    assert!(revoke_line("ab12").is_err());
-    assert!(revoke_line("zz").is_err());
+    assert!(policy.device_revoke("ab12").is_err());
+    assert!(policy.device_revoke("zz").is_err());
 }
 
 fn words(line: &str) -> Vec<String> {
