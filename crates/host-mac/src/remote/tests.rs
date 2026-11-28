@@ -193,3 +193,84 @@ fn device_lines_are_built_only_from_a_fingerprint_and_a_known_permission() {
     assert!(revoke_line("ab12").is_err());
     assert!(revoke_line("zz").is_err());
 }
+
+fn words(line: &str) -> Vec<String> {
+    line.split(' ').map(str::to_owned).collect()
+}
+
+#[test]
+fn the_pairings_words_become_the_lines_rmhost_reads() {
+    assert_eq!(
+        rmhost_line(&words("pair on 120")).unwrap(),
+        "pair open 120\n"
+    );
+    assert_eq!(rmhost_line(&words("pair off")).unwrap(), "pair close\n");
+    assert_eq!(rmhost_line(&words("pair accept")).unwrap(), "pair accept\n");
+    assert_eq!(
+        rmhost_line(&words("pair decline")).unwrap(),
+        "pair decline\n"
+    );
+    assert_eq!(rmhost_line(&words("drop")).unwrap(), "drop\n");
+    let fingerprint = "ab".repeat(32);
+    assert_eq!(
+        rmhost_line(&words(&format!("device {fingerprint} view-only on"))).unwrap(),
+        format!("device {fingerprint} view-only on\n")
+    );
+}
+
+#[test]
+fn a_word_rmhost_has_no_line_for_is_not_delivered_with_a_reason() {
+    for line in [
+        "sharing on",
+        "allow clipboard off",
+        "set updates off",
+        "status",
+        "pair on soon",
+    ] {
+        assert!(rmhost_line(&words(line)).is_err(), "{line}");
+    }
+}
+
+#[test]
+fn what_rmhost_says_of_pairing_is_the_shared_pairings_event_in_lower_case() {
+    use guesthouse_remote_view_core::events::PairingEvent;
+    let device = Pending {
+        name: "Phone".into(),
+        fingerprint: "AB:CD".into(),
+        code: "123 456".into(),
+        seconds: 60,
+    };
+    assert_eq!(
+        pairing_event(&LogEvent::PairingPending(device)),
+        Some(PairingEvent::DeviceWaits {
+            name: "Phone".into(),
+            fingerprint: "ab:cd".into(),
+            code: "123 456".into(),
+            seconds: 60
+        })
+    );
+    assert_eq!(
+        pairing_event(&LogEvent::Paired {
+            fingerprint: "AB".into(),
+            name: "Phone".into()
+        }),
+        Some(PairingEvent::Paired {
+            fingerprint: "ab".into(),
+            name: "Phone".into()
+        })
+    );
+    assert_eq!(
+        pairing_event(&LogEvent::PairingOpen {
+            until_secs: 1_800_000_000
+        }),
+        Some(PairingEvent::PairingOpen {
+            until_unix_seconds: 1_800_000_000
+        })
+    );
+    // No time limit is rmhost's lab flag, and the shared pairing takes 0 as ended: not fed.
+    assert_eq!(
+        pairing_event(&LogEvent::PairingOpen { until_secs: 0 }),
+        None
+    );
+    assert_eq!(pairing_event(&LogEvent::ViewerLeft), None);
+}

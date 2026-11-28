@@ -13,6 +13,7 @@ use crate::protocol::{CloseReason, DeviceInfo, Pending};
 use crate::store::{self, MACHINE_FILE};
 use guesthouse_basics::json_file::write_json;
 use guesthouse_remote_view_core::ctl;
+use guesthouse_remote_view_core::events::PairingEvent;
 use std::fs;
 use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
@@ -159,14 +160,60 @@ pub enum LogEvent {
     Devices(Vec<DeviceInfo>),
     /// A device waits to be accepted or declined.
     PairingPending(Pending),
-    /// A device paired, with the name it gave.
+    /// A device paired, by this fingerprint, with the name it gave.
     Paired {
+        fingerprint: String,
         name: String,
     },
     /// Pairing closed, and why: `paired`, `declined`, `timeout`, `asked` or `other`.
     PairingClosed {
         reason: CloseReason,
     },
+}
+
+/// What rmhost said about pairing, as the shared pairing's event, or `None` for a line that is
+/// not about pairing. Fingerprints are lower case in both lines, so a device that waits and the
+/// same device that paired are one. A pairing with no time limit (`until 0`, rmhost's lab flag
+/// only) is not fed: the shared pairing takes 0 as already ended.
+pub fn pairing_event(event: &LogEvent) -> Option<PairingEvent> {
+    match event {
+        LogEvent::PairingOpen { until_secs } if *until_secs > 0 => {
+            Some(PairingEvent::PairingOpen {
+                until_unix_seconds: *until_secs,
+            })
+        }
+        LogEvent::PairingPending(device) => Some(PairingEvent::DeviceWaits {
+            name: device.name.clone(),
+            fingerprint: device.fingerprint.to_ascii_lowercase(),
+            code: device.code.clone(),
+            seconds: u32::try_from(device.seconds).unwrap_or(u32::MAX),
+        }),
+        LogEvent::Paired { fingerprint, name } => Some(PairingEvent::Paired {
+            fingerprint: fingerprint.to_ascii_lowercase(),
+            name: name.clone(),
+        }),
+        LogEvent::PairingClosed { reason } => Some(PairingEvent::PairingClosed { reason: *reason }),
+        _ => None,
+    }
+}
+
+/// The line rmhost reads for a word of the shared pairing, or why it has none. The pairing says
+/// `pair on SECONDS` and `pair off`, which are remoteman's; rmhost's own are `pair open SECONDS`
+/// and `pair close`. The device words are the same on both. What rmhost has no line for
+/// (`sharing`, `allow clipboard`, `set updates off`) is not delivered.
+pub fn rmhost_line(words: &[String]) -> Result<String, String> {
+    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    match words.as_slice() {
+        ["pair", "on", seconds] => seconds
+            .parse()
+            .map(pair_open_line)
+            .map_err(|_| format!("{seconds} is not a number of seconds.")),
+        ["pair", "off"] => Ok(PAIR_CLOSE_LINE.to_string()),
+        ["pair", "accept" | "decline"] | ["revoke", _] | ["drop"] | ["device", ..] => {
+            Ok(words.join(" ") + "\n")
+        }
+        _ => Err(format!("rmhost has no line for `{}`.", words.join(" "))),
+    }
 }
 
 /// Reads one line of rmhost's output. Lines that say nothing the app shows give `None`.
@@ -214,6 +261,7 @@ pub fn parse_line(line: &str) -> Option<LogEvent> {
         let (fingerprint, name) = rest.split_once(' ').unwrap_or((rest, ""));
         let name = name.trim();
         return Some(LogEvent::Paired {
+            fingerprint: fingerprint.to_string(),
             name: if name.is_empty() {
                 fingerprint.to_string()
             } else {

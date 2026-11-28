@@ -20,6 +20,7 @@ use crate::protocol::{ShareInfo, ShareState, share_event_line};
 use crate::remote::{self, LogEvent};
 use crate::state::Status;
 use crate::store::{self, Machine};
+use guesthouse_remote_view_core::pairing::Event as PairEvent;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
@@ -83,12 +84,25 @@ impl Agent {
             self.share_spawn(id)?;
         }
         match pairing {
-            Some(seconds) => self.send_to_rmhost(id, &remote::pair_open_line(seconds)),
+            Some(seconds) => self.pairing_event(id, PairEvent::Open { seconds }),
             None => Ok(()),
         }
     }
 
-    /// The ops `pair_close`, `pair_accept` and `pair_decline`: one line to rmhost.
+    /// The ops `pair_close`, `pair_accept` and `pair_decline`: the person's event to the shared
+    /// pairing, which sends rmhost what follows.
+    pub(super) fn pair_event(&self, id: &str, event: PairEvent<'static>) -> Result<(), String> {
+        if !matches!(
+            self.share_state(id),
+            Some(ShareState::Starting | ShareState::Listening)
+        ) {
+            return Err("This machine's screen is not being shared.".into());
+        }
+        self.pairing_event(id, event)
+    }
+
+    /// The ops that name a device (`device_allow`, `device_revoke`, `device_drop`): one line to
+    /// rmhost.
     pub(super) fn pair_say(&self, id: &str, line: &str) -> Result<(), String> {
         if !matches!(
             self.share_state(id),
@@ -101,7 +115,7 @@ impl Agent {
 
     /// Writes a line to rmhost's input. The pipe is opened for a moment each time, so it works
     /// as well for an rmhost that an earlier agent started.
-    fn send_to_rmhost(&self, id: &str, line: &str) -> Result<(), String> {
+    pub(super) fn send_to_rmhost(&self, id: &str, line: &str) -> Result<(), String> {
         let pipe = self.run_dir(id).join(remote::INPUT_FILE);
         // Non-blocking: with no reader the open fails at once instead of waiting.
         let mut file = OpenOptions::new()
@@ -145,6 +159,7 @@ impl Agent {
                 return;
             }
             slot.share.generation += 1;
+            self.pairing_ended(id);
             let pid = slot.share.pid.take();
             self.publish_share(id, slot, ShareInfo::off(id));
             pid
@@ -240,6 +255,8 @@ impl Agent {
             ..ShareInfo::default()
         };
         let generation = slot.share.generation;
+        // A new rmhost: what the last one had open went with it.
+        self.pairing_restart(id);
         self.publish_share(id, slot, info);
         Ok(generation)
     }
@@ -322,7 +339,11 @@ impl Agent {
         let Some(mut info) = slot.share.info.clone() else {
             return;
         };
+        if let Some(said) = remote::pairing_event(&event) {
+            self.pairing_says(id, &said);
+        }
         apply(&mut info, event);
+        let info = self.with_pairing_shown(id, info);
         self.publish_share(id, slot, info);
     }
 
@@ -352,6 +373,7 @@ impl Agent {
             return;
         }
         slot.share.generation += 1;
+        self.pairing_ended(id);
         let port = slot.share.info.as_ref().and_then(|info| info.port);
         let info = ShareInfo {
             machine: id.to_string(),
@@ -408,9 +430,14 @@ impl Agent {
         // What it said earlier says where it stands now. Pairing may have been open: it is
         // reported as it was said, and not given a new time.
         let log = fs::read_to_string(run_dir.join(remote::LOG_FILE)).unwrap_or_default();
+        self.pairing_restart(id);
         for event in log.lines().filter_map(remote::parse_line) {
+            if let Some(said) = remote::pairing_event(&event) {
+                self.pairing_says(id, &said);
+            }
             apply(&mut info, event);
         }
+        let info = self.with_pairing_shown(id, info);
         let generation = {
             let mut slots = lock(&self.shared.slots);
             let slot = slots.entry(id.to_string()).or_default();
@@ -447,36 +474,16 @@ fn apply(info: &mut ShareInfo, event: LogEvent) {
             info.state = ShareState::Listening;
             info.port = Some(port);
             info.fingerprint = Some(fingerprint);
-            info.pairing = pairing;
-            info.pairing_until_ms = None;
+            let _ = pairing;
         }
         LogEvent::Viewer(name) => info.viewer = Some(name),
         LogEvent::ViewerLeft => info.viewer = None,
-        LogEvent::PairingOpen { until_secs } => {
-            // A new pairing starts with nothing said about the last one.
-            info.paired = None;
-            info.closed_reason = None;
-            info.pending = None;
-            info.pairing = true;
-            info.pairing_until_ms = (until_secs > 0).then_some(until_secs * 1000);
-        }
         LogEvent::Devices(devices) => info.devices = devices,
-        LogEvent::PairingPending(device) => {
-            // The core turns pairing off as the device comes; the device is waiting on the owner.
-            info.pairing = false;
-            info.pairing_until_ms = None;
-            info.pending = Some(device);
-        }
-        LogEvent::Paired { name } => {
-            info.pending = None;
-            info.paired = Some(name);
-        }
-        LogEvent::PairingClosed { reason } => {
-            info.closed_reason = Some(reason);
-            info.pending = None;
-            info.pairing = false;
-            info.pairing_until_ms = None;
-        }
+        // What a screen shows of pairing comes from the shared pairing (`pairing.rs`).
+        LogEvent::PairingOpen { .. }
+        | LogEvent::PairingPending(_)
+        | LogEvent::Paired { .. }
+        | LogEvent::PairingClosed { .. } => {}
     }
 }
 

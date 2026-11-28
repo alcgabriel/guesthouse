@@ -15,6 +15,7 @@ use crate::protocol::{self, MachineState, Op, Response, StateChange};
 use crate::remote;
 use crate::state::{self, Event, Refused, Status};
 use crate::store;
+use guesthouse_remote_view_core::pairing::Event as PairEvent;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::os::unix::process::{CommandExt, ExitStatusExt};
@@ -28,6 +29,7 @@ use std::time::{Duration, Instant};
 mod guard;
 mod install;
 use install::{Sizes, Tools};
+mod pairing;
 mod share;
 
 /// The pid file in a machine's run folder.
@@ -138,6 +140,8 @@ impl Slot {
 struct Shared {
     config: Config,
     slots: Mutex<BTreeMap<String, Slot>>,
+    /// Each machine's pairing, the shared host-timed one (`pairing.rs`).
+    pairing: guesthouse_remote_view_core::session::Sessions,
     subscribers: Mutex<Vec<(u64, Sender<String>)>>,
     next_subscriber: Mutex<u64>,
 }
@@ -167,6 +171,7 @@ impl Agent {
             shared: Arc::new(Shared {
                 config,
                 slots: Mutex::new(BTreeMap::new()),
+                pairing: guesthouse_remote_view_core::session::Sessions::default(),
                 subscribers: Mutex::new(Vec::new()),
                 next_subscriber: Mutex::new(0),
             }),
@@ -271,9 +276,9 @@ impl Agent {
                 return response.to_line();
             }
             Op::InstallCancel { machine } => self.install_cancel(&machine),
-            Op::PairClose { machine } => self.pair_say(&machine, remote::PAIR_CLOSE_LINE),
-            Op::PairAccept { machine } => self.pair_say(&machine, &remote::pair_accept_line()),
-            Op::PairDecline { machine } => self.pair_say(&machine, &remote::pair_decline_line()),
+            Op::PairClose { machine } => self.pair_event(&machine, PairEvent::Stop),
+            Op::PairAccept { machine } => self.pair_event(&machine, PairEvent::Accept),
+            Op::PairDecline { machine } => self.pair_event(&machine, PairEvent::Decline),
             Op::DeviceAllow {
                 machine,
                 fingerprint,
