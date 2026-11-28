@@ -52,8 +52,9 @@ class Repo:
         self.git("commit", "-q", "-m", subject, *(["--author", f"Bot <{email}>"] if email else []))
 
     def merge(self, branch: str, message: str, *files: str) -> None:
-        """A branch off main with one commit per file, merged with a merge commit."""
-        self.git("checkout", "-q", "-b", branch)
+        """A branch with one commit per file, merged into main with a merge commit."""
+        made = bool(self.git("branch", "--list", branch).strip())
+        self.git("checkout", "-q", *([] if made else ["-b"]), branch)
         for name in files:
             self.touch(name)
             self.git("commit", "-q", "-m", f"Change {name}")
@@ -100,6 +101,11 @@ class Notes(unittest.TestCase):
         repo.git("checkout", "-q", "main")
         repo.git("merge", "-q", "--no-ff", "-m", "Merge remote-tracking branch 'origin/catch-up'", "catch-up")
         # The same pull request twice: a merge commit, then a squash with its number.
+        # Its branch has a commit with the number too, as one squashed into it would.
+        repo.git("checkout", "-q", "-b", "twice")
+        repo.touch("crates/idle/src/inner.rs")
+        repo.git("commit", "-q", "-m", "Move the idle rules into a crate every host can share (#16)")
+        repo.git("checkout", "-q", "main")
         repo.merge(
             "twice",
             "Merge pull request #16 from ruxnlabs/twice\n\nMove the idle rules into a crate every host can share",
@@ -115,6 +121,8 @@ class Notes(unittest.TestCase):
         repo.squash("Release Windows 0.2.0 (#20)", "crates/app-windows/Cargo.toml")
         repo.squash("Point the site at Windows 0.1.0 (#21)", "site/index.html")
         repo.squash("Bump a thing (#22)", "Cargo.lock", email="41898282+github-actions[bot]@users.noreply.github.com")
+        repo.squash("AMD: the fence block goes to the card (#23)", "crates/backend-amd/src/lib.rs", "Cargo.lock")
+        repo.squash("Sign the CLA (#24)", "CLA-SIGNERS.md")
         repo.git("tag", "v0.2.0")
         repo.git("tag", "windows-v0.2.0")
 
@@ -142,7 +150,11 @@ class Notes(unittest.TestCase):
 
     def test_pull_requests_of_both_kinds_in_order(self):
         found = [number for number, _, _, _ in notes.pulls("v0.1.0", "v0.2.0")]
-        self.assertEqual(found, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22])
+        self.assertEqual(found, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24])
+
+    def test_inner_commit_is_in_the_merge(self):
+        inner = self.repo.git("log", "--format=%s", "v0.1.0..v0.2.0")
+        self.assertEqual(inner.count("crate every host can share (#16)"), 2)
 
     def test_merge_title_is_the_first_line_of_its_message(self):
         titles = {number: title for number, title, _, _ in notes.pulls("v0.1.0", "v0.2.0")}
@@ -163,10 +175,12 @@ class Notes(unittest.TestCase):
         self.assertIn("Release Windows 0.2.0 (#20): a release chore", out)
         self.assertIn("Point the site at Windows 0.1.0 (#21): a release chore", out)
         self.assertIn("Bump a thing (#22): a bot's", out)
+        self.assertIn("AMD: the fence block goes to the card (#23): the Linux host only, by the files it touched", out)
+        self.assertIn("Sign the CLA (#24): a contributor licence signature", out)
 
     def test_linux(self):
         text = self.draft("v0.2.0")
-        self.assertEqual(sorted(self.listed(text)), [11, 15, 16, 18, 19])
+        self.assertEqual(sorted(self.listed(text)), [11, 15, 16, 18, 19, 23])
         out = self.left_out(text)
         self.assertIn("Windows app: a gear in the title bar (#10): the Windows host only, by its title", out)
         self.assertIn("Keep up with a chatty guest (#14): the Windows host only, by the files it touched", out)
@@ -174,7 +188,7 @@ class Notes(unittest.TestCase):
     def test_every_left_out_one_is_listed(self):
         for tag in ("v0.2.0", "windows-v0.2.0"):
             text = self.draft(tag)
-            for number in range(10, 23):
+            for number in range(10, 25):
                 self.assertEqual(text.count(f"(#{number})"), 1, f"#{number} in {tag}")
 
 

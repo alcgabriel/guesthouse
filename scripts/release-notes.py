@@ -21,7 +21,8 @@ so does a title with no area.
 Each host's notes are only that host's news. A title that names a host ("Mac host: ...", "Windows
 app: ...", "for the Mac host") is that host's, unless it also says every host or both. A title
 that names none is every host's, unless every file it touched is one host's: mac/ and the Mac
-crates are the Mac host's, windows/ and the Windows host's crates are the Windows host's.
+crates are the Mac host's, windows/ and the Windows host's crates are the Windows host's, and the
+Linux app, daemon, GPU backends and packaging are the Linux host's.
 
 Left out, and listed with why in a comment at the end so nothing goes missing unseen: another
 host's pull requests, the release and version pull requests, the ones pointing the installer or
@@ -46,8 +47,8 @@ LEFT_OUT = [
     re.compile(r"^Version \d+\.\d+\.\d+$"),
     re.compile(r"^Windows \d+\.\d+\.\d+$"),
     re.compile(r"^Release (Windows )?\d+\.\d+\.\d+$"),
-    re.compile(r"^Sign(ing)? (the )?(contributor licen[cs]e agreement|CLA)\b", re.I),
 ]
+CLA = re.compile(r"^Sign(ing)? (the )?(contributor licen[cs]e agreement|CLA)\b", re.I)
 # The hosts, by the words a title names them with. "Windows" alone is often the guest, so it isn't one.
 HOSTS = {
     "mac": re.compile(r"\b(Mac|macOS)\b"),
@@ -55,13 +56,19 @@ HOSTS = {
     "linux": re.compile(r"\bLinux (hosts?|app)\b|^Remote view on Linux:"),
 }
 EVERY_HOST = re.compile(r"\b(every|each|both|all) hosts?\b", re.I)
-# The files only one host builds. Any other file is every host's.
+# The files only one host builds. Cargo.lock and Cargo.toml at the top say nothing either way, and any
+# other file is every host's.
 HOST_FILES = {
     "mac": re.compile(r"^(mac/|crates/(host-mac|pvg-host|pvg-sys)/)"),
     "windows": re.compile(
-        r"^(windows/|crates/(app|host|service|installer)-windows/|crates/hcs/|tools/hcs-boot/|scripts/windows-)"
+        r"^(windows/|crates/((app|host|service|installer)-windows|hcs|control)/|tools/hcs-boot/|scripts/windows-)"
+    ),
+    "linux": re.compile(
+        r"^(crates/(app|daemon|backend|backend-[a-z]+|sensors|replay|frame-socket|transport)/"
+        r"|packaging/|install\.sh$|uninstall\.sh$|tests/(install|proxmox)/|tools/card-check/)"
     ),
 }
+NEUTRAL_FILES = {"Cargo.lock", "Cargo.toml"}
 NAMES = {"mac": "the Mac host", "windows": "the Windows host", "linux": "the Linux host"}
 
 # The areas that go last, in this order, after the others by size.
@@ -149,6 +156,7 @@ def hosts_of(title: str, files: list[str]) -> tuple[set[str], str]:
     named = {host for host, words in HOSTS.items() if words.search(title)}
     if named and not EVERY_HOST.search(title):
         return named, "by its title"
+    files = [name for name in files if name not in NEUTRAL_FILES]
     if named or not files:
         return set(HOSTS), ""
     hosts: set[str] = set()
@@ -163,6 +171,8 @@ def left_out(item: tuple[int, str, str, list[str]], kind: str) -> str | None:
     _, title, email, files = item
     if "[bot]" in email:
         return "a bot's"
+    if CLA.search(title):
+        return "a contributor licence signature"
     if any(rule.search(title) for rule in LEFT_OUT):
         return "a release chore"
     hosts, how = hosts_of(title, files)
