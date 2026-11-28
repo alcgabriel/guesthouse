@@ -77,8 +77,18 @@ class Notes(unittest.TestCase):
             "crates/remote-view/src/lib.rs",
         )
         repo.squash("Mac host: the app icon (#12)", "mac/Icon/icon.png")
-        repo.merge("mac-graphics", "Merge pull request #13 from ruxnlabs/mac-graphics\n\nThe graphics process", "mac/App/a.swift", "crates/pvg-host/src/lib.rs")
-        repo.merge("only-windows", "Merge pull request #14 from ruxnlabs/only-windows\n\nKeep up with a chatty guest", "windows/setup.ps1", "crates/host-windows/src/lib.rs")
+        repo.merge(
+            "mac-graphics",
+            "Merge pull request #13 from ruxnlabs/mac-graphics\n\nThe graphics process",
+            "mac/App/a.swift",
+            "crates/pvg-host/src/lib.rs",
+        )
+        repo.merge(
+            "only-windows",
+            "Merge pull request #14 from ruxnlabs/only-windows\n\nKeep up with a chatty guest",
+            "windows/setup.ps1",
+            "crates/host-windows/src/lib.rs",
+        )
         # A branch that took main in, then was merged: the merge of main isn't a pull request.
         repo.git("checkout", "-q", "-b", "catch-up")
         repo.touch("crates/core/src/lib.rs")
@@ -90,11 +100,18 @@ class Notes(unittest.TestCase):
         repo.git("checkout", "-q", "main")
         repo.git("merge", "-q", "--no-ff", "-m", "Merge remote-tracking branch 'origin/catch-up'", "catch-up")
         # The same pull request twice: a merge commit, then a squash with its number.
-        repo.merge("twice", "Merge pull request #16 from ruxnlabs/twice\n\nMove the idle rules into a crate every host can share", "crates/idle/src/lib.rs")
+        repo.merge(
+            "twice",
+            "Merge pull request #16 from ruxnlabs/twice\n\nMove the idle rules into a crate every host can share",
+            "crates/idle/src/lib.rs",
+        )
         repo.squash("Move the idle rules into a crate every host can share (#16)", "crates/idle/src/more.rs")
         repo.squash("Docs and site: the Mac nightly (#17)", "site/mac.html")
         repo.squash("Remote view: a host that times pairing itself (#18)", "crates/remote-view/src/time.rs")
-        repo.squash("Machine states: one list for every host, the Linux host's, and the Windows host's (#19)", "crates/state/src/lib.rs")
+        repo.squash(
+            "Machine states: one list for every host, the Linux host's, and the Windows host's (#19)",
+            "crates/state/src/lib.rs",
+        )
         repo.squash("Release Windows 0.2.0 (#20)", "crates/app-windows/Cargo.toml")
         repo.squash("Point the site at Windows 0.1.0 (#21)", "site/index.html")
         repo.squash("Bump a thing (#22)", "Cargo.lock", email="41898282+github-actions[bot]@users.noreply.github.com")
