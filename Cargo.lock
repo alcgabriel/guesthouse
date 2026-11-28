@@ -935,6 +935,7 @@ dependencies = [
  "guesthouse-download-core",
  "guesthouse-guest-names-core",
  "guesthouse-idle-core",
+ "guesthouse-install-steps-core",
  "guesthouse-jail",
  "guesthouse-recipes-core",
  "guesthouse-relay",
@@ -1211,6 +1212,13 @@ name = "guesthouse-idle-core"
 version = "0.11.0"
 dependencies = [
  "guesthouse-basics",
+]
+
+[[package]]
+name = "guesthouse-install-steps-core"
+version = "0.11.0"
+dependencies = [
+ "guesthouse-serial-words-core",
 ]
 
 [[package]]

@@ -1,0 +1,15 @@
+[package]
+name = "guesthouse-install-steps-core"
+description = "The plain half of a guest's install, as each host goes through it: the steps it says and their words, how long each wait is and how often it looks, the rule that a disk which stops growing means the install is stuck, and every sentence. Nothing here calls the system, so every host can build on it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# The steps of a Windows install read off the firmware's lines, and the line an Ubuntu install ends with.
+guesthouse-serial-words-core.workspace = true
+
+[lints]
+workspace = true

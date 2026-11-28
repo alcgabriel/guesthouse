@@ -17,12 +17,11 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// Where the boot image and its firmware are made, before they're the machine's.
-const BOOT_PARTS: &str = "boot.part";
-/// Apple's installers, kept for the next machine. A download that stopped goes on from here.
-const INSTALLERS: &str = "macos-installers";
-const PART: &str = "part";
-const NO_RESULT: &str = "reims-util ended without saying what it made.";
+/// Where the boot image and the installer are made and kept, the steps said, how far reims-util is
+/// and the sentences, as the Linux host has them in every host's `guesthouse_install_steps_core`.
+use guesthouse_install_steps_core::linux_host::macos_guest::{
+    self as steps, BOOT_PARTS, DOWNLOADING, GETTING_READY, INSTALLERS, MAKING_BOOT_IMAGE, NO_RESULT, PART,
+};
 
 /// The `--add-kext` words for the guest's drivers, in the order their list has them, each with the
 /// kernel versions it loads on if the list names any. The list is OpenCore's own keys, one
@@ -74,11 +73,10 @@ fn reims_util(task: &Task, doing: &str, words: &[String]) -> Result<Value> {
         match event["event"].as_str() {
             Some("progress") => {
                 let (done, total) = (event["done"].as_u64(), event["total"].as_u64());
-                let percent =
-                    done.zip(total).filter(|(_, total)| *total > 0).map(|(done, total)| done * 100 / total);
+                let percent = steps::percent(done, total);
                 if percent.is_some() && percent != shown {
                     shown = percent;
-                    task.step(&format!("{doing}: {}%", percent.unwrap_or(0)));
+                    task.step(&steps::progress(doing, percent.unwrap_or(0)));
                 }
             }
             Some("done") => made = Some(event["result"].clone()),
@@ -106,7 +104,7 @@ fn make_boot_image(task: &Task, folder: &Path) -> Result<()> {
     if opencore.exists() {
         return Ok(());
     }
-    task.step("Making the Mac's boot image");
+    task.step(MAKING_BOOT_IMAGE);
     let parts = folder.join(BOOT_PARTS);
     let _ = fs::remove_dir_all(&parts);
     fs::create_dir_all(&parts)?;
@@ -117,7 +115,7 @@ fn make_boot_image(task: &Task, folder: &Path) -> Result<()> {
     let mut words: Vec<String> =
         ["opencore", "-o", &image.to_string_lossy(), "--rom", &task.machine.mac].map(str::to_owned).to_vec();
     words.extend(kext_words(&list, &kexts));
-    reims_util(task, "Making the Mac's boot image", &words)?;
+    reims_util(task, MAKING_BOOT_IMAGE, &words)?;
     fs::rename(parts.join(FIRMWARE_CODE_FILE), folder.join(FIRMWARE_CODE_FILE))?;
     fs::rename(parts.join(FIRMWARE_VARS_FILE), folder.join(FIRMWARE_VARS_FILE))?;
     fs::rename(image, opencore)?;
@@ -132,14 +130,14 @@ fn make_installer(task: &Task) -> Result<()> {
     if installer.exists() {
         return Ok(());
     }
-    let doing = "Downloading macOS from Apple";
+    let doing = DOWNLOADING;
     task.step(doing);
     let kept = task.context.paths.store.join(INSTALLERS);
     fs::create_dir_all(&kept)?;
     let words = ["online-installer", MACOS_VERSION, "-o", &kept.to_string_lossy()].map(str::to_owned);
     let made = reims_util(task, doing, &words)?;
     let image = made["image"].as_str().ok_or_else(|| Failure::new(NO_RESULT))?;
-    task.step("Getting the installer ready");
+    task.step(GETTING_READY);
     let part = installer.with_extension(PART);
     let written = Command::new("qemu-img")
         .args(["convert", "-f", "dmg", "-O", "raw", image])
@@ -148,8 +146,7 @@ fn make_installer(task: &Task) -> Result<()> {
         .output()?;
     if !written.status.success() {
         let _ = fs::remove_file(&part);
-        let said = String::from_utf8_lossy(&written.stderr);
-        return Err(Failure(format!("The installer could not be made ready: {}", said.trim())));
+        return Err(Failure(steps::not_ready(&String::from_utf8_lossy(&written.stderr))));
     }
     fs::rename(part, installer)?;
     Ok(())
@@ -166,6 +163,10 @@ pub fn install(task: &mut Task) -> Result<()> {
     crate::throwaway::installed(task.context, &task.machine)?;
     start(task)
 }
+
+#[cfg(test)]
+#[path = "macos_install_pins.rs"]
+mod install_pins;
 
 #[cfg(test)]
 mod tests {

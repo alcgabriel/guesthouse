@@ -546,3 +546,6 @@ fn a_recipes_steps_wait_when_the_machine_ends_off_and_say_so() {
     );
     assert_eq!(crate::recipe::read_outcome(&context, &made), crate::recipe::Outcome::Pending);
 }
+
+#[path = "install_pins.rs"]
+mod pins;
