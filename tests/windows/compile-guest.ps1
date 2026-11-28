@@ -10,7 +10,7 @@
 param([switch]$ListOnly)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$guest = Join-Path $repo 'guest'
+$guest = Join-Path $repo 'guest\windows'
 $inCi = $env:GITHUB_ACTIONS -eq 'true'
 $script:problems = 0
 
@@ -64,7 +64,7 @@ function Get-Value($ast, $argument) {
 # assemblies it names and the line of the script the source starts on.
 function Get-GuestSources {
     foreach ($file in Get-ChildItem -LiteralPath $guest -Filter '*.ps1' | Sort-Object Name) {
-        $name = "guest/$($file.Name)"
+        $name = "guest/windows/$($file.Name)"
         $errors = $null
         $ast = [Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors)
         if ($errors) { Say-Problem $name $errors[0].Extent.StartLineNumber "does not parse: $($errors[0].Message)"; continue }
@@ -86,7 +86,7 @@ function Get-GuestSources {
             $offset = 0
             if ($readFromFile.ContainsKey($file.Name)) {
                 $source = [IO.File]::ReadAllText((Join-Path $guest $readFromFile[$file.Name]), [Text.Encoding]::UTF8)
-                $name = "guest/$($readFromFile[$file.Name])"
+                $name = "guest/windows/$($readFromFile[$file.Name])"
             } elseif ($bound.ContainsKey('TypeDefinition')) {
                 $argument = $bound['TypeDefinition'].Value
                 if ($argument -is [Management.Automation.Language.VariableExpressionAst]) {
@@ -105,10 +105,10 @@ function Get-GuestSources {
                 }
             }
             if ($null -eq $source -or $null -eq $references) {
-                Say-Problem "guest/$($file.Name)" $line 'Add-Type compiles something this check cannot find in the script. Teach tests/windows/compile-guest.ps1 where it is.'
+                Say-Problem "guest/windows/$($file.Name)" $line 'Add-Type compiles something this check cannot find in the script. Teach tests/windows/compile-guest.ps1 where it is.'
                 continue
             }
-            [pscustomobject]@{ Name = $name; Script = "guest/$($file.Name)"; Line = $line; Source = $source; References = $references; Offset = $offset }
+            [pscustomobject]@{ Name = $name; Script = "guest/windows/$($file.Name)"; Line = $line; Source = $source; References = $references; Offset = $offset }
         }
     }
 }
@@ -118,7 +118,7 @@ if ($ListOnly) {
     foreach ($item in $sources) {
         "$($item.Script):$($item.Line) compiles $($item.Name) from line $($item.Offset + 1), $($item.Source.Length) characters, references: $($item.References -join ', ')"
     }
-    foreach ($name in $selfChecked) { "guest/${name} compiles its own probes with -SelfCheck" }
+    foreach ($name in $selfChecked) { "guest/windows/${name} compiles its own probes with -SelfCheck" }
     if ($script:problems) { exit 1 }
     exit 0
 }
@@ -128,11 +128,11 @@ New-Item -ItemType Directory -Force $work | Out-Null
 
 # app-windows.cs with csc, for messages with the file's own lines.
 $csc = Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'csc.exe'
-$appWindows = $sources | Where-Object { $_.Name -eq 'guest/app-windows.cs' }
+$appWindows = $sources | Where-Object { $_.Name -eq 'guest/windows/app-windows.cs' }
 if (-not $appWindows) {
-    Say-Problem 'guest/app-windows.ps1' 0 'its Add-Type of app-windows.cs was not found'
+    Say-Problem 'guest/windows/app-windows.ps1' 0 'its Add-Type of app-windows.cs was not found'
 } else {
-    Start-Group "csc: guest/app-windows.cs (C# 5, /warn:4 /warnaserror+)"
+    Start-Group "csc: guest/windows/app-windows.cs (C# 5, /warn:4 /warnaserror+)"
     $arguments = @('/nologo', '/target:library', '/warn:4', '/warnaserror+', "/out:$(Join-Path $work 'app-windows.dll')")
     $arguments += $appWindows.References | ForEach-Object { "/reference:$_" -replace '(?<!\.dll)$', '.dll' }
     $arguments += Join-Path $guest 'app-windows.cs'
@@ -142,10 +142,10 @@ if (-not $appWindows) {
     $said
     Stop-Group
     foreach ($message in $said) {
-        if ($message -match '\((\d+),\d+\): (error|warning) (.*)$') { Say-Problem 'guest/app-windows.cs' ([int]$Matches[1]) "$($Matches[2]) $($Matches[3])" }
+        if ($message -match '\((\d+),\d+\): (error|warning) (.*)$') { Say-Problem 'guest/windows/app-windows.cs' ([int]$Matches[1]) "$($Matches[2]) $($Matches[3])" }
     }
-    if ($code -ne 0 -and -not ($said -match '\(\d+,\d+\): (error|warning)')) { Say-Problem 'guest/app-windows.cs' 0 "csc stopped with exit code $code" }
-    if ($code -eq 0) { 'ok   csc guest/app-windows.cs' }
+    if ($code -ne 0 -and -not ($said -match '\(\d+,\d+\): (error|warning)')) { Say-Problem 'guest/windows/app-windows.cs' 0 "csc stopped with exit code $code" }
+    if ($code -eq 0) { 'ok   csc guest/windows/app-windows.cs' }
 }
 
 # Each source with Add-Type, in a PowerShell of its own.
@@ -198,10 +198,10 @@ foreach ($item in $sources) {
 foreach ($name in $selfChecked) {
     $said = Invoke-Native powershell.exe @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $guest $name), '-SelfCheck')
     $code = $LASTEXITCODE
-    Start-Group "guest/$name -SelfCheck"
+    Start-Group "guest/windows/$name -SelfCheck"
     $said
     Stop-Group
-    if ($code -eq 0) { "ok   guest/$name -SelfCheck" } else { Say-Problem "guest/$name" 0 "-SelfCheck found $code problem(s): $(($said | Select-Object -Last 1) -join '')" }
+    if ($code -eq 0) { "ok   guest/windows/$name -SelfCheck" } else { Say-Problem "guest/windows/$name" 0 "-SelfCheck found $code problem(s): $(($said | Select-Object -Last 1) -join '')" }
 }
 
 Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
