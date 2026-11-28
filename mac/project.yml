@@ -1,0 +1,124 @@
+# Guesthouse for macOS: a SwiftUI app on the Rust core (build/GuesthouseCore.xcframework, made by
+# ./build-core.sh). Generate the Xcode project with `xcodegen generate`, then build with
+# xcodebuild; README.md has the commands.
+name: Guesthouse
+options:
+  bundleIdPrefix: com.ruxn.guesthouse
+  deploymentTarget:
+    macOS: "27.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ARCHS: arm64
+    DEAD_CODE_STRIPPING: YES
+    # Signed ad hoc until the Developer ID certificate exists.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+targets:
+  Guesthouse:
+    type: application
+    platform: macOS
+    sources:
+      - App
+      - Shared
+      # The reading side of the frame channel, compiled in from where it lives (MIT, with its
+      # headers), not copied.
+      - path: ../scripts/mac/rmhost/rmframes_sub.c
+        group: rmframes
+    dependencies:
+      - framework: build/GuesthouseCore.xcframework
+        embed: false
+      # The agent goes into Contents/MacOS beside the app, and its launchd plist into
+      # Contents/Library/LaunchAgents, where SMAppService looks for it.
+      - target: guesthouse-agent
+        embed: true
+        copy:
+          destination: executables
+    postBuildScripts:
+      - name: Copy the agent launchd plist
+        script: |
+          mkdir -p "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
+          cp "$SRCROOT/Launchd/com.ruxn.guesthouse.agent.plist" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents/"
+        inputFiles:
+          - $(SRCROOT)/Launchd/com.ruxn.guesthouse.agent.plist
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/com.ruxn.guesthouse.agent.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ruxn.guesthouse
+        PRODUCT_NAME: Guesthouse
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Guesthouse
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_NSHumanReadableCopyright: Copyright (C) 2026 RUXN LLC and contributors. GPL-2.0-or-later.
+        ENABLE_HARDENED_RUNTIME: YES
+        # No App Sandbox: the app will start QEMU and its helpers, which a sandbox would stop.
+        ENABLE_APP_SANDBOX: NO
+        CODE_SIGN_ENTITLEMENTS: App/Guesthouse.entitlements
+        # Keeps Xcode from adding get-task-allow to Debug builds, so the signature carries only
+        # what the entitlements file says.
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+        SWIFT_OBJC_BRIDGING_HEADER: App/Guesthouse-Bridging.h
+        HEADER_SEARCH_PATHS: $(SRCROOT)/../scripts/mac/rmhost
+  # The background agent: owns running machines so the app is UI only. A plain command line
+  # tool; it runs from launchd (--xpc) or as a detached child of the app (--socket).
+  guesthouse-agent:
+    type: tool
+    platform: macOS
+    sources:
+      - Agent
+      - Shared
+    dependencies:
+      - framework: build/GuesthouseCore.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_NAME: guesthouse-agent
+        PRODUCT_BUNDLE_IDENTIFIER: com.ruxn.guesthouse.agent
+        # The identifier the app checks the agent by, which comes from this embedded Info.plist.
+        GENERATE_INFOPLIST_FILE: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: NO
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+        SKIP_INSTALL: YES
+  # Tests of the plain-words logic, which is compiled in directly so no app has to be started
+  # to run them: `xcodebuild -scheme GuesthouseTests test`.
+  GuesthouseTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+      - App/MachineStatus.swift
+      - App/MachineFormat.swift
+      - App/DiskUsage.swift
+      - App/ShareStatus.swift
+      - App/ScreenStatus.swift
+      - App/FirmwareFinder.swift
+      - App/GraphicsCounts.swift
+      - App/InstallStatus.swift
+      - App/InstallText.swift
+      - App/GuestPassword.swift
+      - App/ScreenSizing.swift
+      - App/ProblemText.swift
+      - App/ReportText.swift
+      - App/UpdateText.swift
+      - App/LocalNetwork.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ruxn.guesthouse.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+schemes:
+  GuesthouseTests:
+    build:
+      targets:
+        GuesthouseTests: all
+    test:
+      targets:
+        - GuesthouseTests

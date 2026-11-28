@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The launchd form of the agent, for SMAppService.agent(plistName:). The app registers it at
+     launch and falls back to a socket if that fails (see App/AgentLauncher.swift). -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ruxn.guesthouse.agent</string>
+    <key>BundleProgram</key>
+    <string>Contents/MacOS/guesthouse-agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>guesthouse-agent</string>
+        <string>--xpc</string>
+    </array>
+    <key>MachServices</key>
+    <dict>
+        <key>com.ruxn.guesthouse.agent</key>
+        <true/>
+    </dict>
+    <!-- Restarted after a crash, not after a clean exit: the agent leaves by itself once it has
+         no machines and nobody connected, and launchd starts it again on the next connection. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+</dict>
+</plist>
