@@ -1,16 +1,19 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
-# The build VM's packages, run in it as root (vm.sh ssh sudo sh -s < vm-packages.sh).
-# What a build of the module, of our Mesa and of the .deb files needs. LLVM 21
+# The build's packages, run as root in the build VM (vm.sh ssh sudo sh -s <
+# vm-packages.sh) or on the Ubuntu that build-here.sh runs on. What a build of
+# the module, of our Mesa and of the .deb files needs. The kernel's headers
+# are those of the running kernel, or PVG_HEADERS (a container's kernel is
+# not Ubuntu's: linux-headers-generic there). LLVM 21
 # (Ubuntu 26.04's own), clang, libclc and the SPIR-V translator only for
 # mesa_clc, a tool of the build; the Mesa that is packaged links no LLVM.
 set -eu
 export DEBIAN_FRONTEND=noninteractive
 apt-get -q update
 apt-get -q -y install --no-install-recommends \
-	build-essential dkms debhelper fakeroot dpkg-dev git rsync file \
-	linux-headers-"$(uname -r)" \
+	build-essential dkms debhelper fakeroot dpkg-dev git rsync file sudo curl ca-certificates \
+	"${PVG_HEADERS:-linux-headers-$(uname -r)}" \
 	meson ninja-build pkg-config cmake bison flex \
 	python3-mako python3-yaml python3-packaging python3-ply \
 	glslang-tools spirv-tools spirv-tools-dev patchelf \

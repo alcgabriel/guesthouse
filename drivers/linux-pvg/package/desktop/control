@@ -8,7 +8,7 @@ Priority: optional
 Description: Guesthouse: a weston desktop on the Mac's graphics device
  weston with its GL renderer through our Mesa (Zink on KosmicKrisp), started
  at boot for the account the install made, on the pvg device, at the scale
- the Mac app gives, with a German keyboard and foot as its terminal. Says
+ the Mac app gives, with the Mac's keyboard layout and foot as its terminal. Says
  "guesthouse: first start ok" on the serial port once it is up after an
  install. The test clients es2gears_wayland, weston-simple-egl, vkcube and
  glmark2-es2-wayland come with it.

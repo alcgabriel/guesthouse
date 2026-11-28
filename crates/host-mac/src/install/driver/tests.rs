@@ -188,3 +188,30 @@ fn a_package_the_release_script_made_is_what_the_app_fetches() {
     assert_eq!(kept_package(&downloads), Some(folder));
     let _ = fs::remove_dir_all(dir);
 }
+
+#[test]
+fn the_linux_manifest_the_package_scripts_write_is_one_the_app_takes() {
+    // As drivers/linux-pvg/package/lib.sh writes it (pvg_write_manifest), for version 0.1.7: each
+    // file published as guesthouse-linux-driver-V-FILE, with FILE its name in the package.
+    let sum = "38d05ebe74bb28e8402705f407ce20f16f1c611c0716062f52d911dd089cbf1d";
+    let files = [
+        "install.sh",
+        "pvg-dkms_0.1.7_all.deb",
+        "pvg-mesa_0.1.7_arm64.deb",
+        "guesthouse-desktop_0.1.7_all.deb",
+        "guesthouse-gnome_0.1.7_all.deb",
+        "guesthouse-plasma_0.1.7_all.deb",
+    ];
+    let lines: Vec<String> = files
+        .iter()
+        .map(|f| format!("  {{\"name\": \"guesthouse-linux-driver-0.1.7-{f}\", \"as\": \"{f}\", \"sha256\": \"{sum}\"}}"))
+        .collect();
+    let text = format!("{{\"version\": \"0.1.7\", \"files\": [\n{}\n]}}\n", lines.join(",\n"));
+    let manifest = Manifest::parse_for(&LINUX, &text).unwrap();
+    assert_eq!(manifest.version, "0.1.7");
+    assert_eq!(manifest.files.len(), files.len());
+    assert_eq!(manifest.files[0].package_name, LINUX_SCRIPT);
+    assert_eq!(manifest.files[2].name, "guesthouse-linux-driver-0.1.7-pvg-mesa_0.1.7_arm64.deb");
+    assert_eq!(LINUX.manifest, "guesthouse-linux-driver-latest.json");
+    assert_eq!(LINUX.base, "https://files.ruxn.com/p/guesthouse-linux-driver/");
+}

@@ -1,0 +1,52 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: https://github.com/ruxnlabs/mesa (Mesa), https://github.com/ruxnlabs/guesthouse (the rest)
+Upstream-Name: Mesa, as Guesthouse builds it for the Mac host's graphics device
+Comment: /opt/pvg-mesa is Mesa built from the commit named at the end of this
+ file: KosmicKrisp with the pvg bridge as the Vulkan driver, and Zink over it
+ for EGL, GLES, GL and GBM. Mesa is mostly under the MIT licence, with some
+ files under the other licences its own licence page lists; each source file's
+ SPDX line or header says which. That page and the licence texts of Mesa's
+ licenses/ folder follow below, as that commit has them. The files Guesthouse
+ added to Mesa are under the MIT licence.
+
+Files: opt/pvg-mesa/*
+Copyright: The Mesa authors, and 2026 Guesthouse contributors for what
+ Guesthouse added
+License: MIT and others, as below
+
+Files: opt/pvg-mesa/share/drirc.d/10-pvg.conf
+Copyright: 2026 Guesthouse contributors
+License: MIT
+
+Files: usr/lib/pvg-mesa/* usr/lib/udev/rules.d/71-pvg-mesa.rules etc/guesthouse/mesa.env
+ opt/pvg-mesa/share/glvnd/egl_vendor.d/10_pvg.json
+Copyright: 2026 Guesthouse contributors
+License: GPL-2.0-or-later
+
+License: GPL-2.0-or-later
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the Free
+ Software Foundation; either version 2 of the License, or (at your option) any
+ later version.
+ .
+ On Debian and Ubuntu systems the full text of the GNU General Public License
+ version 2 is in /usr/share/common-licenses/GPL-2.
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.

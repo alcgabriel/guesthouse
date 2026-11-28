@@ -111,6 +111,27 @@ fn the_drivers_service_runs_install_sh_from_the_ruxn_disk_once_a_version() {
     assert!(DRIVER_RUNNER.contains(&format!("{} exit-", "driver failed")));
 }
 
+#[test]
+fn the_drivers_service_reads_the_version_from_the_manifest_the_package_carries() {
+    use std::io::Write;
+    // The manifest as the package's scripts write it (drivers/linux-pvg/package/lib.sh), given to
+    // the service's own line on standard input in place of the disk's copy.
+    let manifest = "{\"version\": \"0.1.7\", \"files\": [\n  {\"name\": \"guesthouse-linux-driver-0.1.7-install.sh\", \
+                    \"as\": \"install.sh\", \"sha256\": \"00\"}\n]}\n";
+    let read = DRIVER_RUNNER.lines().find(|l| l.starts_with("version=$(sed")).unwrap();
+    let script = format!("mnt=/dev\nmanifest=stdin\n{read}\nprintf %s \"$version\"");
+    let mut sh = std::process::Command::new("/bin/sh")
+        .arg("-c")
+        .arg(script)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    sh.stdin.take().unwrap().write_all(manifest.as_bytes()).unwrap();
+    let out = sh.wait_with_output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "0.1.7");
+}
+
 fn line(sum: char, name: &str) -> String {
     format!("{} *{name}\n", sum.to_string().repeat(64))
 }
