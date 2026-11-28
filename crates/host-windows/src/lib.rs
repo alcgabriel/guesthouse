@@ -10,6 +10,7 @@ pub mod announce;
 pub mod events;
 pub mod guest;
 pub mod guest_ctl;
+pub mod hyper_v;
 pub mod machine;
 pub mod network;
 pub mod printable;

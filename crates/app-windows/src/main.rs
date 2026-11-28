@@ -10,7 +10,8 @@
 //! report's making and sending, `log.rs` a log's lines, `pace.rs` how often the window is told
 //! things, `remote_view.rs` what the Remote View group shows and asks, `shell.rs` how
 //! the window gets about, `preferences.rs` the app's own settings, `update.rs` whether a newer
-//! Guesthouse is out, and `system.rs` the rest of what's asked of Windows.
+//! Guesthouse is out, `hyper_v.rs` what's said of Windows' Hyper-V feature, which bridging needs,
+//! and `system.rs` the rest of what's asked of Windows.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
@@ -20,6 +21,8 @@ mod app;
 mod bridge;
 #[cfg(windows)]
 mod console;
+#[cfg(any(windows, test))]
+mod hyper_v;
 #[cfg(any(windows, test))]
 mod log;
 #[cfg(any(windows, test))]

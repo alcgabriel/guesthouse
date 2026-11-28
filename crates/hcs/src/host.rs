@@ -65,3 +65,25 @@ pub fn new_guid() -> Result<GUID> {
 pub fn guid_string(guid: &GUID) -> String {
     guid_text(guid)
 }
+
+/// Whether a hypervisor is running under Windows, as the processor's CPUID says (leaf 1, ECX bit 31),
+/// which it does with Virtual Machine Platform or Hyper-V on. `None` on a processor that can't say.
+pub fn hypervisor_present() -> Option<bool> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        // SAFETY: leaf 1 is there on every x86-64 processor. Newer Rust has the call as safe.
+        #[allow(unused_unsafe)]
+        let leaf = unsafe { std::arch::x86_64::__cpuid(1) };
+        Some(leaf.ecx & (1 << 31) != 0)
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    None
+}
+
+/// Whether the processor says virtualization is on in the firmware (`PF_VIRT_FIRMWARE_ENABLED`).
+/// Off is also what a processor with none says.
+pub fn virtualization_in_firmware() -> bool {
+    use windows_sys::Win32::System::Threading::{IsProcessorFeaturePresent, PF_VIRT_FIRMWARE_ENABLED};
+    // SAFETY: a plain question with a constant.
+    unsafe { IsProcessorFeaturePresent(PF_VIRT_FIRMWARE_ENABLED) != 0 }
+}

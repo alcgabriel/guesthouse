@@ -21,15 +21,20 @@
 //! an install would stop), `updates-ask` (the question about them), `updates-ready-away` and
 //! `updates-ask-away` (the same while the service isn't answering), `updates-blocked` (a machine
 //! being made), `updates-installing`, `updates-declined`, `updates-launch-failed` and
-//! `updates-installed`. A preview counts as installed, reads and writes none of the person's
-//! settings, and never reaches the file drop, downloads or runs anything: its updater is
-//! `update::Fake`, whose look finds what its state did, whose download and check go well at once,
-//! and whose installer ends having done nothing. Nothing is sent to the service, whatever is
-//! pressed.
+//! `updates-installed`. Windows' Hyper-V feature, which bridging needs, has a stopped machine's
+//! Network section in each case the service says: `net-off`, `net-held` (machines running hold
+//! turning it on up), `net-ask` (the question before it's turned on), `net-turning`, `net-failed`,
+//! `net-restart`, `net-restart-ask` (the question before Windows restarts), `net-home` (Windows
+//! Home), `net-firmware`, `net-unknown` and `net-older` (a service from before it said), and
+//! `home-restart` is Home waiting for the restart. A preview counts as installed, reads and writes
+//! none of the person's settings, and never reaches the file drop, downloads or runs anything: its
+//! updater is `update::Fake`, whose look finds what its state did, whose download and check go well
+//! at once, and whose installer ends having done nothing. Nothing is sent to the service, whatever
+//! is pressed.
 
 use guesthouse_control::client::Unreached;
 use guesthouse_control::{
-    AdapterInfo, Bridging, Card, CardInfo, Forward, Machine, NetworkMode, SnapshotInfo, State, System,
+    AdapterInfo, Bridging, Card, CardInfo, Forward, HyperV, Machine, NetworkMode, SnapshotInfo, State, System,
 };
 use windows_reactor::WindowTheme;
 
@@ -189,6 +194,7 @@ pub fn stage(main: &mut Main) {
             show(main, "ubuntu", State::Off);
             main.deleting = Some("ubuntu".to_owned());
         }
+        net if net.starts_with("net-") || net == "home-restart" => hyper_v(main, net),
         remote if remote.starts_with("rv-") => {
             remote_view(main, remote);
             main.section = Section::RemoteView;
@@ -214,6 +220,60 @@ pub fn stage(main: &mut Main) {
     if let Some(section) = std::env::var(SECTION).ok().as_deref().and_then(Section::of_label) {
         main.section = section;
     }
+}
+
+/// A stopped Windows machine's Network section while Hyper-V stands as `state` says, named
+/// `net-...`, or Home waiting for the restart, `home-restart`. Turn on answers as if it worked, at
+/// once, and Restart now asks and then does nothing: a preview never asks the service or Windows.
+fn hyper_v(main: &mut Main, state: &str) {
+    let hyper_v = match state {
+        "net-off" | "net-held" | "net-ask" => HyperV::Off,
+        "net-turning" => HyperV::TurningOn { percent: Some(40) },
+        "net-failed" => HyperV::Failed {
+            reason:
+                "Windows couldn't download the files Hyper-V needs (0x800F0906). Check that this PC reaches \
+                     Windows Update."
+                    .to_owned(),
+            log: Some(r"C:\Windows\Logs\DISM\dism.log".to_owned()),
+        },
+        "net-restart" | "net-restart-ask" | "home-restart" => HyperV::RestartPending,
+        "net-home" => HyperV::NotInEdition,
+        "net-firmware" => HyperV::NoVirtualization,
+        "net-unknown" => HyperV::Unknown {
+            reason: "DISM didn't say how Hyper-V stands in 120 s, so it was stopped.".to_owned(),
+        },
+        // net-older: a service from before it said where Hyper-V stands.
+        _ => HyperV::Unsaid,
+    };
+    if let Ok(status) = &mut main.seen {
+        status.bridging = Bridging {
+            available: false,
+            reason: Some(
+                "Bridging needs Windows' Hyper-V feature, which isn't turned on, or isn't in this edition: Windows \
+                 Home has none. On Pro, Education and Enterprise, turn on Hyper-V in Windows Features and restart."
+                    .to_owned(),
+            ),
+            adapters: Vec::new(),
+            hyper_v,
+        };
+        // Nothing holds turning it on up, but in net-held, where two machines do.
+        for machine in &mut status.machines {
+            machine.state = match (state, machine.name.as_str()) {
+                ("net-held", "ubuntu") => State::Running,
+                ("net-held", "office") => State::Installing,
+                ("net-restart-ask", "ubuntu") => State::Running,
+                _ => State::Off,
+            };
+        }
+    }
+    if state == "home-restart" {
+        main.page = Page::Home;
+        return;
+    }
+    show(main, "win11", State::Off);
+    main.section = Section::Network;
+    main.hyper_v_ask = state == "net-ask";
+    main.restart_ask = state == "net-restart-ask";
 }
 
 /// Pretends the app is installed and has looked for a newer Guesthouse: the look is still going
@@ -545,6 +605,7 @@ fn status() -> Status {
                     wifi: true,
                 },
             ],
+            hyper_v: HyperV::On,
         },
     }
 }

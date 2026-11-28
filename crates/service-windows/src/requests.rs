@@ -8,8 +8,8 @@ use crate::report_parts::tail_file;
 use crate::store::{OWN_FILES, Settings, Store, empty, usable_name};
 use guesthouse_control::report::pieces;
 use guesthouse_control::{
-    Answer, Bridging, Card, CardInfo, DEFAULT_USER, Event, Machine, MachineSettings, NetworkMode, NewMachine,
-    Request, Share, SnapshotInfo, State, System, forwards_refusal, shares_refusal, user_problem,
+    Answer, Bridging, Card, CardInfo, DEFAULT_USER, Event, HyperV, Machine, MachineSettings, NetworkMode,
+    NewMachine, Request, Share, SnapshotInfo, State, System, forwards_refusal, shares_refusal, user_problem,
     valid_edition,
 };
 use guesthouse_host_windows::events::Sink;
@@ -43,6 +43,9 @@ const REPORT_TAIL: u64 = 2 * 1024 * 1024;
 const CARDS_KEPT: Duration = Duration::from_secs(30);
 /// How long what bridging offers is kept, for the same reason: the adapters are read from Windows.
 const BRIDGING_KEPT: Duration = Duration::from_secs(30);
+/// How long it's kept while Hyper-V isn't on, when no adapters are read: the host keeps its read of
+/// Hyper-V's feature itself, and reads it again beside a status, never in it.
+const HYPER_V_KEPT: Duration = Duration::from_secs(2);
 /// How long a machine that's been ended has to take its port forwards away, as the service stops.
 const UNMAKE_WAIT: Duration = Duration::from_secs(15);
 
@@ -145,6 +148,8 @@ pub struct Service<W: Work> {
     making: Mutex<Option<String>>,
     cards: Mutex<Option<(Instant, Vec<CardInfo>)>>,
     bridging: Mutex<Option<(Instant, Bridging)>>,
+    /// How turning Hyper-V on stands, while it's done and after it failed.
+    turning: Mutex<hyper_v::Turning>,
     /// Port forwards are made and taken away one machine at a time, as `netsh` is.
     forwarding: Mutex<()>,
     /// Whether the forwards and remote views' rules a stopped service left behind have been looked
@@ -197,6 +202,7 @@ impl<W: Work> Service<W> {
             making: Mutex::new(None),
             cards: Mutex::new(None),
             bridging: Mutex::new(None),
+            turning: Mutex::default(),
             forwarding: Mutex::new(()),
             cleaned: AtomicBool::new(false),
             switching: Mutex::new(()),
@@ -252,6 +258,7 @@ impl<W: Work> Service<W> {
             Request::DeviceRevoke { name, fingerprint } => {
                 self.device(&name, |policy| policy.device_revoke(&fingerprint))
             }
+            Request::EnableHyperV => return self.enable_hyper_v(connection),
         };
         let _ = connection.send(&answer);
     }
@@ -300,14 +307,26 @@ impl<W: Work> Service<W> {
     /// Whether a machine can be bridged onto this PC's network, and onto which adapters.
     fn bridging(&self) -> Bridging {
         let mut kept = self.bridging.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        match &*kept {
-            Some((when, bridging)) if when.elapsed() < BRIDGING_KEPT => bridging.clone(),
+        let bridging = match &*kept {
+            Some((when, bridging))
+                if when.elapsed()
+                    < if bridging.hyper_v == HyperV::On { BRIDGING_KEPT } else { HYPER_V_KEPT } =>
+            {
+                bridging.clone()
+            }
             _ => {
                 let bridging = self.work.network().bridging();
                 *kept = Some((Instant::now(), bridging.clone()));
                 bridging
             }
-        }
+        };
+        drop(kept);
+        self.with_turning(bridging)
+    }
+
+    /// Reads what bridging offers again at the next look.
+    fn forget_bridging(&self) {
+        *self.bridging.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
     }
 
     fn status(&self) -> Answer {
@@ -457,6 +476,12 @@ impl<W: Work> Service<W> {
             if let Some(other) = &*making {
                 let reason = format!("{other} is being made. One machine is made at a time, so wait for it.");
                 let _ = connection.send(&Answer::Refused { reason });
+                return;
+            }
+            if self.turning_on() {
+                let reason =
+                    "Windows' Hyper-V feature is being turned on. Make the machine once that's done.";
+                let _ = connection.send(&Answer::Refused { reason: reason.into() });
                 return;
             }
             if let Err(reason) = self.machines.store.make(&name) {
@@ -628,6 +653,13 @@ impl<W: Work> Service<W> {
             let entry = entries.get_mut(&name).expect("found just now");
             if !entry.idle() {
                 return Answer::Refused { reason: format!("{name} is {}.", busy_words(entry)) };
+            }
+            if self.turning_on() {
+                return Answer::Refused {
+                    reason: format!(
+                        "Windows' Hyper-V feature is being turned on. Start {name} once that's done."
+                    ),
+                };
             }
             entry.stop = Some(Arc::clone(&stop));
             entry.ctl = Some(ctl.clone());
@@ -1667,6 +1699,7 @@ use guesthouse_basics::words::size_in_gb_or_mb_down as size_words;
 mod size_words_tests;
 
 mod forwards;
+mod hyper_v;
 mod pairing;
 mod remote_view;
 

@@ -99,6 +99,8 @@ pub fn view(main: &Main, context: &mut ViewContext<Main>) -> View {
         (None, Some(ask)) => content.content_dialog(snapshot_dialog(ask, context)),
         (None, None) if main.bridge_ask => content.content_dialog(bridge_dialog(main, context)),
         (None, None) if main.install_ask => content.content_dialog(install_dialog(main, context)),
+        (None, None) if main.hyper_v_ask => content.content_dialog(hyper_v_dialog(context)),
+        (None, None) if main.restart_ask => content.content_dialog(restart_dialog(main, context)),
         (None, None) if removing.is_some() => {
             let name = removing.map(|(_, name)| name.as_str()).unwrap_or_default();
             content.content_dialog(remove_dialog(name, context))
@@ -113,6 +115,8 @@ fn can_go_back(main: &Main) -> bool {
         || main.snapshot_ask.is_some()
         || main.bridge_ask
         || main.install_ask
+        || main.hyper_v_ask
+        || main.restart_ask
         || main.viewing.as_ref().is_some_and(|viewing| viewing.removing.is_some());
     let page = match main.seen {
         Ok(_) => main.page != Page::Home,
@@ -347,6 +351,39 @@ fn bridge_dialog(main: &Main, context: &ViewContext<Main>) -> ContentDialog {
         .default_button(ContentDialogButton::Close)
         .is_open(true)
         .on_closed(context.callback(Message::BridgeAnswered))
+}
+
+/// Asks before Windows' Hyper-V feature is turned on, saying what changes on the PC, what it may
+/// change for other virtualization apps, and how to undo it. Cancel is what Enter presses.
+fn hyper_v_dialog(context: &ViewContext<Main>) -> ContentDialog {
+    let words: Vec<View> = crate::hyper_v::ASK_WORDS
+        .iter()
+        .map(|words| TextBlock::new().text(*words).text_wrapping(TextWrapping::Wrap).into())
+        .collect();
+    ContentDialog::new()
+        .title(crate::hyper_v::ASK_TITLE)
+        .content(StackPanel::new().spacing(10.0).children(words))
+        .primary_button_text(crate::hyper_v::ASK_TURN_ON)
+        .close_button_text("Cancel")
+        .default_button(ContentDialogButton::Close)
+        .is_open(true)
+        .on_closed(context.callback(Message::HyperVAnswered))
+}
+
+/// Asks again before Windows is restarted, naming the machines running now. Nothing is forced:
+/// Windows asks each app, and the service its machines. Cancel is what Enter presses.
+fn restart_dialog(main: &Main, context: &ViewContext<Main>) -> ContentDialog {
+    let running = crate::hyper_v::running(main.machines());
+    ContentDialog::new()
+        .title(crate::hyper_v::RESTART_TITLE)
+        .content(
+            TextBlock::new().text(crate::hyper_v::restart_words(&running)).text_wrapping(TextWrapping::Wrap),
+        )
+        .primary_button_text(crate::hyper_v::RESTART_BUTTON)
+        .close_button_text("Cancel")
+        .default_button(ContentDialogButton::Close)
+        .is_open(true)
+        .on_closed(context.callback(Message::RestartAnswered))
 }
 
 /// Asks before an install that stops running machines, naming them, as the installer stops the

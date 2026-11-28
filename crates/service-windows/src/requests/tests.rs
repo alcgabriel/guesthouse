@@ -1191,6 +1191,7 @@ fn a_file_that_is_a_link_is_not_followed() {
     assert!(missing.iter().any(|(name, reason)| name == "events.log" && reason.contains("plain file")));
 }
 
+mod hyper_v;
 mod network;
 mod pairing;
 mod places;

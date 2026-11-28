@@ -1,6 +1,7 @@
 //! The work that calls into Windows: making a machine's disks, and running the machine.
 
 pub mod boot;
+pub mod hyper_v;
 pub mod linux;
 pub mod network;
 pub mod prepare;

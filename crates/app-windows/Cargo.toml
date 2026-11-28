@@ -42,8 +42,9 @@ guesthouse-relay.workspace = true
 # The few calls WinUI doesn't make for us: the file dialog, the clipboard, cancelling a read that
 # waits on the pipe, and the console, which is Windows' Remote Desktop control in a window of our
 # own (OLE and variants for the control, the library loader for RdpBase and ATL, the pipe's wait,
-# and the window), the registry, where Windows keeps what opens when the person signs in, and a job
-# that ends an update's download with the app. The same crate and version as `hcs`.
+# and the window), the registry, where Windows keeps what opens when the person signs in, a job
+# that ends an update's download with the app, and the restart that finishes turning on Hyper-V.
+# The same crate and version as `hcs`.
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
@@ -58,6 +59,8 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Ole",
     "Win32_System_Pipes",
     "Win32_System_Registry",
+    "Win32_System_Shutdown",
+    "Win32_System_Threading",
     "Win32_System_Time",
     "Win32_System_Variant",
     "Win32_UI_Controls_Dialogs",

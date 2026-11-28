@@ -112,7 +112,18 @@ pub enum Request {
     DeviceAllow { name: String, fingerprint: String, what: String, on: bool },
     /// Stops trusting a device: it's disconnected and has to pair again. Answered with `Share`.
     DeviceRevoke { name: String, fingerprint: String },
+    /// Turns on Windows' Hyper-V feature, which bridging is made on, as [`HYPER_V_FEATURE`] names
+    /// it. It's refused while a machine runs, is being made or has work going on, and while it's
+    /// being turned on already. The service never restarts the PC: it answers with `Event` lines as
+    /// it goes, then `Done`, whose reason is `None` once it's on or waits only for Windows to
+    /// restart. Asked when it's on already, or waiting for a restart, it answers `Done` at once and
+    /// changes nothing. A service from before this answers it with `protocol::NOT_A_REQUEST`.
+    EnableHyperV,
 }
+
+/// The Windows feature `EnableHyperV` turns on, with its parents, as Microsoft's own instructions
+/// for turning on Hyper-V with DISM name it.
+pub const HYPER_V_FEATURE: &str = "Microsoft-Hyper-V";
 
 /// What a machine is given at each boot, which can be changed while it's off.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -224,12 +235,57 @@ pub fn forwards_refusal(forwards: &[Forward]) -> Option<String> {
 pub struct Bridging {
     /// Whether Hyper-V's virtual switch is there to make the bridge with.
     pub available: bool,
-    /// When it isn't, why, in words for the person.
+    /// When it isn't, why, in words for the person. An app from before `hyper_v` shows this.
     #[serde(default)]
     pub reason: Option<String>,
     /// The physical adapters that are up, Ethernet and Wi-Fi.
     #[serde(default)]
     pub adapters: Vec<AdapterInfo>,
+    /// Where Windows' Hyper-V feature stands, which bridging needs. A service from before this
+    /// says nothing, and a case this app doesn't know reads as nothing said too, so the rest of the
+    /// status still reads: either way the app falls back to `reason`.
+    #[serde(default, deserialize_with = "hyper_v_or_unsaid")]
+    pub hyper_v: HyperV,
+}
+
+/// Where Windows' Hyper-V feature stands on this PC, as the service finds it, each case one the app
+/// words on its own.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum HyperV {
+    /// Its virtual machine management service is there, so a machine can be bridged.
+    On,
+    /// Off, and this edition has it, so it can be turned on.
+    Off,
+    /// This edition of Windows doesn't have it: DISM doesn't know the feature, as on Windows Home.
+    NotInEdition,
+    /// Turned on, and waiting for Windows to restart.
+    RestartPending,
+    /// No hypervisor is running, and the processor says virtualization is off in the firmware, or
+    /// it has none. Turning Hyper-V on wouldn't make it run.
+    NoVirtualization,
+    /// Being turned on now, `percent` of the way as DISM last said.
+    TurningOn {
+        #[serde(default)]
+        percent: Option<u8>,
+    },
+    /// Still off, as the last try to turn it on failed: why, and DISM's log, if it has one.
+    Failed {
+        reason: String,
+        #[serde(default)]
+        log: Option<String>,
+    },
+    /// Where it stands couldn't be told, and why.
+    Unknown { reason: String },
+    /// Not said: a service from before this, or a case newer than the app. Never sent.
+    #[default]
+    Unsaid,
+}
+
+/// Reads `hyper_v` as it was sent, or as [`HyperV::Unsaid`] when it's a case this app doesn't know.
+fn hyper_v_or_unsaid<'de, D: serde::Deserializer<'de>>(reader: D) -> Result<HyperV, D::Error> {
+    let value = serde_json::Value::deserialize(reader)?;
+    Ok(serde_json::from_value(value).unwrap_or_default())
 }
 
 /// A physical network adapter of this PC.
@@ -782,6 +838,37 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(status, Answer::Status { bridging, .. } if !bridging.available));
+    }
+
+    #[test]
+    fn hyper_v_is_said_as_a_case_each_and_one_this_app_doesnt_know_reads_as_unsaid() {
+        for (hyper_v, line) in [
+            (HyperV::On, json!({"state": "on"})),
+            (HyperV::Off, json!({"state": "off"})),
+            (HyperV::NotInEdition, json!({"state": "not_in_edition"})),
+            (HyperV::RestartPending, json!({"state": "restart_pending"})),
+            (HyperV::NoVirtualization, json!({"state": "no_virtualization"})),
+            (HyperV::TurningOn { percent: Some(40) }, json!({"state": "turning_on", "percent": 40})),
+            (
+                HyperV::Failed { reason: "No.".into(), log: Some(r"C:\Windows\Logs\DISM\dism.log".into()) },
+                json!({"state": "failed", "reason": "No.", "log": r"C:\Windows\Logs\DISM\dism.log"}),
+            ),
+            (HyperV::Unknown { reason: "Why.".into() }, json!({"state": "unknown", "reason": "Why."})),
+        ] {
+            assert_eq!(serde_json::to_value(&hyper_v).unwrap(), line);
+            let bridging = json!({"available": false, "hyper_v": line});
+            assert_eq!(serde_json::from_value::<Bridging>(bridging).unwrap().hyper_v, hyper_v);
+        }
+        assert_eq!(serde_json::to_value(Request::EnableHyperV).unwrap(), json!({"ask": "enable_hyper_v"}));
+        // Before this, and a case from a newer service: the rest still reads.
+        let before: Bridging = serde_json::from_value(json!({"available": false, "reason": "Off."})).unwrap();
+        assert_eq!((before.hyper_v, before.reason.as_deref()), (HyperV::Unsaid, Some("Off.")));
+        let newer: Bridging = serde_json::from_value(json!({"available": true, "adapters": [],
+            "hyper_v": {"state": "sideways", "why": 3}}))
+        .unwrap();
+        assert!(newer.available && newer.hyper_v == HyperV::Unsaid);
+        let garbled: Bridging = serde_json::from_value(json!({"available": false, "hyper_v": 7})).unwrap();
+        assert_eq!(garbled.hyper_v, HyperV::Unsaid);
     }
 
     #[test]
