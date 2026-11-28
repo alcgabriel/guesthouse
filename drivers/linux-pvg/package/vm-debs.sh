@@ -1,11 +1,12 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
-# Makes the five .deb files in the build VM from what make-package.sh put
-# in ~/pkg-in: the driver's sources (driver/, uapi/), the Mesa install
-# (stage/opt/pvg-mesa), this folder's files (tools/), and the version and
-# sources in version and sources-*. The packages land in ~/pkg-out.
-# Usage: vm-debs.sh (as pvg; it uses sudo for dpkg-deb's root-owned files)
+# Makes the five .deb files in the build VM, or on the Ubuntu build-here.sh
+# runs on, from what lib.sh's pvg_stage_inputs put in ~/pkg-in: the driver's
+# sources (driver/, uapi/), the Mesa install (stage/opt/pvg-mesa), this
+# folder's files (tools/), Mesa's licences (mesa-licences/), and the version
+# and sources in version and sources-*. The packages land in ~/pkg-out.
+# Usage: vm-debs.sh (it uses sudo for dpkg-deb's root-owned files)
 set -eu
 in=$HOME/pkg-in
 out=$HOME/pkg-out
@@ -15,6 +16,11 @@ t=$in/tools
 rm -rf "$out" "$work"
 mkdir -p "$out" "$work"
 fill() { sed -e "s|@VERSION@|$version|g" -e "s|@SOURCE@|$2|g" -e "s|@DEPENDS@|${3:-}|g" "$1"; }
+# Usage: copyright DIR PACKAGE. Debian's copyright file, from copyright/PACKAGE.
+copyright() {
+	mkdir -p "$1/usr/share/doc/$2"
+	cp "$t/copyright/$2" "$1/usr/share/doc/$2/copyright"
+}
 
 # pvg-dkms: the sources in /usr/src/pvg-VERSION, as DKMS wants them.
 d=$work/dkms
@@ -25,6 +31,7 @@ cp "$t/dkms/modules-load.conf" "$d/usr/lib/modules-load.d/pvg.conf"
 cp "$t/dkms/modprobe.conf" "$d/etc/modprobe.d/pvg.conf"
 fill "$t/dkms/control" "$(cat "$in/sources-driver")" > "$d/DEBIAN/control"
 echo /etc/modprobe.d/pvg.conf > "$d/DEBIAN/conffiles"
+copyright "$d" pvg-dkms
 for s in postinst prerm; do fill "$t/dkms/$s" "" > "$d/DEBIAN/$s"; chmod 755 "$d/DEBIAN/$s"; done
 
 # pvg-mesa: /opt/pvg-mesa, and what makes it the pvg device's: glvnd's
@@ -62,6 +69,18 @@ depends=$(cd "$work/shlib" && dpkg-shlibdeps -O -l"$m/opt/pvg-mesa/lib" --ignore
 [ -n "$depends" ] || { echo "vm-debs: dpkg-shlibdeps found nothing"; exit 1; }
 fill "$t/mesa-pkg/control" "$(cat "$in/sources-mesa")" "$depends" > "$m/DEBIAN/control"
 echo /etc/guesthouse/mesa.env > "$m/DEBIAN/conffiles"
+# Mesa's copyright: ours, then which commit, then Mesa's licence page and every
+# licence text of its licenses/ folder, as that commit has them.
+copyright "$m" pvg-mesa
+(
+	printf '\nBuilt from: %s\n' "$(cat "$in/sources-mesa")"
+	printf '\nMesa'"'"'s docs/license.rst:\n\n'
+	cat "$in/mesa-licences/docs/license.rst"
+	find "$in/mesa-licences/licenses" -type f | sort | while read -r f; do
+		printf '\n\nMesa'"'"'s licenses/%s:\n\n' "${f#"$in"/mesa-licences/licenses/}"
+		cat "$f"
+	done
+) >> "$m/usr/share/doc/pvg-mesa/copyright"
 
 # guesthouse-desktop.
 g=$work/desktop
@@ -75,6 +94,7 @@ cp "$t/desktop/weston.ini" "$g/etc/guesthouse/weston.ini"
 cp "$t/desktop/pam" "$g/etc/pam.d/guesthouse-desktop"
 fill "$t/desktop/control" "" > "$g/DEBIAN/control"
 printf '/etc/guesthouse/weston.ini\n/etc/pam.d/guesthouse-desktop\n' > "$g/DEBIAN/conffiles"
+copyright "$g" guesthouse-desktop
 for s in postinst prerm; do cp "$t/desktop/$s" "$g/DEBIAN/$s"; chmod 755 "$g/DEBIAN/$s"; done
 
 # guesthouse-gnome: GNOME in place of weston, chosen by install.sh --gnome.
@@ -89,6 +109,7 @@ cp "$t/gnome/dconf-profile" "$n/etc/dconf/profile/user"
 cp "$t/gnome/dconf-defaults" "$n/etc/dconf/db/guesthouse.d/10-guesthouse"
 fill "$t/gnome/control" "" > "$n/DEBIAN/control"
 printf '/etc/dconf/profile/user\n/etc/dconf/db/guesthouse.d/10-guesthouse\n' > "$n/DEBIAN/conffiles"
+copyright "$n" guesthouse-gnome
 for s in postinst prerm postrm; do cp "$t/gnome/$s" "$n/DEBIAN/$s"; chmod 755 "$n/DEBIAN/$s"; done
 
 # guesthouse-plasma: KDE Plasma in place of weston, chosen by install.sh --plasma.
@@ -102,6 +123,7 @@ cp "$t/plasma/environment.conf" "$k/usr/lib/environment.d/90-guesthouse-plasma.c
 cp "$t/plasma/kscreenlockerrc" "$k/etc/xdg/"
 fill "$t/plasma/control" "" > "$k/DEBIAN/control"
 echo /etc/xdg/kscreenlockerrc > "$k/DEBIAN/conffiles"
+copyright "$k" guesthouse-plasma
 for s in postinst prerm; do cp "$t/plasma/$s" "$k/DEBIAN/$s"; chmod 755 "$k/DEBIAN/$s"; done
 
 for p in dkms:pvg-dkms_${version}_all mesa:pvg-mesa_${version}_arm64 desktop:guesthouse-desktop_${version}_all \
