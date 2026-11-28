@@ -1,4 +1,4 @@
-# Lints for the shell and PowerShell in the repo.
+# Lints for the shell and PowerShell in the repo, and the release notes script's tests.
 name: Scripts
 
 on:
@@ -31,6 +31,8 @@ jobs:
         run: bash tests/proxmox/run.sh
       - name: The package page, against the docs
         run: bash tests/packages/page.sh
+      - name: Release notes, on a made-up repo
+        run: python3 tests/release-notes/test.py
 
   psscriptanalyzer:
     name: PSScriptAnalyzer
