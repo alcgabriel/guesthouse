@@ -3,11 +3,12 @@
 # module's DKMS package (built once by DKMS as a check), our Mesa in /opt/pvg-mesa, the desktop
 # packages, install.sh and the manifest. A pull request only builds it.
 #
-# On a push to main, or by hand, it also publishes it on files.ruxn.com/p/guesthouse/, where the Mac
-# app fetches guesthouse-linux-driver-latest.json and the files it names. It has no secret: the
-# Worker takes the job's OIDC token (scripts/files-publish.sh). A version is published once. When
-# the manifest that's up already names this version, nothing is sent, so a change that should reach
-# the guests also raises drivers/linux-pvg/package/version.txt.
+# On a push to main, or by hand, it also publishes it on files.ruxn.com/p/guesthouse-linux-driver/,
+# a project of its own on the file site, where the Mac app fetches guesthouse-linux-driver-latest.json
+# and the files it names. It has no secret: the Worker takes the job's OIDC token
+# (scripts/files-publish.sh). A version is published once. When the manifest that's up already names
+# this version, nothing is sent, so a change that should reach the guests also raises
+# drivers/linux-pvg/package/version.txt.
 name: Linux driver package
 
 on:
@@ -86,7 +87,8 @@ jobs:
         run: |
           set -eu
           . drivers/linux-pvg/package/lib.sh
-          site=https://files.ruxn.com/p/guesthouse
+          project=guesthouse-linux-driver
+          site=https://files.ruxn.com/p/$project
           up=$(curl -fsSL "$site/$pvg_manifest_name" 2>/dev/null | jq -r .version 2>/dev/null || true)
           if [ "$up" = "$VERSION" ]; then
             echo "Version $VERSION is published already. Raise version.txt to publish a new one."
@@ -107,5 +109,5 @@ jobs:
             files="$files publish/$(pvg_published_name "$VERSION" "$f")"
           done
           # shellcheck disable=SC2086 # the names have no spaces
-          scripts/files-publish.sh guesthouse $files
-          scripts/files-publish.sh --replace guesthouse "publish/$pvg_manifest_name"
+          scripts/files-publish.sh "$project" $files
+          scripts/files-publish.sh --replace "$project" "publish/$pvg_manifest_name"

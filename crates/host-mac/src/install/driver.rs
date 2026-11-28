@@ -31,7 +31,8 @@
 //!
 //! `GUESTHOUSE_DRIVER_DIR` names a folder of the same files instead, for the lab.
 //!
-//! **A Linux guest's package** (`LINUX`) is published the same way, under
+//! **A Linux guest's package** (`LINUX`) is published the same way, in a project of its own,
+//! `files.ruxn.com/p/guesthouse-linux-driver/`, by `.github/workflows/linux-package.yml`, under
 //! `guesthouse-linux-driver-latest.json`: `install.sh`, the `.deb` files it installs, and the
 //! manifest, which goes to the guest with them so the guest knows the version it installed. Its
 //! files and their words on the serial port are in `drivers/linux-pvg/README.md`; `ubuntu` has the
@@ -42,9 +43,9 @@ use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Where the owner's file site serves the guesthouse project's published files, which the Linux
-/// driver's package is published under.
-pub const BASE_URL: &str = "https://files.ruxn.com/p/guesthouse/";
+/// Where the owner's file site serves the Linux driver's package: a project of its own, published by
+/// `.github/workflows/linux-package.yml`.
+pub const LINUX_BASE_URL: &str = "https://files.ruxn.com/p/guesthouse-linux-driver/";
 /// Where it serves the Windows driver's package: a project of its own, published by
 /// `.github/workflows/windows-pvg.yml`.
 pub const WINDOWS_BASE_URL: &str = "https://files.ruxn.com/p/guesthouse-windows-driver/";
@@ -90,7 +91,7 @@ pub const WINDOWS: Package = Package {
 pub const LINUX_SCRIPT: &str = "install.sh";
 
 pub const LINUX: Package = Package {
-    base: BASE_URL,
+    base: LINUX_BASE_URL,
     manifest: "guesthouse-linux-driver-latest.json",
     folder: "linux-driver",
     required: &[LINUX_SCRIPT],

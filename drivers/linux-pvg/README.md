@@ -39,7 +39,7 @@ The module isn't signed. The Mac app's machines have no Secure Boot (QEMU's firm
 
 ## The package
 
-The app fetches the package by its manifest from `files.ruxn.com/p/guesthouse/`, puts it on a small disk labelled `RUXN`, and a service in the installed system runs `install.sh` from it once for each version. The folder holds:
+The app fetches the package by its manifest from `files.ruxn.com/p/guesthouse-linux-driver/`, a project of its own on the file site, puts it on a small disk labelled `RUXN`, and a service in the installed system runs `install.sh` from it once for each version. The folder holds:
 
 | File | What |
 |---|---|
@@ -54,7 +54,7 @@ The app fetches the package by its manifest from `files.ruxn.com/p/guesthouse/`,
 
 Each `.deb` has its copyright file in `/usr/share/doc/PACKAGE/copyright`. `pvg-mesa`'s carries Mesa's licence page and every licence text of Mesa's `licenses/` folder, from the commit it was built from.
 
-The version is in `package/version.txt`. On files.ruxn.com each file is published as `guesthouse-linux-driver-V-FILE`, once, and the manifest last; a new version is a new `version.txt`.
+The version is in `package/version.txt`. In that project each file is published as `guesthouse-linux-driver-V-FILE`, once, and the manifest last; a new version is a new `version.txt`.
 
 ### Building it
 

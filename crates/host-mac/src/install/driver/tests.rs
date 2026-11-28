@@ -213,5 +213,5 @@ fn the_linux_manifest_the_package_scripts_write_is_one_the_app_takes() {
     assert_eq!(manifest.files[0].package_name, LINUX_SCRIPT);
     assert_eq!(manifest.files[2].name, "guesthouse-linux-driver-0.1.7-pvg-mesa_0.1.7_arm64.deb");
     assert_eq!(LINUX.manifest, "guesthouse-linux-driver-latest.json");
-    assert_eq!(BASE_URL, "https://files.ruxn.com/p/guesthouse/");
+    assert_eq!(LINUX.base, "https://files.ruxn.com/p/guesthouse-linux-driver/");
 }
