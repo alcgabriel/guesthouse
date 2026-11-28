@@ -204,7 +204,9 @@ PATH=$mingw:$PATH ninja -C "$out/meson" src/d3d11/ruxnd3d11.dll src/dxgi/ruxndxg
 
 cp "$out/meson/src/d3d11/ruxnd3d11.dll" "$out/meson/src/dxgi/ruxndxgi.dll" "$out/obj/winemetal.dll" \
 	"$out/obj/d3d11tri.exe" "$out/obj/spin.exe" "$out/obj/memgrow.exe" "$out/obj/videoprobe.exe" "$out/obj/outprobe.exe" "$out/obj/kmtprobe.exe" \
-	"$src/dxmttri.cmd" "$out/stick/"
+	"$out/stick/"
+# The lab's run step for the stick, where the tree has one.
+if [ -f "$src/dxmttri.cmd" ]; then cp "$src/dxmttri.cmd" "$out/stick/"; fi
 if [ "$checks" = 1 ]; then
 	sed -n '$p' "$out/host/wiretest.txt"
 	grep -c "parsed to the end" "$out/host/dxbccheck.txt" | sed 's/^/dxbccheck: shaders parsed: /'

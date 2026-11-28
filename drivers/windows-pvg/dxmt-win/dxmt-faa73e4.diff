@@ -69,6 +69,20 @@ index b79deb7..d4422ad 100644
  EXPORTS  
      D3D11CoreCreateDevice @18
      D3D11CreateDevice @22
+diff --git a/src/d3d11/d3d11_context_impl.cpp b/src/d3d11/d3d11_context_impl.cpp
+index d2ef5d4..5c0a453 100644
+--- a/src/d3d11/d3d11_context_impl.cpp
++++ b/src/d3d11/d3d11_context_impl.cpp
+@@ -3826,6 +3826,9 @@ public:
+     }
+     if (SrcBox.right <= SrcBox.left)
+       return;
++    // A buffer's box is empty too when its rows or slices are.
++    if (pSrcBox && (SrcBox.bottom <= SrcBox.top || SrcBox.back <= SrcBox.front))
++      return;
+     if (auto staging_dst = GetStagingResource(pDstResource, DstSubresource)) {
+       if (auto staging_src = GetStagingResource(pSrcResource, SrcSubresource)) {
+         SwitchToBlitEncoder(CommandBufferState::BlitEncoderActive);
 diff --git a/src/d3d11/d3d11_texture_device.cpp b/src/d3d11/d3d11_texture_device.cpp
 index 0647de1..3d2925c 100644
 --- a/src/d3d11/d3d11_texture_device.cpp
@@ -166,7 +180,7 @@ index 187df0b..446e0a9 100644
  constexpr size_t kResourceInitializerChunks = 2;
  
 diff --git a/src/dxmt/dxmt_ring_bump_allocator.hpp b/src/dxmt/dxmt_ring_bump_allocator.hpp
-index 5c92d92..dcb954d 100644
+index 5c92d92..ecf9b76 100644
 --- a/src/dxmt/dxmt_ring_bump_allocator.hpp
 +++ b/src/dxmt/dxmt_ring_bump_allocator.hpp
 @@ -9,7 +9,12 @@
@@ -182,7 +196,17 @@ index 5c92d92..dcb954d 100644
  constexpr size_t kStagingBlockSizeForDeferredContext = 0x200000; // 2MB
  constexpr size_t kStagingBlockLifetime = 300;
  
-@@ -94,9 +99,10 @@ public:
+@@ -71,6 +76,9 @@ public:
+   allocate(size_t block_size) {
+     Block block{};
+     buffer_info_.length = block_size;
++    // newBuffer writes the mapping it made into the info; a second block
++    // must not pass the first one's mapping in as memory of its own.
++    buffer_info_.memory.set(nullptr);
+     block.buffer = device_.newBuffer(buffer_info_);
+     block.gpu_address = buffer_info_.gpu_address;
+     return block;
+@@ -94,9 +102,10 @@ public:
      WMT::Reference<WMT::Buffer> buffer;
      uint64_t gpu_address;
      void *mapped_address;
@@ -194,7 +218,7 @@ index 5c92d92..dcb954d 100644
          free(mapped_address);
          mapped_address = nullptr;
        }
-@@ -109,6 +115,7 @@ public:
+@@ -109,6 +118,7 @@ public:
        buffer = std::move(move.buffer);
        gpu_address = move.gpu_address;
        mapped_address = move.mapped_address;
@@ -202,7 +226,7 @@ index 5c92d92..dcb954d 100644
        move.mapped_address = nullptr;
      };
    };
-@@ -116,6 +123,18 @@ public:
+@@ -116,6 +126,18 @@ public:
    Block
    allocate(size_t block_size) {
      Block block{};
@@ -221,7 +245,7 @@ index 5c92d92..dcb954d 100644
      block.mapped_address = placed_buffer_ ? malloc(block_size) : nullptr;
      WMTBufferInfo info;
      info.options = buffer_info_;
-@@ -123,6 +142,7 @@ public:
+@@ -123,6 +145,7 @@ public:
      info.length = block_size;
      block.buffer = device_.newBuffer(info);
      block.gpu_address = info.gpu_address;
