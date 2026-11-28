@@ -21,6 +21,7 @@ default-members = [
     "crates/core",
     "crates/daemon",
     "crates/daemon-shell",
+    "crates/download",
     "crates/frame-socket",
     "crates/guest-names",
     "crates/guest-scripts",
@@ -90,6 +91,7 @@ guesthouse-account-core = { path = "crates/account" }
 guesthouse-answers-core = { path = "crates/answers" }
 guesthouse-carry-core = { path = "crates/carry" }
 guesthouse-catalog-core = { path = "crates/catalog" }
+guesthouse-download-core = { path = "crates/download" }
 guesthouse-serial-words-core = { path = "crates/serial-words" }
 guesthouse-idle-core = { path = "crates/idle" }
 guesthouse-guest-names-core = { path = "crates/guest-names" }

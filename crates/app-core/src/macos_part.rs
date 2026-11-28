@@ -26,11 +26,15 @@ pub const REIMS_UTIL: &str = "reims-util";
 pub const KEXTS_FOLDER: &str = "kexts";
 pub const KEXT_SET: &str = "set.toml";
 
-const PART: &str = "part";
-const NEW: &str = "new";
-const DOWNLOADING: &str = "Downloading macOS support";
+/// The archive's and the unpacked folder's names, the words curl is given, how far it is and the
+/// sentences, as the Linux host has them in every host's `guesthouse_download_core`.
+use guesthouse_download_core::linux_host::macos_part::{
+    DOWNLOADING, UNPACKING, WRONG_FILE, archive_file, not_downloaded, not_unpacked, progress, unpacked_folder,
+};
+#[cfg(test)]
+use guesthouse_download_core::linux_host::macos_part::{NEW, PART};
+use guesthouse_download_core::linux_host::{self as rules, CURL_WORDS, GO_ON_WORDS};
 const POLL: Duration = Duration::from_millis(500);
-const MIB: u64 = 1024 * 1024;
 
 pub fn folder(paths: &Paths) -> PathBuf {
     let own = paths.helper(IN_PROGRAM);
@@ -54,31 +58,31 @@ pub fn is_here(paths: &Paths) -> bool {
 
 /// The download's size, as said before it starts.
 pub fn download_size() -> String {
-    format!("{} MiB", ARCHIVE_BYTES.div_ceil(MIB))
+    guesthouse_download_core::linux_host::macos_part::size_text(ARCHIVE_BYTES)
 }
 
 fn said(output: &std::process::Output) -> String {
-    String::from_utf8_lossy(&output.stderr).trim().to_owned()
+    rules::said(&output.stderr)
 }
 
 /// Downloads to `to`, going on from what an earlier try left there, and says how far it is.
 fn download(url: &str, to: &Path, step: &dyn Fn(&str)) -> Result<()> {
     let mut child = Command::new("curl")
-        .args(["--fail", "--location", "--silent", "--show-error", "--retry", "3", "--continue-at", "-"])
-        .arg("--output")
+        .args(CURL_WORDS)
+        .args(GO_ON_WORDS)
         .arg(to)
         .arg(url)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| Failure(format!("curl could not be started: {error}")))?;
+        .map_err(|error| Failure(rules::not_started(error)))?;
     let mut shown = None;
     while child.try_wait()?.is_none() {
-        let percent = fs::metadata(to).map_or(0, |found| found.len() * 100 / ARCHIVE_BYTES.max(1)).min(100);
+        let percent = rules::percent(fs::metadata(to).map_or(0, |found| found.len()), ARCHIVE_BYTES);
         if shown != Some(percent) {
             shown = Some(percent);
-            step(&format!("{DOWNLOADING}: {percent}%"));
+            step(&progress(percent));
         }
         sleep(POLL);
     }
@@ -86,19 +90,18 @@ fn download(url: &str, to: &Path, step: &dyn Fn(&str)) -> Result<()> {
     if ended.status.success() {
         return Ok(());
     }
-    Err(Failure(format!("macOS support could not be downloaded: {}", said(&ended))))
+    Err(Failure(not_downloaded(&said(&ended))))
 }
 
 fn sha256(file: &Path) -> Result<String> {
     let output = Command::new("sha256sum").arg(file).stdin(Stdio::null()).output()?;
-    let text = String::from_utf8_lossy(&output.stdout);
-    text.split_whitespace().next().map(str::to_owned).ok_or_else(|| Failure(said(&output)))
+    rules::sha256sum_sum(&output.stdout).ok_or_else(|| Failure(said(&output)))
 }
 
 /// Unpacks the archive beside where it goes and moves it into place whole, so a part that's there
 /// is all there.
 fn unpack(archive: &Path, into: &Path) -> Result<()> {
-    let new = into.with_extension(NEW);
+    let new = unpacked_folder(into);
     let _ = fs::remove_dir_all(&new);
     fs::create_dir_all(&new)?;
     let output = Command::new("tar")
@@ -110,7 +113,7 @@ fn unpack(archive: &Path, into: &Path) -> Result<()> {
         .output()?;
     if !output.status.success() || !whole(&new) {
         let _ = fs::remove_dir_all(&new);
-        return Err(Failure(format!("macOS support could not be unpacked. {}", said(&output))));
+        return Err(Failure(not_unpacked(&said(&output))));
     }
     let _ = fs::remove_dir_all(into);
     fs::rename(new, into)?;
@@ -118,16 +121,16 @@ fn unpack(archive: &Path, into: &Path) -> Result<()> {
 }
 
 fn fetch(url: &str, wanted: &str, into: &Path, step: &dyn Fn(&str)) -> Result<()> {
-    let archive = into.with_extension(PART);
+    let archive = archive_file(into);
     fs::create_dir_all(into.parent().unwrap_or(Path::new("")))?;
     step(DOWNLOADING);
     download(url, &archive, step)?;
     let found = sha256(&archive)?;
-    if found != wanted {
+    if !rules::sum_is_wanted(&found, wanted) {
         let _ = fs::remove_file(&archive);
-        return Err(Failure::new("The macOS support that came is not the file it should be. Try again."));
+        return Err(Failure::new(WRONG_FILE));
     }
-    step("Unpacking macOS support");
+    step(UNPACKING);
     unpack(&archive, into)?;
     let _ = fs::remove_file(archive);
     Ok(())
@@ -140,6 +143,10 @@ pub fn ensure(paths: &Paths, step: &dyn Fn(&str)) -> Result<()> {
     }
     fetch(ARCHIVE_URL, ARCHIVE_SHA256, &paths.parts.join(PART_NAME), step)
 }
+
+#[cfg(test)]
+#[path = "macos_part_pins.rs"]
+mod pins;
 
 #[cfg(test)]
 mod tests {
