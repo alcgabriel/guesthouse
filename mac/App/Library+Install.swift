@@ -10,11 +10,7 @@ extension Library {
     /// has stopped, and once when it is done. A stopped (cancelled) install is an ordinary machine.
     func showsInstall(_ machine: Machine) -> Bool {
         guard let install = install(of: machine) else { return false }
-        switch install.state {
-        case "running", "failed": return true
-        case "done": return !installsSeen.contains(machine.agentID)
-        default: return false
-        }
+        return Rules.showsInstall(installState: install.state, seen: installsSeen.contains(machine.agentID))
     }
 
     func markInstallSeen(_ machine: Machine) {

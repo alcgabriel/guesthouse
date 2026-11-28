@@ -10,9 +10,6 @@ nonisolated struct MachineStatus: Equatable {
     /// has not worked in time.
     static let off = MachineStatus(state: "off", reason: nil)
 
-    /// A machine whose process is, or may be, there.
-    var isAlive: Bool { ["starting", "running", "stopping", "stopping_stalled"].contains(state) }
-
     /// The one or two words for the sidebar and for VoiceOver.
     var title: String {
         switch state {
@@ -54,16 +51,6 @@ nonisolated struct MachineStatus: Equatable {
             }
         default:
             String(localized: "\(name) is turned off.")
-        }
-    }
-
-    /// The action that makes sense next, if any.
-    var nextStep: NextStep? {
-        switch state {
-        case "running": .openScreen
-        case "stopping_stalled": .forceOff
-        case "off", "failed": .start
-        default: nil
         }
     }
 }

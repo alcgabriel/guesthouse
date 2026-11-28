@@ -70,6 +70,11 @@ char *guesthouse_driver_record(const char *id, const char *version);
  * {"warning": ...} or {"error"}. */
 char *guesthouse_start_check(const char *request);
 
+/* Answers one rule of a machine's page: "rule" is next_step, is_alive, can_force_off,
+ * can_open_screen, can_start, shows_install or start_check_order, with that rule's facts; the
+ * answer is {"step"}, {"yes"}, {"order"} or {"error"}. States are the shared names. */
+char *guesthouse_rule(const char *request);
+
 /* Records the pixels and scaling (100 or 200) machine `id`'s screen should have to fill its
  * window, and for a running machine on the guarded path sends it to the graphics process as its
  * display mode, at most one a second, the last one winning. May wait a second or more: call it

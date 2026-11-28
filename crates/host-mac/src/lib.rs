@@ -20,6 +20,7 @@ pub mod protocol;
 pub mod remote;
 pub mod report;
 pub mod report_ffi;
+pub mod rules;
 pub mod screen_size;
 pub mod server;
 pub mod start_checks;

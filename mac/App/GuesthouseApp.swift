@@ -110,13 +110,14 @@ struct AppCommands: Commands {
 
     private var canStart: Bool {
         guard let selected, let status = selectedStatus else { return false }
-        return selected.startable && library.startPlan(for: selected).plan != nil && library.agent.connected
-            && ["off", "failed"].contains(status.state)
+        return Rules.canStart(
+            startable: selected.startable, problem: library.startPlan(for: selected).plan == nil,
+            agentConnected: library.agent.connected, state: status.state)
     }
 
     private var canOpenScreen: Bool {
-        guard let selected, selected.frames != nil, let status = selectedStatus else { return false }
-        return selected.startable ? status.isAlive : true
+        guard let selected, let status = selectedStatus else { return false }
+        return Rules.canOpenScreen(hasScreen: selected.frames != nil, startable: selected.startable, state: status.state)
     }
 
     /// The standard About panel, with the core's version under the app's.

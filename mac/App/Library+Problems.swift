@@ -55,9 +55,17 @@ extension Library {
 
     /// The first problem Start would run into, unless the person has said to go on without it.
     func startProblem(for machine: Machine, ignoring: Set<StartCheck>) -> Problem? {
-        if !ignoring.contains(.memory), let found = memoryProblem(starting: machine) { return found }
-        if !ignoring.contains(.disk), let found = diskProblem(starting: machine) { return found }
-        if !ignoring.contains(.driver), let found = driverProblem(starting: machine) { return found }
+        for name in Rules.startCheckOrder {
+            switch name {
+            case "memory" where !ignoring.contains(.memory):
+                if let found = memoryProblem(starting: machine) { return found }
+            case "disk" where !ignoring.contains(.disk):
+                if let found = diskProblem(starting: machine) { return found }
+            case "driver" where !ignoring.contains(.driver):
+                if let found = driverProblem(starting: machine) { return found }
+            default: break
+            }
+        }
         return nil
     }
 

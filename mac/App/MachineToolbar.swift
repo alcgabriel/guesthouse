@@ -37,7 +37,7 @@ struct MachineToolbar: ToolbarContent {
             }
             Menu {
                 Button("Force Off") { library.forceOff(machine) }
-                    .disabled(!canForceOff)
+                    .disabled(!status.canForceOff)
                 Divider()
                 Button("Rename…") {
                     dialogs.newName = machine.name
@@ -66,7 +66,9 @@ struct MachineToolbar: ToolbarContent {
     }
 
     private var canStart: Bool {
-        machine.startable && startProblem == nil && library.agent.connected && ["off", "failed"].contains(status.state)
+        Rules.canStart(
+            startable: machine.startable, problem: startProblem != nil,
+            agentConnected: library.agent.connected, state: status.state)
     }
 
     private var startHelp: String {
@@ -76,21 +78,10 @@ struct MachineToolbar: ToolbarContent {
         return "Start the machine"
     }
 
-    /// Force Off is for a machine that is coming up or running, and for a shutdown that has not
-    /// worked in time.
-    private var canForceOff: Bool {
-        switch status.state {
-        case "starting", "running": true
-        case "stopping_stalled": true
-        default: false
-        }
-    }
-
     /// A machine the app runs shows its screen while it is up; one run by hand shows its
     /// screen whenever it has one.
     private var canOpenScreen: Bool {
-        guard machine.frames != nil else { return false }
-        return machine.startable ? status.isAlive : true
+        Rules.canOpenScreen(hasScreen: machine.frames != nil, startable: machine.startable, state: status.state)
     }
 }
 

@@ -388,3 +388,20 @@ pub unsafe extern "C" fn guesthouse_start_check(request: *const c_char) -> *mut 
         None => error_json("the check is not text"),
     })
 }
+
+/// Answers one rule of a machine's page (what a state offers, whether Start and Open Screen work,
+/// whether an install is shown, the order the start checks run in): `request` is JSON with
+/// `"rule"` and that rule's facts (see `rules`). Returns `{"step"}`, `{"yes"}`, `{"order"}` or
+/// `{"error"}`.
+///
+/// # Safety
+/// `request` is null or points to a nul-terminated string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn guesthouse_rule(request: *const c_char) -> *mut c_char {
+    // SAFETY: passed on from the caller.
+    let request = unsafe { text(request) };
+    into_c_string(match request {
+        Some(request) => crate::rules::answer(request),
+        None => error_json("the rule is not text"),
+    })
+}
