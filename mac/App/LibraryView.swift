@@ -112,7 +112,7 @@ extension MachineStatus {
     var color: Color {
         switch state {
         case "running": .green
-        case "starting", "shutting_down": .orange
+        case "starting", "stopping", "stopping_stalled": .orange
         case "failed": .red
         default: .gray
         }

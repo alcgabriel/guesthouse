@@ -207,7 +207,7 @@ fn what_a_machine_that_is_not_running_is_told_is_the_linux_apps_sentence() {
 fn the_report_goes_where_the_others_go_in_the_others_words() {
     // The shared crate's own tests read the Linux sources; here only that this host uses them.
     assert_eq!(
-        guesthouse_control::report::report_address(),
+        guesthouse_report_core::contract::report_address(),
         "https://files.ruxn.com/r/guesthouse"
     );
 }

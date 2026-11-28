@@ -2,6 +2,7 @@
 //! an event, so every rule is tested without a process: the agent turns what happens (a request,
 //! QEMU answering, QEMU exiting) into events and applies them one at a time.
 
+use guesthouse_state_core::common::State;
 use std::fmt;
 
 /// Where a machine stands.
@@ -23,15 +24,30 @@ pub enum Status {
 }
 
 impl Status {
-    /// The name a state goes by in messages.
-    pub fn name(&self) -> &'static str {
+    /// The shared state this is. The wire name and the word shown come from the shared crate, so
+    /// every host says them alike; the reason of a failure stays here, beside the state.
+    pub fn shared(&self) -> State {
         match self {
-            Status::Stopped => "stopped",
-            Status::Starting => "starting",
-            Status::Running => "running",
-            Status::ShuttingDown { .. } => "shutting_down",
-            Status::Failed { .. } => "failed",
+            Status::Stopped => State::Off,
+            Status::Starting => State::Starting,
+            Status::Running => State::Running,
+            Status::ShuttingDown { stalled: false } => State::Stopping,
+            Status::ShuttingDown { stalled: true } => State::StoppingStalled,
+            Status::Failed { .. } => State::Failed,
         }
+    }
+
+    /// The name a state goes by in messages: the shared wire name (`off`, `stopping_stalled`...).
+    pub fn name(&self) -> String {
+        match serde_json::to_value(self.shared()) {
+            Ok(serde_json::Value::String(name)) => name,
+            _ => String::new(),
+        }
+    }
+
+    /// The word a state is shown with (Off, Still stopping...), the shared one.
+    pub fn title(&self) -> &'static str {
+        self.shared().name()
     }
 
     pub fn reason(&self) -> Option<&str> {
@@ -293,7 +309,10 @@ mod tests {
 
     #[test]
     fn names_and_reasons_for_messages() {
-        assert_eq!(ShuttingDown { stalled: true }.name(), "shutting_down");
+        assert_eq!(ShuttingDown { stalled: true }.name(), "stopping_stalled");
+        assert_eq!(ShuttingDown { stalled: false }.name(), "stopping");
+        assert_eq!(Stopped.name(), "off");
+        assert_eq!(Stopped.title(), "Off");
         assert!(ShuttingDown { stalled: true }.stalled());
         assert!(!Running.stalled());
         assert_eq!(failed("why").reason(), Some("why"));

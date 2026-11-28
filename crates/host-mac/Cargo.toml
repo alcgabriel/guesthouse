@@ -20,8 +20,15 @@ sha2 = "0.11"
 # What every host shares about viewing a machine from other devices: the state types, the
 # controls' words, the port choice. Pinned to an exact commit of the public repo, GPL-2.0-or-later.
 guesthouse-remote-view-core.workspace = true
-# The words a report is sent in, shared with the Linux and Windows hosts (no OS calls in it).
-guesthouse-control.workspace = true
+# Bug reports, the part no host differs in (the report server's words, the summary, the scrubber, how it is
+# sent), shared with the Linux and Windows hosts.
+guesthouse-report-core.workspace = true
+# The rules every host shares: the account an install makes in a guest and its password, the
+# answer-file XML escape, and a JSON file written in one step.
+guesthouse-account-core.workspace = true
+guesthouse-answers-core.workspace = true
+guesthouse-state-core.workspace = true
+guesthouse-basics.workspace = true
 # Whether a newer Guesthouse is out, for every host.
 guesthouse-update-check.workspace = true
 

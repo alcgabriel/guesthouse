@@ -484,7 +484,7 @@ fn the_agent_shares_a_machine_with_a_viewer_and_stops_when_told() {
     remote::set_enabled(&machines, "sh", false).unwrap();
     wait_for("the machine to stop", || {
         let list = request(&agent, r#"{"v":1,"id":6,"op":"list"}"#);
-        (list["machines"][0]["state"] == "stopped").then_some(())
+        (list["machines"][0]["state"] == "off").then_some(())
     });
     assert_eq!(request(&agent, &start)["ok"], true);
     wait_for("the machine to run", || {

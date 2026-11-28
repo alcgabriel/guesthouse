@@ -66,7 +66,7 @@ struct MachineToolbar: ToolbarContent {
     }
 
     private var canStart: Bool {
-        machine.startable && startProblem == nil && library.agent.connected && ["stopped", "failed"].contains(status.state)
+        machine.startable && startProblem == nil && library.agent.connected && ["off", "failed"].contains(status.state)
     }
 
     private var startHelp: String {
@@ -81,7 +81,7 @@ struct MachineToolbar: ToolbarContent {
     private var canForceOff: Bool {
         switch status.state {
         case "starting", "running": true
-        case "shutting_down": status.stalled
+        case "stopping_stalled": true
         default: false
         }
     }

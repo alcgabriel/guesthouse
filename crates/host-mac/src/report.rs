@@ -16,7 +16,7 @@ pub mod collect;
 pub mod extra;
 pub mod send;
 
-pub use guesthouse_control::report::ProblemKind;
+pub use guesthouse_report_core::kind::ProblemKind;
 use serde::Deserialize;
 
 /// What the person chose and wrote, and what the app knows that the core does not.
@@ -45,38 +45,7 @@ impl Request {
     }
 }
 
-/// What to tell the person before they send, if the report would be thin: no logs of the machine
-/// running, or a machine that is not running to ask. As the Linux app says it, and sending anyway
-/// is always theirs to choose.
-pub fn before_sending(
-    machine: bool,
-    running: bool,
-    has_run_logs: bool,
-    kind: ProblemKind,
-) -> Option<String> {
-    if !machine {
-        return None;
-    }
-    let can_run = !matches!(kind, ProblemKind::WontStart | ProblemKind::InstallFailed);
-    let not_running = can_run && !running;
-    let text = match (!has_run_logs, not_running) {
-        (true, true) => {
-            "This report has no logs of the machine running, and logs from inside the guest need it running. \
-             The fullest report comes with the machine running: start it, make the problem happen again if \
-             you can, then send."
-        }
-        (true, false) => {
-            "This report has no logs of the machine running. Start it, make the problem happen again, then \
-             send. If it won't start at all, send anyway."
-        }
-        (false, true) => {
-            "The machine isn't running, so the report has nothing from inside the guest. The fullest report \
-             comes with it running: start it, make the problem happen if you can, then send."
-        }
-        (false, false) => return None,
-    };
-    Some(text.to_owned())
-}
+pub use guesthouse_report_core::warning::before_sending;
 
 #[cfg(test)]
 mod tests;

@@ -4,20 +4,22 @@ import Foundation
 nonisolated struct MachineStatus: Equatable {
     var state: String
     var reason: String?
-    /// A shutdown that has not worked in time.
-    var stalled: Bool
 
-    static let stopped = MachineStatus(state: "stopped", reason: nil, stalled: false)
+    /// The state names are the shared ones (`off`, `starting`, `installing`, `running`, `stopping`,
+    /// `stopping_stalled`, `failed`), as every host says them; `stopping_stalled` is a shutdown that
+    /// has not worked in time.
+    static let off = MachineStatus(state: "off", reason: nil)
 
     /// A machine whose process is, or may be, there.
-    var isAlive: Bool { ["starting", "running", "shutting_down"].contains(state) }
+    var isAlive: Bool { ["starting", "running", "stopping", "stopping_stalled"].contains(state) }
 
     /// The one or two words for the sidebar and for VoiceOver.
     var title: String {
         switch state {
         case "starting": String(localized: "Starting")
         case "running": String(localized: "Running")
-        case "shutting_down": String(localized: "Shutting down")
+        case "stopping": String(localized: "Stopping")
+        case "stopping_stalled": String(localized: "Still stopping")
         case "failed": String(localized: "Failed")
         default: String(localized: "Off")
         }
@@ -40,9 +42,9 @@ nonisolated struct MachineStatus: Equatable {
             String(localized: "\(name) is starting. This takes a few seconds.")
         case "running":
             String(localized: "\(name) is running.")
-        case "shutting_down" where stalled:
+        case "stopping_stalled":
             String(localized: "\(name) is taking a long time to shut down. If it is stuck, Force Off ends it at once, and anything not saved in it is lost.")
-        case "shutting_down":
+        case "stopping":
             String(localized: "\(name) is shutting down. Windows is closing its programs.")
         case "failed":
             if let reason, !reason.isEmpty {
@@ -59,8 +61,8 @@ nonisolated struct MachineStatus: Equatable {
     var nextStep: NextStep? {
         switch state {
         case "running": .openScreen
-        case "shutting_down" where stalled: .forceOff
-        case "stopped", "failed": .start
+        case "stopping_stalled": .forceOff
+        case "off", "failed": .start
         default: nil
         }
     }

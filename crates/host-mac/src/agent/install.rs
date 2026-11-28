@@ -185,8 +185,8 @@ impl MachineControl for AgentControl {
     fn machine_state(&mut self, id: &str) -> (String, Option<String>) {
         let slots = lock(&self.agent.shared.slots);
         match slots.get(id).map(|slot| slot.status()) {
-            Some(status) => (status.name().to_string(), status.reason().map(String::from)),
-            None => ("stopped".to_string(), None),
+            Some(status) => (status.name(), status.reason().map(String::from)),
+            None => ("off".to_string(), None),
         }
     }
 

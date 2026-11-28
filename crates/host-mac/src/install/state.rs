@@ -4,6 +4,7 @@
 //! in the machine's folder as it changes, so an install carries on after the app was closed.
 
 use super::plan::{Guest, Plan, Step};
+use guesthouse_basics::json_file::write_json;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -395,12 +396,7 @@ impl InstallInfo {
 
 /// Writes the state through a temporary file, so a crash never leaves half of it.
 pub fn save(folder: &Path, info: &InstallInfo) -> std::io::Result<()> {
-    let temporary = folder.join(format!("{STATE_FILE}.new"));
-    fs::write(
-        &temporary,
-        serde_json::to_string_pretty(info).expect("state is JSON") + "\n",
-    )?;
-    fs::rename(temporary, folder.join(STATE_FILE))
+    write_json(&folder.join(STATE_FILE), info)
 }
 
 /// The state kept in a machine's folder, if there is one that can be read.

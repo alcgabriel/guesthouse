@@ -7,7 +7,8 @@
 //! 2. an environment variable, for trying the app with a stand-in (`GUESTHOUSE_QEMU`,
 //!    `GUESTHOUSE_RMHOST`);
 //! 3. the copy inside the app bundle, which is how a release ships it;
-//! 4. the lab's own build, only as a convenience while the app is developed on the lab's Mac.
+//! 4. the lab's own builds, newest first, only as a convenience while the app is developed on the
+//!    lab's Mac (one marked list further down, to be deleted for the public repo).
 //!
 //! Every answer says in a sentence why that one was chosen, because Settings shows it.
 
@@ -52,29 +53,40 @@ impl Tool {
             Tool::PvgQemu => "GUESTHOUSE_PVG_QEMU",
         }
     }
-
-    /// Where the lab's build sits under the home folder. DEVELOPMENT CONVENIENCE: these are
-    /// paths on the lab's Mac, so a person's own Mac never has them and a release does not
-    /// rely on them.
-    fn lab_build_under_home(self) -> &'static str {
-        match self {
-            Tool::Qemu => {
-                "Developer/lab/m5/build/rmhost/qemu-windows/qemu-system-aarch64"
-            }
-            Tool::Rmhost => {
-                "Developer/lab/m5/build/rmhost/rmhost"
-            }
-            // The build of the graphics process that can publish frames; the stock one in
-            // build/guesthouse has no --frames and is refused.
-            Tool::PvgHost => {
-                "Developer/lab/m5/.tools/m4-frame-export/target/release/guesthouse-pvg-host"
-            }
-            Tool::PvgQemu => {
-                "Developer/lab/m5/build/qemu-pvg/qemu/qemu-system-aarch64"
-            }
-        }
-    }
 }
+
+// ---------------------------------------------------------------------------------------------
+// LAB ONLY. The builds on the lab's Mac, each list in the order tried, newest first. Paths are
+// under the home folder. A person's own Mac never has them and a release does not rely on them;
+// the fix for the public repo is to delete this whole section and the `lab` place with it.
+// ---------------------------------------------------------------------------------------------
+const LAB_QEMU: &[&str] = &[
+    "Developer/lab/m5/build/rmhost/qemu-windows/qemu-system-aarch64",
+];
+const LAB_RMHOST: &[&str] =
+    &["Developer/lab/m5/build/rmhost/rmhost"];
+/// The contributor's build (a library with a thin main, both sockets 0600, the frame export built
+/// in), which the lab's run.sh uses by default; then the earlier separate frame-export build.
+/// The stock build in build/guesthouse has no --frames and is refused.
+const LAB_PVG_HOST: &[&str] = &[
+    "Developer/lab/m5/build/guesthouse-adcafeb/release/guesthouse-pvg-host",
+    "Developer/lab/m5/.tools/m4-frame-export/target/release/guesthouse-pvg-host",
+];
+const LAB_PVG_QEMU: &[&str] = &[
+    "Developer/lab/m5/build/qemu-pvg/qemu/qemu-system-aarch64",
+];
+
+/// The lab's builds of `tool` that exist under `home`, newest first.
+fn lab_builds(tool: Tool, home: &Path) -> Vec<PathBuf> {
+    let list = match tool {
+        Tool::Qemu => LAB_QEMU,
+        Tool::Rmhost => LAB_RMHOST,
+        Tool::PvgHost => LAB_PVG_HOST,
+        Tool::PvgQemu => LAB_PVG_QEMU,
+    };
+    list.iter().map(|path| home.join(path)).collect()
+}
+// ---------------------------------------------------------------------------------------------
 
 /// Which of the places a QEMU was found in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,7 +127,8 @@ pub struct Places {
     pub environment: Option<PathBuf>,
     /// The QEMU inside the app bundle, where one would be.
     pub bundled: Option<PathBuf>,
-    pub lab: Option<PathBuf>,
+    /// The lab's builds, newest first; empty off the lab's Mac.
+    pub lab: Vec<PathBuf>,
 }
 
 impl Places {
@@ -129,7 +142,8 @@ impl Places {
                 .map(PathBuf::from),
             bundled,
             lab: std::env::var_os("HOME")
-                .map(|home| Path::new(&home).join(tool.lab_build_under_home())),
+                .map(|home| lab_builds(tool, Path::new(&home)))
+                .unwrap_or_default(),
         }
     }
 }
@@ -166,14 +180,20 @@ pub fn locate(tool: Tool, places: &Places) -> Result<Found, String> {
             Source::Bundled,
             "The copy that comes inside Guesthouse.",
         ),
+    ];
+    let lab = places.lab.iter().map(|path| {
         (
-            &places.lab,
+            Some(path),
             Source::Lab,
             "The lab's own build, used because it is there. Only the lab's Mac has it.",
-        ),
-    ];
+        )
+    });
+    let candidates = candidates
+        .into_iter()
+        .map(|(path, source, why)| (path.as_ref(), source, why))
+        .chain(lab);
     for (path, source, why) in candidates {
-        if let Some(path) = path.as_ref().filter(|path| path.is_file()) {
+        if let Some(path) = path.filter(|path| path.is_file()) {
             return Ok(Found {
                 path: path.clone(),
                 source,
@@ -259,7 +279,7 @@ mod tests {
         let places = Places {
             setting: Some(chosen.display().to_string()),
             bundled: Some(dir.file("bundled")),
-            lab: Some(dir.file("lab")),
+            lab: vec![dir.file("lab")],
             ..Places::default()
         };
         let found = locate(Tool::Qemu, &places).unwrap();
@@ -272,7 +292,7 @@ mod tests {
         let dir = Scratch::new("bundled");
         let places = Places {
             bundled: Some(dir.file("bundled")),
-            lab: Some(dir.file("lab")),
+            lab: vec![dir.file("lab")],
             ..Places::default()
         };
         assert_eq!(locate(Tool::Qemu, &places).unwrap().source, Source::Bundled);
@@ -296,12 +316,29 @@ mod tests {
     fn the_lab_build_is_used_last_and_says_so() {
         let dir = Scratch::new("lab");
         let places = Places {
-            lab: Some(dir.file("lab")),
+            lab: vec![dir.file("lab")],
             ..Places::default()
         };
         let found = locate(Tool::Qemu, &places).unwrap();
         assert_eq!(found.source, Source::Lab);
         assert!(found.why.contains("lab"));
+    }
+
+    #[test]
+    fn the_newer_lab_graphics_process_comes_before_the_older_one() {
+        let dir = Scratch::new("pvg");
+        let (newer, older) = (dir.file("newer"), dir.file("older"));
+        let mut places = Places {
+            lab: vec![dir.0.join("absent"), newer.clone(), older.clone()],
+            ..Places::default()
+        };
+        assert_eq!(locate(Tool::PvgHost, &places).unwrap().path, newer);
+        places.lab.remove(1);
+        assert_eq!(locate(Tool::PvgHost, &places).unwrap().path, older);
+        assert!(
+            lab_builds(Tool::PvgHost, Path::new("/h"))[0]
+                .ends_with("guesthouse-adcafeb/release/guesthouse-pvg-host")
+        );
     }
 
     #[test]

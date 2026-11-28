@@ -164,17 +164,14 @@ pub struct MachineState {
     pub machine: String,
     pub state: String,
     pub reason: Option<String>,
-    /// A shutdown that has not worked in time: the card offers Force Off.
-    pub stalled: bool,
 }
 
 impl MachineState {
     pub fn new(machine: &str, status: &Status) -> MachineState {
         MachineState {
             machine: machine.to_string(),
-            state: status.name().to_string(),
+            state: status.name(),
             reason: status.reason().map(String::from),
-            stalled: status.stalled(),
         }
     }
 }
@@ -397,11 +394,11 @@ mod tests {
         );
         assert_eq!(
             StateChange::line(state),
-            r#"{"v":1,"event":"state","machine":"win","state":"failed","reason":"bad disk","stalled":false}"#
+            r#"{"v":1,"event":"state","machine":"win","state":"failed","reason":"bad disk"}"#
         );
         let state = MachineState::new("win", &Status::ShuttingDown { stalled: true });
         let line = StateChange::line(state);
-        assert!(line.contains(r#""state":"shutting_down","reason":null,"stalled":true"#));
+        assert!(line.contains(r#""state":"stopping_stalled","reason":null"#));
     }
 
     #[test]

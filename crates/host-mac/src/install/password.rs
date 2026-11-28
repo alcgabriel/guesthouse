@@ -1,13 +1,19 @@
 //! The password of a guest's account. The app makes it (random, readable, no letters that look
 //! alike), keeps it in the Mac's Keychain and sends it with the install; this only checks that
 //! what arrives is safe to write into the answer files, where it is put at generation time and
-//! nowhere else.
+//! nowhere else. The shared rule for every host's password comes first; the Mac asks for plainer
+//! characters on top, since the app's own passwords are always of that kind.
+
+use guesthouse_account_core::common::password_problem;
 
 const LEAST: usize = 8;
 const MOST: usize = 64;
 
 /// Letters, digits and dashes only, so no quoting is ever needed in XML, YAML or a shell line.
 pub fn check(password: &str) -> Result<(), String> {
+    if let Some(problem) = password_problem(password) {
+        return Err(problem);
+    }
     let fits = (LEAST..=MOST).contains(&password.len())
         && password
             .chars()

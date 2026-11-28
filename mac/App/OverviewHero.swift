@@ -69,7 +69,7 @@ struct OverviewHero: View {
     /// What the machine is, and for one that is not simply on or off, what has happened.
     private var subtitle: String {
         switch status.state {
-        case "running", "stopped": MachineFormat.kindDescription(machine.kind)
+        case "running", "off": MachineFormat.kindDescription(machine.kind)
         default: status.sentence(for: machine.name)
         }
     }

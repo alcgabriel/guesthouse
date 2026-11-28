@@ -233,11 +233,11 @@ impl MachineControl for FakeGuest {
             return ("failed".into(), Some(why.clone()));
         }
         if self.off_at.is_some_and(|at| self.now >= at) {
-            return ("stopped".into(), None);
+            return ("off".into(), None);
         }
         match self.stops_at {
-            Some(at) if self.now >= at && self.started.len() == 1 => ("stopped".into(), None),
-            _ if self.started.is_empty() => ("stopped".into(), None),
+            Some(at) if self.now >= at && self.started.len() == 1 => ("off".into(), None),
+            _ if self.started.is_empty() => ("off".into(), None),
             _ => ("running".into(), None),
         }
     }

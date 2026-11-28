@@ -111,7 +111,7 @@ struct AppCommands: Commands {
     private var canStart: Bool {
         guard let selected, let status = selectedStatus else { return false }
         return selected.startable && library.startPlan(for: selected).plan != nil && library.agent.connected
-            && ["stopped", "failed"].contains(status.state)
+            && ["off", "failed"].contains(status.state)
     }
 
     private var canOpenScreen: Bool {

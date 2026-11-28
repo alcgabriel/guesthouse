@@ -12,6 +12,7 @@ use super::runner::{Ended, Progress, Report, StepError, Steps};
 use super::state::{InstallInfo, Source, StepStatus};
 use super::{driver, password, ubuntu, windows};
 use crate::store::MACHINE_FILE;
+use guesthouse_basics::json_file::write_json;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
@@ -105,13 +106,8 @@ pub fn set_keys(folder: &Path, changes: &[(&str, Option<&str>)]) -> Result<(), S
             }
         }
     }
-    let temporary = folder.join(format!("{MACHINE_FILE}.new"));
-    fs::write(
-        &temporary,
-        serde_json::to_string_pretty(&settings).expect("settings are JSON") + "\n",
-    )
-    .and_then(|()| fs::rename(&temporary, &path))
-    .map_err(|e| StepError::new(format!("Cannot write {MACHINE_FILE}: {e}")))
+    write_json(&path, &settings)
+        .map_err(|e| StepError::new(format!("Cannot write {MACHINE_FILE}: {e}")))
 }
 
 /// The installer the fetch named in the machine's file.
@@ -406,7 +402,7 @@ impl RealSteps<'_> {
         // Ubuntu powers itself off when it has finished; wait for that, so the next start is its own.
         if guest == Guest::Ubuntu {
             let began = self.control.now_ms();
-            while self.control.machine_state(&id).0 != "stopped" {
+            while self.control.machine_state(&id).0 != "off" {
                 if self.control.now_ms() - began >= POWER_OFF_MAX_MS {
                     return Err(StepError::coded(
                         "timeout",

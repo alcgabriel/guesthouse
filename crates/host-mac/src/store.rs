@@ -3,6 +3,7 @@
 //! starting a machine needs from it.
 
 use crate::launch::{DEFAULT_MODES, DEFAULT_SCALE, Graphics, InstallerBoot, LINUX, Launch};
+use guesthouse_state_core::common::State;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
@@ -101,13 +102,6 @@ struct Settings {
     remote_port: Option<u16>,
 }
 
-/// Where a machine stands as the store knows it. The agent knows better once it runs.
-#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy)]
-#[serde(rename_all = "lowercase")]
-pub enum State {
-    Stopped,
-}
-
 #[derive(Serialize, Debug, PartialEq, Eq)]
 pub struct Machine {
     /// The machine's folder name, which names it to the agent and in its run folder.
@@ -121,6 +115,7 @@ pub struct Machine {
     pub frames: Option<String>,
     /// The QMP socket that takes the machine's input, if it has one.
     pub qmp: Option<String>,
+    /// Where it stands as the store knows it (always off); the agent knows better once it runs.
     pub state: State,
     /// The machine's own folder.
     pub folder: String,
@@ -211,7 +206,7 @@ fn read_machine(folder: &Path) -> Result<Machine, String> {
         disk: resolve(folder, &settings.disk).display().to_string(),
         frames,
         qmp,
-        state: State::Stopped,
+        state: State::Off,
         folder: folder.display().to_string(),
         startable: launch.is_some(),
         modes: launch.as_ref().map(|l| l.modes.clone()).unwrap_or_default(),
@@ -449,7 +444,7 @@ mod tests {
         assert_eq!(machine.cores, 4);
         assert_eq!(machine.memory_mb, 8192);
         assert_eq!(machine.disk, "/disks/Windows 11.img");
-        assert_eq!(machine.state, State::Stopped);
+        assert_eq!(machine.state, State::Off);
         assert_eq!(machine.frames, None);
         assert_eq!(machine.qmp, None);
         assert_eq!(machine.folder, store.join("win").display().to_string());
@@ -527,7 +522,7 @@ mod tests {
         let store = scratch();
         add_machine(&store, "win", &settings("Win"));
         let json = serde_json::to_value(list(&store).unwrap()).unwrap();
-        assert_eq!(json["machines"][0]["state"], "stopped");
+        assert_eq!(json["machines"][0]["state"], "off");
         assert_eq!(json["skipped"], serde_json::json!([]));
     }
 

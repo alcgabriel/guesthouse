@@ -3,34 +3,34 @@ import Testing
 
 struct MachineStatusTests {
     @Test func stoppedMachineSaysOffAndOffersStart() {
-        let status = MachineStatus.stopped
+        let status = MachineStatus.off
         #expect(status.sentence(for: "Windows 11") == "Windows 11 is turned off.")
         #expect(status.nextStep == .start)
     }
 
     @Test func runningOffersTheScreen() {
-        let status = MachineStatus(state: "running", reason: nil, stalled: false)
+        let status = MachineStatus(state: "running", reason: nil)
         #expect(status.sentence(for: "W").contains("is running"))
         #expect(status.nextStep == .openScreen)
     }
 
     @Test func aShutdownThatStalledOffersForceOffAndWarns() {
-        let waiting = MachineStatus(state: "shutting_down", reason: nil, stalled: false)
-        let stalled = MachineStatus(state: "shutting_down", reason: nil, stalled: true)
+        let waiting = MachineStatus(state: "stopping", reason: nil)
+        let stalled = MachineStatus(state: "stopping_stalled", reason: nil)
         #expect(waiting.nextStep == nil)
         #expect(stalled.nextStep == .forceOff)
         #expect(stalled.sentence(for: "W").contains("Force Off"))
     }
 
     @Test func aFailureGivesItsReasonAndOffersAnotherTry() {
-        let status = MachineStatus(state: "failed", reason: "the disk image is not there", stalled: false)
+        let status = MachineStatus(state: "failed", reason: "the disk image is not there")
         #expect(status.sentence(for: "W").hasSuffix("the disk image is not there"))
         #expect(status.nextStep == .start)
-        #expect(MachineStatus(state: "failed", reason: nil, stalled: false).sentence(for: "W").hasSuffix("went wrong."))
+        #expect(MachineStatus(state: "failed", reason: nil).sentence(for: "W").hasSuffix("went wrong."))
     }
 
     @Test func startingOffersNothing() {
-        #expect(MachineStatus(state: "starting", reason: nil, stalled: false).nextStep == nil)
+        #expect(MachineStatus(state: "starting", reason: nil).nextStep == nil)
     }
 }
 

@@ -10,6 +10,7 @@
 use crate::launch::Launch;
 use crate::protocol::{CloseReason, DeviceInfo, Pending};
 use crate::store::{self, MACHINE_FILE};
+use guesthouse_basics::json_file::write_json;
 use guesthouse_remote_view_core::ctl;
 use std::fs;
 use std::net::UdpSocket;
@@ -95,11 +96,7 @@ pub fn set_enabled(machines: &Path, id: &str, on: bool) -> Result<Option<u16>, S
     if let Some(port) = port {
         settings["remote_port"] = port.into();
     }
-    let temporary = path.with_extension("json.new");
-    let text = serde_json::to_string_pretty(&settings).expect("settings are JSON") + "\n";
-    fs::write(&temporary, text)
-        .and_then(|()| fs::rename(&temporary, &path))
-        .map_err(|e| format!("Cannot write {MACHINE_FILE}: {e}"))?;
+    write_json(&path, &settings).map_err(|e| format!("Cannot write {MACHINE_FILE}: {e}"))?;
     Ok(port)
 }
 

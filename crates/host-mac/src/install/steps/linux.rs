@@ -199,7 +199,7 @@ impl RealSteps<'_> {
                         return Ok(Ended::Done);
                     }
                 }
-                "failed" | "stopped" if now - began > POLL_MS => {
+                "failed" | "off" if now - began > POLL_MS => {
                     return Err(StepError::new(why.unwrap_or_else(|| {
                         "The machine stopped soon after it started.".into()
                     })));

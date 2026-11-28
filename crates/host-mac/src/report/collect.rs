@@ -7,7 +7,7 @@
 //! guest's memory.
 
 use super::Request;
-use guesthouse_control::report::stage::FIRST_LIMIT;
+use guesthouse_report_core::trim::FIRST_LIMIT;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};

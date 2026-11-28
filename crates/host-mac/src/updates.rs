@@ -107,9 +107,5 @@ mod tests {
     #[test]
     fn the_mac_file_is_beside_the_windows_one() {
         assert!(LATEST_URL.starts_with("https://files.ruxn.com/p/guesthouse/"));
-        assert!(
-            guesthouse_control::updates::LATEST_URL
-                .starts_with("https://files.ruxn.com/p/guesthouse/")
-        );
     }
 }

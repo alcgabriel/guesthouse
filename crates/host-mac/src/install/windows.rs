@@ -9,6 +9,9 @@
 //! not done. `notes/mac-app-install.md` has the whole reasoning for the owner.
 
 use super::driver;
+use guesthouse_account_core::common::{MOST_WINDOWS_NAME_CHARS, WINDOWS_RESERVED};
+use guesthouse_answers_core::windows_host::escape;
+use guesthouse_basics::text::base64_encode;
 use std::path::{Path, PathBuf};
 
 /// Microsoft's own page for the ARM installer, which the app opens for the person.
@@ -35,32 +38,21 @@ pub fn check_installer(path: &Path) -> Result<PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
-/// Names Windows keeps for itself.
-const RESERVED: [&str; 8] = [
-    "administrator",
-    "guest",
-    "defaultaccount",
-    "system",
-    "admin",
-    "root",
-    "wdagutilityaccount",
-    "krbtgt",
-];
-/// The longest name Windows takes for an account.
-const MAX_ACCOUNT: usize = 20;
-
 /// The guest's account, named after the Mac's user: letters, digits and dashes of the short name,
 /// as many as Windows takes, and never one it keeps for itself.
 pub fn account_name(mac_user: &str) -> String {
     let mut name: String = mac_user
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
-        .take(MAX_ACCOUNT)
+        .take(MOST_WINDOWS_NAME_CHARS)
         .collect();
     if name.is_empty() || !name.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
-        name = format!("user{name}").chars().take(MAX_ACCOUNT).collect();
+        name = format!("user{name}")
+            .chars()
+            .take(MOST_WINDOWS_NAME_CHARS)
+            .collect();
     }
-    if RESERVED.contains(&name.to_ascii_lowercase().as_str()) {
+    if WINDOWS_RESERVED.contains(&name.to_ascii_lowercase().as_str()) {
         name.push('1');
     }
     name
@@ -97,40 +89,17 @@ pub struct Answers<'a> {
     pub edition: &'a str,
 }
 
-fn xml(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-/// A PowerShell line that says `text` on the first serial port, for the host to read.
 fn say(text: &str) -> String {
     format!(
         "$p = New-Object System.IO.Ports.SerialPort COM1,115200; $p.Open(); $p.WriteLine('{text}'); $p.Close()"
     )
 }
 
-/// Standard base64, for PowerShell's `-EncodedCommand`, which takes UTF-16 text so no quoting
-/// reaches the command line.
+/// Standard base64 of the text as UTF-16, for PowerShell's `-EncodedCommand`, so no quoting reaches
+/// the command line.
 fn base64_utf16(text: &str) -> String {
-    const DIGITS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let bytes: Vec<u8> = text.encode_utf16().flat_map(u16::to_le_bytes).collect();
-    let mut out = String::new();
-    for chunk in bytes.chunks(3) {
-        let n = chunk
-            .iter()
-            .enumerate()
-            .fold(0u32, |n, (i, b)| n | (u32::from(*b) << (16 - 8 * i)));
-        for i in 0..4 {
-            if i <= chunk.len() {
-                out.push(DIGITS[(n >> (18 - 6 * i) & 63) as usize] as char);
-            } else {
-                out.push('=');
-            }
-        }
-    }
-    out
+    base64_encode(&bytes)
 }
 
 /// What the first logon runs: test signing, the driver from the stick, and what happened said on
@@ -162,8 +131,8 @@ fn first_logon_script() -> String {
 /// checks for a TPM and Secure Boot waived (the machine has neither), one administrator, with the password it was given,
 /// who signs in by itself, and the first logon's commands.
 pub fn autounattend(answers: &Answers) -> String {
-    let account = xml(answers.account);
-    let script = xml(&first_logon_script());
+    let account = escape(answers.account);
+    let script = escape(&first_logon_script());
     format!(
         r#"<?xml version="1.0" encoding="utf-8"?>
 <unattend xmlns="urn:schemas-microsoft-com:unattend">
@@ -242,9 +211,9 @@ pub fn autounattend(answers: &Answers) -> String {
   </settings>
 </unattend>
 "#,
-        password = xml(answers.password),
-        edition = xml(answers.edition),
-        computer = xml(answers.computer_name),
+        password = escape(answers.password),
+        edition = escape(answers.edition),
+        computer = escape(answers.computer_name),
     )
 }
 

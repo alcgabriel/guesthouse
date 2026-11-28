@@ -138,7 +138,7 @@ fn a_linux_machine_starts_with_a_network_and_the_scale_it_was_given() {
     for id in ["deb", "std", "win"] {
         let off = format!(r#"{{"v":1,"id":2,"op":"force_off","machine":"{id}"}}"#);
         assert!(request(&agent, &off).ok);
-        wait_state(&agent, id, "stopped");
+        wait_state(&agent, id, "off");
     }
 }
 
@@ -194,7 +194,7 @@ fn the_wanted_size_reaches_a_running_guarded_machine_and_nothing_else() {
     for id in ["deb", "q", "hostnomodes"] {
         let off = format!(r#"{{"v":1,"id":2,"op":"force_off","machine":"{id}"}}"#);
         assert!(request(&agent, &off).ok);
-        wait_state(&agent, id, "stopped");
+        wait_state(&agent, id, "off");
     }
     // A second after the last one, and the machine is off again.
     let after = want("deb", 1280, 800);

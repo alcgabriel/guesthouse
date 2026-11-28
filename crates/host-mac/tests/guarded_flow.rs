@@ -155,7 +155,7 @@ fn the_graphics_process_starts_first_and_both_end_when_the_machine_does() {
     assert!(host.started <= qemu.started || host.pid != qemu.pid);
 
     assert!(op(&agent, "shutdown", "win").ok);
-    wait_state(&agent, "win", "stopped");
+    wait_state(&agent, "win", "off");
     wait_for("the graphics process to go", || gone(&host));
     assert!(!run.join("host.pid").exists());
 }
@@ -205,7 +205,7 @@ fn a_graphics_process_that_outstays_its_qemu_is_ended() {
     wait_state(&agent, "hoststuck", "running");
     let host = pid_of(&support.run("hoststuck"), "host.pid");
     assert!(op(&agent, "force_off", "hoststuck").ok);
-    wait_state(&agent, "hoststuck", "stopped");
+    wait_state(&agent, "hoststuck", "off");
     // It stays when QEMU goes; after the moment it is given, it is asked and it leaves.
     wait_for("the stuck graphics process to be ended", || gone(&host));
 }
@@ -223,7 +223,7 @@ fn a_new_agent_finds_both_again_and_force_off_ends_both() {
     let second = support.agent();
     assert_eq!(state_of(&second, "win").state, "running");
     assert!(op(&second, "force_off", "win").ok);
-    wait_state(&second, "win", "stopped");
+    wait_state(&second, "win", "off");
     wait_for("QEMU and the graphics process to go", || {
         gone(&qemu) && gone(&host)
     });
@@ -244,7 +244,7 @@ fn nothing_is_left_behind_when_qemu_is_ended_from_outside() {
     // (the first agent also notices; what matters is that nothing is left behind)
     wait_for("both gone", || gone(&qemu) && gone(&host));
     let fresh = support.agent();
-    assert_eq!(state_of(&fresh, "win").state, "stopped");
+    assert_eq!(state_of(&fresh, "win").state, "off");
 }
 
 #[test]
@@ -286,7 +286,7 @@ fn programs_that_cannot_do_the_job_are_refused_before_anything_starts() {
     assert!(started.ok, "{:?}", started.error);
     wait_state(&agent, "win", "running");
     assert!(op(&agent, "force_off", "win").ok);
-    wait_state(&agent, "win", "stopped");
+    wait_state(&agent, "win", "off");
 }
 
 fn share_of(agent: &Agent, id: &str) -> Option<guesthouse_core::protocol::ShareInfo> {
@@ -329,7 +329,7 @@ fn a_machine_with_sharing_on_is_shared_when_it_runs_however_it_was_started_and_a
     assert!(support.run("win").join("rmhost.in").exists());
     let pid = pid_of(&support.run("win"), "rmhost.pid");
     assert!(op(&agent, "force_off", "win").ok);
-    wait_state(&agent, "win", "stopped");
+    wait_state(&agent, "win", "off");
     wait_for("rmhost to go", || gone(&pid));
 }
 
@@ -353,7 +353,7 @@ fn a_sharing_that_cannot_start_says_why_where_the_app_can_see_it() {
             .contains("rmhost")
     );
     assert!(op(&agent, "force_off", "win").ok);
-    wait_state(&agent, "win", "stopped");
+    wait_state(&agent, "win", "off");
 }
 
 #[test]
@@ -380,5 +380,5 @@ fn a_new_agent_that_finds_a_machine_running_with_sharing_on_shares_it() {
         share_of(&second, "win").is_some_and(|s| s.state == ShareState::Listening)
     });
     assert!(op(&second, "force_off", "win").ok);
-    wait_state(&second, "win", "stopped");
+    wait_state(&second, "win", "off");
 }

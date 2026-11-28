@@ -5,9 +5,14 @@
 
 use super::collect::{Collection, FIRST_PER_FILE, Places};
 use super::{Request, extra};
-use guesthouse_control::report::stage::{DESCRIPTION_FILE, MOST_REPACKS, SUMMARY_FILE, halved};
-use guesthouse_control::report::summary::{self, Summary};
-use guesthouse_control::report::{KEPT_DAYS, MANIFEST_FILE, MOST_REPORT_BYTES, Scrubber, keep_end};
+use guesthouse_report_core::clock;
+use guesthouse_report_core::contract::MOST_REPORT_BYTES;
+use guesthouse_report_core::manifest::{
+    DESCRIPTION_FILE, MANIFEST_FILE, Missing, SUMMARY_FILE, manifest_from,
+};
+use guesthouse_report_core::scrub::Scrubber;
+use guesthouse_report_core::summary::{self, Summary};
+use guesthouse_report_core::trim::{MOST_REPACKS, halved, keep_end};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -142,7 +147,7 @@ pub fn prepare(
     let reports = places.support.join(REPORTS_FOLDER);
     fs::create_dir_all(&reports).map_err(|e| format!("Cannot make {}: {e}", reports.display()))?;
     let names = names(request, places);
-    let stamp = guesthouse_control::report::clock::stamp(guesthouse_control::report::clock::now());
+    let stamp = clock::stamp(clock::now());
     let name = format!("{NAME_START}{stamp}");
     let folder = reports.join(&name);
     let archive = reports.join(format!("{name}.tar.gz"));
@@ -248,32 +253,22 @@ fn summary_of(request: &Request, collection: &Collection, description: &str) -> 
     summary
 }
 
-/// The words the others' manifests have, from a Mac.
+/// What the Mac takes out beyond the shared scrubber's list, said in the manifest's notes.
+const EXTRA_REDACTIONS: &str = "Beyond the user name, host name and home folder, passwords, pairing keys, device fingerprints, pairing codes and serial numbers were taken out where they were found.";
+
+/// The shared manifest, for a report from a Mac.
 fn manifest(files: &[(String, usize)], missing: &[(String, String)], notes: &[String]) -> String {
-    let mut text = format!(
-        "A Guesthouse bug report from a Mac. It goes to the developer, is read by the developer and their \
-         automation tools, and is deleted after {KEPT_DAYS} days.\n\
-         The user name, host name and home folder were taken out of its files where they were found, and \
-         so were passwords, pairing keys, device fingerprints, pairing codes and serial numbers. That's a \
-         best effort on free-form logs, not a promise.\n\nFiles:\n"
-    );
-    for (name, bytes) in files {
-        text.push_str(&format!("  {name} ({bytes} bytes)\n"));
-    }
-    text.push_str(&format!("  {MANIFEST_FILE}\n"));
-    if !missing.is_empty() {
-        text.push_str("\nNot in it:\n");
-        for (name, reason) in missing {
-            text.push_str(&format!("  {name}: {reason}\n"));
-        }
-    }
-    if !notes.is_empty() {
-        text.push_str("\nNotes:\n");
-        for note in notes {
-            text.push_str(&format!("  {note}\n"));
-        }
-    }
-    text
+    let missing: Vec<Missing> = missing
+        .iter()
+        .map(|(name, reason)| Missing {
+            name: name.clone(),
+            reason: reason.clone(),
+            how: None,
+        })
+        .collect();
+    let mut notes = notes.to_vec();
+    notes.insert(0, EXTRA_REDACTIONS.to_owned());
+    manifest_from(Some("a Mac"), files, &missing, &notes)
 }
 
 fn pack(reports: &Path, name: &str, archive: &Path) -> Result<(), String> {

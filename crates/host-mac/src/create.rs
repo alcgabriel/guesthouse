@@ -7,6 +7,7 @@
 
 use crate::launch::socket_problem;
 use crate::store::{self, MACHINE_FILE};
+use guesthouse_basics::json_file::write_json;
 use serde::Deserialize;
 use std::fs;
 use std::io::{self, Read};
@@ -284,12 +285,9 @@ fn clone_or_copy(from: &Path, to: &Path) -> io::Result<()> {
     fs::copy(from, to).map(|_| ())
 }
 
-/// Writes `machine.json` through a temporary file, so a crash never leaves half of one.
+/// Writes `machine.json` in one step, so a crash never leaves half of one.
 fn write_settings(folder: &Path, settings: &serde_json::Value) -> io::Result<()> {
-    let temporary = folder.join(format!("{MACHINE_FILE}.new"));
-    let text = serde_json::to_string_pretty(settings).expect("settings are JSON");
-    fs::write(&temporary, text + "\n")?;
-    fs::rename(&temporary, folder.join(MACHINE_FILE))
+    write_json(&folder.join(MACHINE_FILE), settings)
 }
 
 /// Gives machine `id` another name, keeping every other setting as it is.

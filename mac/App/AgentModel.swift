@@ -41,7 +41,7 @@ final class AgentModel {
     @ObservationIgnored private let log = Logger(subsystem: "com.ruxn.guesthouse", category: "agent")
 
     func status(of machine: Machine) -> MachineStatus {
-        statuses[machine.agentID] ?? .stopped
+        statuses[machine.agentID] ?? .off
     }
 
     func share(of machine: Machine) -> ShareStatus {
@@ -203,7 +203,7 @@ final class AgentModel {
             link = nil
             return false
         }
-        statuses = listed.filter { $0.value != .stopped }
+        statuses = listed.filter { $0.value != .off }
         shares = answer.shares ?? [:]
         installs = answer.installs ?? [:]
         if LaunchOptions.printStates {
@@ -280,9 +280,9 @@ final class AgentModel {
         }
         if object["event"] as? String == "state" {
             if let machine = object["machine"] as? String, let status = Self.status(from: object) {
-                statuses[machine] = status == .stopped ? nil : status
+                statuses[machine] = status == .off ? nil : status
                 if LaunchOptions.printStates {
-                    print("state: \(machine) \(status.state)\(status.reason.map { ": \($0)" } ?? "")\(status.stalled ? " (stalled)" : "")")
+                    print("state: \(machine) \(status.state)\(status.reason.map { ": \($0)" } ?? "")")
                 }
                 onChange()
             }
@@ -328,8 +328,7 @@ final class AgentModel {
         guard let state = object["state"] as? String else { return nil }
         return MachineStatus(
             state: state,
-            reason: object["reason"] as? String,
-            stalled: object["stalled"] as? Bool ?? false
+            reason: object["reason"] as? String
         )
     }
 }

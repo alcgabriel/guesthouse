@@ -2,8 +2,8 @@
 //! the answer. The arguments and the reading are the shared crate's (and tested there against the
 //! Linux host's own); running curl is this file's.
 
-use guesthouse_control::report::send::{curl_arguments, read_reply};
-use guesthouse_control::report::{MOST_REPORT_BYTES, report_address};
+use guesthouse_report_core::contract::{MOST_REPORT_BYTES, report_address};
+use guesthouse_report_core::send::{curl_arguments, read_reply};
 use std::fs;
 use std::path::Path;
 use std::process::Command;

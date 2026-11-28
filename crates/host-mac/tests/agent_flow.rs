@@ -137,7 +137,7 @@ fn start_run_and_shut_down() {
     support.machine("win", "plain");
     let agent = support.agent();
     let (events, _keep) = listen(&agent);
-    assert_eq!(state_of(&agent, "win").state, "stopped");
+    assert_eq!(state_of(&agent, "win").state, "off");
 
     assert!(op(&agent, "start", "win").ok);
     assert_eq!(expect(&events, "win", "running"), ["starting", "running"]);
@@ -162,10 +162,7 @@ fn start_run_and_shut_down() {
     assert!(run.join("machine.pid").exists());
 
     assert!(op(&agent, "shutdown", "win").ok);
-    assert_eq!(
-        expect(&events, "win", "stopped"),
-        ["shutting_down", "stopped"]
-    );
+    assert_eq!(expect(&events, "win", "off"), ["stopping", "off"]);
     assert!(!run.join("machine.pid").exists());
 }
 
@@ -184,7 +181,7 @@ fn starting_twice_and_shutting_down_a_stopped_machine_are_refused() {
     assert!(!op(&agent, "start", "win").ok);
     assert!(!op(&agent, "start", "nobody").ok);
     assert!(op(&agent, "force_off", "win").ok);
-    expect(&events, "win", "stopped");
+    expect(&events, "win", "off");
 }
 
 #[test]
@@ -238,7 +235,7 @@ fn a_machine_without_firmware_files_cannot_be_started() {
     let agent = support.agent();
     let answer = op(&agent, "start", "hand");
     assert!(answer.error.unwrap().contains("cannot be started"));
-    assert_eq!(state_of(&agent, "hand").state, "stopped");
+    assert_eq!(state_of(&agent, "hand").state, "off");
 }
 
 #[test]
@@ -250,13 +247,11 @@ fn a_guest_that_ignores_the_power_button_stalls_and_force_off_ends_it() {
     assert!(op(&agent, "start", "slow").ok);
     expect(&events, "slow", "running");
     assert!(op(&agent, "shutdown", "slow").ok);
-    expect(&events, "slow", "shutting_down");
-    assert!(!state_of(&agent, "slow").stalled);
-    // After the timeout the same state is announced again, now stalled.
-    expect(&events, "slow", "shutting_down");
-    assert!(state_of(&agent, "slow").stalled);
+    expect(&events, "slow", "stopping");
+    // After the timeout the shared state for a stalled shutdown is announced.
+    expect(&events, "slow", "stopping_stalled");
     assert!(op(&agent, "force_off", "slow").ok);
-    expect(&events, "slow", "stopped");
+    expect(&events, "slow", "off");
 }
 
 #[test]
@@ -268,7 +263,7 @@ fn force_off_falls_back_to_sigterm_when_quit_is_ignored() {
     assert!(op(&agent, "start", "deaf").ok);
     expect(&events, "deaf", "running");
     assert!(op(&agent, "force_off", "deaf").ok);
-    expect(&events, "deaf", "stopped");
+    expect(&events, "deaf", "off");
 }
 
 #[test]
@@ -280,8 +275,8 @@ fn a_machine_that_exits_by_itself_is_stopped_and_a_crash_is_failed() {
     let (events, _keep) = listen(&agent);
     assert!(op(&agent, "start", "self").ok);
     assert_eq!(
-        expect(&events, "self", "stopped"),
-        ["starting", "running", "stopped"]
+        expect(&events, "self", "off"),
+        ["starting", "running", "off"]
     );
     assert!(op(&agent, "start", "boom").ok);
     expect(&events, "boom", "failed");
@@ -305,7 +300,7 @@ fn a_new_agent_finds_a_running_machine_and_can_stop_it() {
     assert_eq!(state_of(&second, "win").state, "running");
     let (found, _keep_found) = listen(&second);
     assert!(op(&second, "shutdown", "win").ok);
-    expect(&found, "win", "stopped");
+    expect(&found, "win", "off");
 }
 
 #[test]
@@ -321,7 +316,7 @@ fn a_pid_file_of_something_else_is_not_a_machine() {
     )
     .unwrap();
     let agent = support.agent();
-    assert_eq!(state_of(&agent, "win").state, "stopped");
+    assert_eq!(state_of(&agent, "win").state, "off");
     assert!(!run.join("machine.pid").exists());
 }
 
@@ -355,7 +350,7 @@ fn the_socket_carries_answers_and_events_and_the_agent_leaves_when_idle() {
         panic!("never saw {needle}");
     };
     connection.send(r#"{"v":1,"id":11,"op":"list"}"#).unwrap();
-    assert!(wait_for(r#""id":11"#).contains(r#""state":"stopped""#));
+    assert!(wait_for(r#""id":11"#).contains(r#""state":"off""#));
     connection
         .send(r#"{"v":1,"id":12,"op":"start","machine":"win"}"#)
         .unwrap();
@@ -364,7 +359,7 @@ fn the_socket_carries_answers_and_events_and_the_agent_leaves_when_idle() {
     connection
         .send(r#"{"v":1,"id":13,"op":"shutdown","machine":"win"}"#)
         .unwrap();
-    wait_for(r#""state":"stopped""#);
+    wait_for(r#""state":"off""#);
     drop(connection);
 
     // A second server on the same socket is refused while the first holds the lock.

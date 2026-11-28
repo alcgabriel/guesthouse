@@ -9,9 +9,12 @@ fn the_account_is_the_macs_user_made_fit_for_windows() {
     assert_eq!(account_name(""), "user");
     assert_eq!(account_name("administrator"), "administrator1");
     assert_eq!(account_name("Guest"), "Guest1");
+    // The shared list is the rule now: it has the setup-made names, and not "admin".
+    assert_eq!(account_name("defaultuser0"), "defaultuser01");
+    assert_eq!(account_name("admin"), "admin");
     assert_eq!(
         account_name("a-very-long-short-name-indeed").len(),
-        MAX_ACCOUNT
+        MOST_WINDOWS_NAME_CHARS
     );
 }
 
