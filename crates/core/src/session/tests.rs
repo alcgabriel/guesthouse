@@ -304,6 +304,47 @@ mod dispatch {
     }
 
     #[test]
+    fn an_allocation_property_update_from_the_guest_is_answered_with_no_fence_to_wait_for() {
+        const RECORDED: [&str; 2] = [
+            "ac10010000000000805b034000000000380000000000000000770340809003400000008000000000000000000000000000000000000000000600000000000000",
+            "08bc01000000000080c30440000000003800000000000000c0ee044080fb04400000008000000000000000000000000000000000000000000600000000000000",
+        ];
+        let mut session = session();
+        for hex in RECORDED {
+            let bytes: Vec<u8> = (0..hex.len())
+                .step_by(2)
+                .map(|at| u8::from_str_radix(&hex[at..at + 2], 16).unwrap())
+                .collect();
+            assert_eq!(send(&mut session, &bytes), [0; 16]);
+        }
+        assert!(session.unknown_commands.is_empty());
+        let short = message(Command::UpdateAllocationProperty, HEADER_SIZE + 8);
+        assert_eq!(status_of(&send(&mut session, &short)), Status::UNSUCCESSFUL.0);
+    }
+
+    #[test]
+    fn a_context_scheduling_priority_is_asked_for_and_normal() {
+        let request = message(Command::GetContextSchedulingPriority, HEADER_SIZE + 8);
+        assert_eq!(send(&mut session(), &request), [0; 8]);
+    }
+
+    #[test]
+    fn offered_allocations_are_taken_back_intact_with_no_fence() {
+        let mut session = session();
+        let mut offer = message(Command::OfferAllocations, HEADER_SIZE + 20);
+        offer[HEADER_SIZE + 4] = 1;
+        offer.extend_from_slice(&0x40u32.to_le_bytes());
+        assert_eq!(send(&mut session, &offer), SUCCESS.to_le_bytes());
+        let mut reclaim = message(Command::ReclaimAllocations, HEADER_SIZE + 16);
+        reclaim[HEADER_SIZE + 8] = 1;
+        reclaim[HEADER_SIZE + 13] = 1;
+        reclaim.extend_from_slice(&0x40u32.to_le_bytes());
+        assert_eq!(send(&mut session, &reclaim), [0; 16]);
+        let short = message(Command::ReclaimAllocations, HEADER_SIZE + 8);
+        assert_eq!(status_of(&send(&mut session, &short)), Status::UNSUCCESSFUL.0);
+    }
+
+    #[test]
     fn a_short_priority_request_fails() {
         let mut session = session();
         let short = priority_message(Command::SetAllocationPriority, 1, &[2], &[]);

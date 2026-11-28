@@ -13,6 +13,7 @@ use guesthouse_messages::allocation::{
     CACHED_FOR_CPU, CreateAllocation, CreateAllocationAnswer, DestroyAllocation, OpenResource, PRIMARY,
     SetGuestPages, lock_answer, locked_allocation,
 };
+use guesthouse_messages::allocation::{OfferAllocations, ReclaimAllocations, UpdateAllocationProperty};
 use guesthouse_messages::priority::{self, NORMAL_PRIORITY, PriorityRequest};
 use guesthouse_messages::standard::{DescribeStandard, StandardRecord};
 use guesthouse_messages::wire::{align_up, checked_align_up};
@@ -326,6 +327,37 @@ impl<B: Backend, M: GuestMemory> Session<B, M> {
             };
             self.defer(DeferredAction::FreeAllocation(freed));
         }
+    }
+
+    /// The guest's wish for where an allocation lives and how the GPU reaches it. The host's driver
+    /// places memory itself, so this only checks the message and answers that nothing is pending.
+    pub(super) fn update_allocation_property(&mut self, message: &[u8], out: &mut Vec<u8>) -> Handled {
+        let update = UpdateAllocationProperty::parse(message)?;
+        log::debug!(
+            "allocation {:#x} property update: segments={:#x} preference={:#x} flags={:#x} mask={:#x}",
+            update.allocation,
+            update.supported_segments,
+            update.segment_preference,
+            update.flags,
+            update.property_mask
+        );
+        UpdateAllocationProperty::answer(Status::SUCCESS, out);
+        Ok(())
+    }
+
+    /// Allocations the guest gives up for now. Nothing is taken from them, so there is nothing to
+    /// do but answer.
+    pub(super) fn offer_allocations(&mut self, message: &[u8], out: &mut Vec<u8>) -> Handled {
+        OfferAllocations::parse(message)?;
+        answer_status(Status::SUCCESS, out);
+        Ok(())
+    }
+
+    /// Allocations the guest takes back. They were never taken from it, so all come back intact
+    /// and there is no fence to wait for.
+    pub(super) fn reclaim_allocations(&mut self, message: &[u8], out: &mut Vec<u8>) -> Handled {
+        ReclaimAllocations::parse(message)?.answer(out);
+        Ok(())
     }
 
     /// Keeps the priorities for the allocations named, or for the whole resource if none is. The
