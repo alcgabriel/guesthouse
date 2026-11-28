@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Writes what the driver saw under its service key's Parameters
 // (HKLM\SYSTEM\CurrentControlSet\Services\ruxnwddm\Parameters), so it can

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The framebuffer the desktop is copied into for milestone 1, and nothing
 // else: the early framebuffer that the firmware's pvgfb set up in reserved

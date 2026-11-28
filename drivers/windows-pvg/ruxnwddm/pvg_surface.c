@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Surfaces, and their mapping ids from the mapper, ported from
 // pvg_surface.c of the Linux driver at 377700a.

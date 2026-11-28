@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Blt presents: a windowed swap chain of the older model presents by a
 // blt from the program's back buffer into the compositor's surface for the

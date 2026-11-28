@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // A log kept in the kernel for processes that cannot write one: Edge's GPU
 // process runs in a sandbox that may not open C:\ruxnlog, so its winemetal

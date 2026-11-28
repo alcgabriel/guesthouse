@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Memory for the device, as ruxnpvg's pages.c gets it. The device reads
 // guest memory by its physical address (the host maps the guest's RAM as a

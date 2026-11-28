@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // What pvg_task.c, pvg_object.c and pvg_client.c share: the task's layout
 // and limits, the serializer's operations, and the helpers each uses. Split

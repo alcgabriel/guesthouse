@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The video present network for one source, one target and one mode: the
 // mode of the framebuffer the device already shows (scanout.c). Windows

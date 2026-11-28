@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Buffer objects: memory a program maps and the host reads and writes,
 // ported from pvg_bo.c of the Linux driver.

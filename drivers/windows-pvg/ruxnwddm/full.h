@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The state and the functions of the full (render and display) driver,
 // milestone 2: allocations, devices and contexts, the fence of the one

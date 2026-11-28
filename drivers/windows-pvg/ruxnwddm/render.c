@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The render side of the full driver: devices, contexts and processes, the
 // submission of command buffers, and the fence of each submission.

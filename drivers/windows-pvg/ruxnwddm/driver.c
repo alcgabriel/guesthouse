@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // DriverEntry and the table of DDIs the graphics kernel calls. Each DDI here
 // is a thin entry that finds the adapter and hands the call to the file that

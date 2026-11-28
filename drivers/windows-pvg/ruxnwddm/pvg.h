@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The device's tasks, buffer objects, surfaces, mapper and display, as
 // ruxnpvg has them (task.h and screen.h there), moved under the graphics

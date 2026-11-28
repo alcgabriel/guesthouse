@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The entries only the full (render and display) driver has: allocations,
 // devices, contexts and processes, paging, submission and its fences,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Paging of the full driver. The video memory manager moves allocations in
 // and out of the aperture segment and keeps each process's GPU page tables

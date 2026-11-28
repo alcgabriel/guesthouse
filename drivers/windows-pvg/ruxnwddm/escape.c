@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Escapes: the private calls wddmtool makes with D3DKMTEscape. INFO reads
 // the driver's counters and touches no register. RING_START and RING_NOP

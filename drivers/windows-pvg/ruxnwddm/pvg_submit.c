@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // A task's submits and syncs, through the task escapes (pvg_object.c
 // dispatches them): command buffers handed to the device with command 67,

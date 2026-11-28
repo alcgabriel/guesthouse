@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The adapter: start and stop, power, and what it tells Windows about
 // itself and its one monitor. At start it checks the PCI ids, finds BAR 0,

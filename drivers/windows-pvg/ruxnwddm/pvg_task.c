@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // A task for each open handle, and what a program does with it, ported
 // from pvg_task.c of the Linux driver at 377700a.

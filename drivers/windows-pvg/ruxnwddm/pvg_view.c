@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Objects of kind 8: textures one operation describes from
 // another object. The kernel writes no head for them, so it checks the

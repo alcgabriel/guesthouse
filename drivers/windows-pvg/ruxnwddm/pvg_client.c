@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Clients of the tasks, and the escape that carries ruxnpvg's task
 // controls to them.

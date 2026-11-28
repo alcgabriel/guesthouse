@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The IOSurface mapper's device, ported from pvg_surface.c of the Linux
 // driver at 377700a.

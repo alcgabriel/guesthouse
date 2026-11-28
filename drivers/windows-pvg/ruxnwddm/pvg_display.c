@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The display: one handle at a time takes the screen from the early
 // framebuffer, shows surfaces on it, and gives it back. Ported from

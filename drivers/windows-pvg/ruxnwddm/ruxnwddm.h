@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // ruxnwddm: a WDDM display miniport for the paravirtualized graphics PCI
 // device. Milestone 1 is a display-only driver (the kernel-mode display-only

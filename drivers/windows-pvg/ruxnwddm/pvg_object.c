@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // What a program does with its task, through the task escapes: parameters,
 // buffer objects and surfaces, objects made and destroyed, placements,

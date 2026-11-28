@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The live allocations, for the lab: every allocation a device made or
 // opened is on the adapter's list from its making to its end, and the

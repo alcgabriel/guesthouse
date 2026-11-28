@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // Allocations of the full driver: the memory objects Windows' video memory
 // manager places and pages for the user-mode driver and for itself.

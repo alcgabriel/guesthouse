@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: MIT
 //
 // The control interface of ruxnpvg, shared by the driver, pvgtest and
 // pvgtri. The device is \\.\ruxnpvg, open to administrators and the system

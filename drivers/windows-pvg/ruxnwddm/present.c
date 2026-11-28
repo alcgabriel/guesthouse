@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The desktop's pixels into the scanout. In the display-only model Windows
 // composes the desktop in software into a picture in system memory and

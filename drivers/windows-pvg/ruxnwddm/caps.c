@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // What the full (render and display) driver tells the graphics kernel about
 // itself, in answer to DxgkDdiQueryAdapterInfo: the driver caps, one

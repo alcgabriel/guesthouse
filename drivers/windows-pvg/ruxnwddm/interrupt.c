@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The device's MSI messages, as the graphics kernel delivers them. The
 // handling is ruxnpvg's interrupt.c: message 0 is the graphics device's,

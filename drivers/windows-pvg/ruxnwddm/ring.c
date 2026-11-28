@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
 //
 // The device's first command ring, ported from ruxnpvg's ring.c (itself a
 // port of pvg_ring.c of the Linux driver) with KMDF taken out. Unchanged:
